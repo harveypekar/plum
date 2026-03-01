@@ -1,16 +1,20 @@
 ---
 name: plum-todo-push
-description: Use when the user invokes /plum-todo-push to append a new task to the end of TODO.txt
+description: Use when the user invokes /plum-todo-push to create a new GitHub Issue
 ---
 
 # Todo Push
 
-Append a new task to the end of TODO.txt.
+Create a new GitHub Issue for a task.
 
 ## Instructions
 
-1. The user's arguments after `/todo-push` are the task text to add
-2. Generate a random 6-letter lowercase ID: run `cat /dev/urandom | tr -dc 'a-z' | head -c 6` via Bash
-3. Read TODO.txt to get the current contents
-4. Append the line as `<id> <task text>` (e.g., `kxmvqf Fix the login bug`)
-5. Confirm to the user what was added (including the ID) and show the updated TODO.txt
+1. The user's arguments after `/plum-todo-push` are the task text to add
+2. Determine appropriate labels from the standard set:
+   - **Category** (pick one): `deploy`, `backup`, `monitor`, `research`, `security`, `common`
+   - **Priority** (pick one): `P0-critical`, `P1-high`, `P2-normal`, `P3-low`
+3. Create the issue via Bash:
+   ```bash
+   gh issue create --title "<task text>" --label "<category>" --label "<priority>"
+   ```
+4. Confirm to the user: show the issue number, title, labels, and URL
