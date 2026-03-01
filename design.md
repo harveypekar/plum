@@ -29,17 +29,34 @@ Plum is a lightweight framework for managing sysadmin tasks across two environme
 ```
 plum/
 ├── design.md                      # This document
+├── CLAUDE.md                      # Claude Code project instructions
+├── TODO.txt                       # Task queue (/plum-todo-pop, /plum-todo-push)
+├── claude-quad.bat                # Windows Terminal multi-pane launcher
+├── .claude/
+│   ├── hooks/                     # Claude Code hooks (block-env, lint-shell)
+│   └── skills/                    # Slash command skills
+│       ├── plum-design-update/    # /plum-design-update
+│       ├── plum-postmortem/       # /plum-postmortem
+│       ├── plum-todo-pop/         # /plum-todo-pop
+│       └── plum-todo-push/        # /plum-todo-push
+├── MANUAL.md                      # Claude Code command reference
 ├── docs/
-│   └── staging.md                 # VPS inventory & staging environment
+│   ├── staging.md                 # VPS inventory & staging environment
+│   ├── workflow-subagents.md      # Subagent + worktree + PR + Docker workflow
+│   └── plans/                     # Implementation plans
 ├── scripts/
 │   ├── deploy/                    # Deployment automation
 │   ├── backup/                    # Backup tasks (data, media)
 │   ├── monitor/                   # Monitoring tasks (Claude usage, etc.)
-│   └── common/                    # Shared utilities (logging, env loading, etc.)
+│   └── common/                    # Shared utilities
+│       ├── logging.sh             # Logging infrastructure
+│       ├── load-env.sh            # Environment variable loader
+│       ├── design-drift.sh        # Design drift detection helper
+│       ├── validate-secrets.py    # Pre-commit secret file blocker
+│       └── test-logging.sh        # Logging test script
 ├── docker/
 │   ├── Dockerfile                 # VPS environment replica
 │   └── docker-compose.local.yml   # Local testing setup
-├── logs/                          # Local logs (not committed)
 ├── .env.example                   # Template for environment variables
 ├── .gitignore                     # Exclude .env, logs, secrets
 └── README.md                      # Quick start & usage guide
@@ -119,11 +136,12 @@ All VPS system information documented in `docs/staging.md`:
 
 ### common/
 - Shared utilities used across categories
-- Logging infrastructure
-- Environment variable loading
-- Error handling helpers
-- SSH/remote execution utilities
-- Encryption of filenames, file contents, and entire directories
+- `logging.sh` — Log to `~/.logs/plum/[name]/YYYY-MM-DD.log` with INFO/WARN/ERROR levels
+- `load-env.sh` — Find and source `.env` from project root
+- `design-drift.sh` — Scan git history for design.md drift (used by `/plum-design-update`)
+- `validate-secrets.py` — Pre-commit hook blocking forbidden file types
+- `test-logging.sh` — Verify logging infrastructure works
+- Future: SSH/remote execution utilities, encryption helpers
 
 ## Logging Strategy
 
@@ -151,10 +169,37 @@ Example:
 ## Technology Stack
 
 - **Scripting:** Bash (compatible with both local WSL2 Zsh and VPS)
+- **Python:** Preferred over Bash for complex logic; used for pre-commit validation
+- **Claude Code:** Development workflow via skills (slash commands), hooks, and CLAUDE.md
 - **Docker:** Testing environment for VPS replication
 - **Git:** Version control, deployment tracking
 - **SSH:** Secure remote execution
 - **Cron:** Scheduled task execution on VPS
+
+## Claude Code Integration
+
+### Skills (Slash Commands)
+Custom skills in `.claude/skills/`:
+- `/plum-todo-pop` — Pop first task from TODO.txt and execute it
+- `/plum-todo-push <task>` — Append a new task to TODO.txt with random 6-letter ID
+- `/plum-design-update` — Detect design.md drift from git history, interactively propose fixes
+- `/plum-postmortem` — Same as design-update, intended for post-merge checks
+
+### Hooks
+Automated guardrails in `.claude/hooks/`:
+- `block-env.sh` (PreToolUse) — Prevents Claude from editing `.env` files
+- `lint-shell.sh` (PostToolUse) — Runs shellcheck after `.sh` file edits
+
+### Design Drift Detection
+Keeps design.md in sync with reality:
+1. `scripts/common/design-drift.sh` scans commits since last `design-checked-*` tag
+2. Outputs structured markdown: commit diffs, project tree, design.md section headers
+3. Skills consume this output and propose section-by-section fixes
+4. After review, the analyzed commit is tagged `design-checked-<short-hash>` so future runs skip it
+
+### Project Documentation
+- `CLAUDE.md` — Concise project rules for Claude Code (structure, conventions, security)
+- `MANUAL.md` — Full reference of all slash commands, hooks, and superpowers
 
 ## Security & Data Protection: Hard Enforcement
 
@@ -168,23 +213,28 @@ Example:
 4. **NO plaintext secret transmission** - Use encrypted channels only
 
 ### Enforcement Mechanisms
-1. **Pre-commit hook** - Blocks commits containing:
-   - Common secret patterns (API_KEY=, password=, token=, etc.)
-   - .env files (except .env.example)
-   - High-entropy strings that look like keys
-   - PII patterns (email, credit card, SSN, etc.)
+1. **Pre-commit hook** — Blocks commits containing forbidden file types:
+   - `.env` files (except `.env.example`)
+   - `.key` and `.pem` files
+   - Files in `secrets/` or `credentials/` directories
+   - Also scans file contents for exact personal identifiers (real email, etc.) stored in `.env`
+   - Implemented in `scripts/common/validate-secrets.py`
 
-2. **Script validation** - Before deployment:
+2. **Claude Code hooks** — Automated guardrails during development:
+   - `block-env.sh` (PreToolUse) — Denies any Claude edit/write to `.env` files
+   - `lint-shell.sh` (PostToolUse) — Runs shellcheck on `.sh` files after edits
+
+3. **Script validation** - Before deployment:
    - Scan scripts for hardcoded secrets
    - Verify no logging of $-variables containing secrets
    - Check for plaintext HTTP (enforce HTTPS)
 
-3. **Deployment validation** - Before sending to VPS:
+4. **Deployment validation** - Before sending to VPS:
    - Encrypt sensitive data in transit (SSH only, never HTTP)
    - Verify .env file not included in deployment
    - Confirm all secrets source from environment variables, not files
 
-4. **Logging sanitization** - All logging functions must:
+5. **Logging sanitization** - All logging functions must:
    - Never log variables from .env
    - Redact API keys, tokens, passwords before logging
    - Log only safe, non-identifying data
@@ -199,10 +249,6 @@ secrets/
 credentials/
 ```
 
-### Python
-
-Python should be preferred as a scripting language if simple shell script isn't sufficient. Create and use a virtual environment.
-
 ### Additional Considerations
 1. **VPS access** - SSH key-based only (no passwords)
 2. **Script permissions** - Restrictive umask, owner-only readable where applicable
@@ -212,9 +258,9 @@ Python should be preferred as a scripting language if simple shell script isn't 
 
 ## Next Steps
 
-0. **Set up Security Agent** - Subagent that should approve all changes
-1. **Inventory the VPS** - Document in docs/staging.md
-2. **Set up Docker** - Create Dockerfile replicating VPS environment
-3. **Create script skeleton** - Template for new scripts with logging
-4. **Implement first script** - Deploy or backup script as initial test
-5. **Refine workflow** - Iterate based on what works in practice
+0. ~~**Set up Security Agent**~~ — Done: pre-commit hook (`validate-secrets.py`) blocks forbidden files; Claude Code hook (`block-env.sh`) blocks .env edits
+1. **Inventory the VPS** — Document in docs/staging.md (template exists, needs real data)
+2. ~~**Set up Docker**~~ — Done: Dockerfile and docker-compose.local.yml created
+3. ~~**Create script skeleton**~~ — Done: logging.sh, load-env.sh, and common utilities created
+4. **Implement first script** — Deploy or backup script as initial test
+5. **Refine workflow** — Iterate based on what works in practice

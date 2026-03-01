@@ -1,3 +1,2 @@
-Propose a commit message format in design.
-Propose a commit strategy for subagents.
-Add a post commit
+utxtfr Add exact personal identifier scanning to validate-secrets.py: read specific strings (email, etc.) from .env and block commits containing those exact values in file contents
+snsxma Separate single worktree/docker tests, and tests for multi agent/docker work

@@ -39,13 +39,20 @@ For each discrepancy found:
 4. Ask the user: **accept / reject / modify?**
 5. If accepted, apply the change using the Edit tool
 
+**Before starting**, resolve the current commit hash:
+```bash
+CHECKED_HASH=$(git rev-parse HEAD)
+CHECKED_SHORT=$(git rev-parse --short HEAD)
+```
+Use `$CHECKED_HASH` / `$CHECKED_SHORT` everywhere below — never use HEAD directly, as it may shift if a commit is made during the process.
+
 After processing all discrepancies:
 1. Show a summary of all changes made
 2. Ask if the user wants to commit the updated design.md
 3. If yes, commit with message: `docs: update design.md to match current project state`
-4. Tag the current HEAD commit: `git tag design-checked-$(git rev-parse --short HEAD)`
+4. Tag the resolved commit: `git tag design-checked-$CHECKED_SHORT $CHECKED_HASH`
 5. Confirm the tag was created so future runs skip these commits
 
 If NO discrepancies are found:
 1. Report that design.md is in sync
-2. Still tag the HEAD commit so these commits are skipped next time
+2. Still tag the resolved commit so these commits are skipped next time: `git tag design-checked-$CHECKED_SHORT $CHECKED_HASH`
