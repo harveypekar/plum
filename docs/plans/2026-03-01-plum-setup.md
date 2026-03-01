@@ -372,7 +372,7 @@ Expected: Commit succeeds, hook runs and shows "✅ Security check passed"
 
 ```bash
 # Create test file with fake API key
-echo "API_KEY=sk-fake-test" > test_secret.txt
+echo "API_KEY=sk-1234567890abcdefghij" > test_secret.txt
 git add test_secret.txt
 git commit -m "test: this should fail"
 ```
@@ -1071,7 +1071,7 @@ ssh-keygen -t ed25519 -f ~/.ssh/vps-key -C "vps-access"
 
 ### Add to VPS
 ```bash
-ssh-copy-id -i ~/.ssh/vps-key.pub user@VPS_HOST
+ssh-copy-id -i ~/.ssh/vps-key.pub user@your-vps.com
 # Or manually add ~/.ssh/vps-key.pub to ~/.ssh/authorized_keys on VPS
 ```
 
