@@ -23,13 +23,10 @@ RUN apt-get update && apt-get install -y \
 # Create app directory
 WORKDIR /plum
 
-# Copy scripts into container
+# Copy scripts and env files into container
+# Wildcard .env* copies .env.example always, plus .env if it exists
 COPY scripts/ /plum/scripts/
-COPY .env.example /plum/.env.example
-
-# Copy .env if it exists (for local development)
-# Note: This is only for local testing, never in production
-COPY .env /plum/.env 2>/dev/null || true
+COPY .env* /plum/
 
 # Make scripts executable
 RUN chmod +x /plum/scripts/**/*.sh
