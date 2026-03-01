@@ -42,12 +42,14 @@ plum/
 │       ├── plum-postmortem/       # /plum-postmortem
 │       ├── plum-todo-pop/         # /plum-todo-pop
 │       ├── plum-todo-push/        # /plum-todo-push
-│       └── plum-churn/            # /plum-churn
+│       ├── plum-churn/            # /plum-churn
+│       └── plum-audit/            # /plum-audit
 ├── MANUAL.md                      # Claude Code command reference
 ├── docs/
 │   ├── staging.md                 # VPS inventory & staging environment
 │   ├── workflow-subagents.md      # Subagent + worktree + PR + Docker workflow
-│   └── plans/                     # Implementation plans
+│   ├── plans/                     # Implementation plans
+│   └── audits/                  # Audit reports
 ├── scripts/
 │   ├── setup-hooks.sh             # Install git hooks for new clones
 │   ├── deploy/                    # Deployment automation
@@ -216,6 +218,7 @@ Custom skills in `.claude/skills/`:
 - `/plum-design-update` — Detect design.md drift from git history, interactively propose fixes
 - `/plum-postmortem` — Same as design-update, intended for post-merge checks
 - `/plum-churn` — Dispatch all open GitHub Issues as parallel subagents in isolated worktrees
+- `/plum-audit [section]` — Comprehensive project health audit across 6 categories
 
 ### Hooks
 Automated guardrails in `.claude/hooks/`:

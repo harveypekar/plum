@@ -13,6 +13,7 @@ These are specific to Plum (defined in `.claude/skills/`):
 | `/plum-design-update` | Detects drift between design.md and git history, proposes updates |
 | `/plum-postmortem` | After merging a PR, checks if design.md needs updating |
 | `/plum-churn` | Dispatches all open GitHub Issues as parallel subagents in isolated worktrees |
+| `/plum-audit [section]` | Runs comprehensive project health audit (security, quality, docs, infra, claude, testing) |
 
 ## Workflow Slash Commands
 
