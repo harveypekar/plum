@@ -25,9 +25,11 @@ if [ -z "$ENV_FILE" ]; then
     exit 1
 fi
 
-# Source .env (with safety checks)
+# Source .env with set -a to preserve variable quoting
 if [ -f "$ENV_FILE" ]; then
-    export $(grep -v '^#' "$ENV_FILE" | xargs)
+    set -a
+    source "$ENV_FILE"
+    set +a
 else
     echo "❌ Error: Cannot read .env file"
     exit 1

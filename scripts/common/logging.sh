@@ -4,11 +4,15 @@
 
 # Configuration
 LOGS_DIR="${LOGS_DIR:-$HOME/.logs/plum}"
-SCRIPT_NAME="${1:-unknown}"
+SCRIPT_NAME="${SCRIPT_NAME:-unknown}"
 LOG_FILE="$LOGS_DIR/$SCRIPT_NAME/$(date +%Y-%m-%d).log"
 
-# Ensure log directory exists
+# Ensure log directory exists and is writable
 mkdir -p "$(dirname "$LOG_FILE")"
+if ! touch "$LOG_FILE" 2>/dev/null; then
+    echo "❌ ERROR: Cannot write to log file: $LOG_FILE" >&2
+    exit 1
+fi
 
 # Log levels
 LOG_INFO="INFO"
@@ -22,7 +26,13 @@ log() {
     local message="$@"
     local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
 
-    echo "[$timestamp] [$level] $message" | tee -a "$LOG_FILE"
+    # Write to log file
+    echo "[$timestamp] [$level] $message" >> "$LOG_FILE"
+
+    # Optionally output to console if verbose
+    if [ "${LOG_VERBOSE:-false}" = "true" ]; then
+        echo "[$timestamp] [$level] $message"
+    fi
 }
 
 # Convenience functions

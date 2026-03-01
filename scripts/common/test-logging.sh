@@ -4,7 +4,10 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/logging.sh" "test-logging"
+
+# Source utilities
+export SCRIPT_NAME="test-logging"
+source "$SCRIPT_DIR/logging.sh"
 
 log_info "Testing logging infrastructure"
 log_info "Log file: $LOG_FILE"
