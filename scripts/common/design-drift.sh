@@ -10,6 +10,11 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$REPO_ROOT"
 
+if ! git rev-parse --git-dir > /dev/null 2>&1; then
+    echo "Error: not a git repository: $REPO_ROOT" >&2
+    exit 1
+fi
+
 # --- Find the most recent design-checked-* tag ---
 LATEST_TAG=$(git tag -l 'design-checked-*' --sort=-creatordate | head -n 1)
 
@@ -75,15 +80,13 @@ fi
 echo "## Current Project Tree"
 echo ""
 echo "\`\`\`"
-find "$REPO_ROOT" \
-    -path '*/.git' -prune -o \
-    -path '*/logs' -prune -o \
-    -path '*/node_modules' -prune -o \
+find . \
+    -path './.git' -prune -o \
+    -path './logs' -prune -o \
+    -path './node_modules' -prune -o \
     -name '.env' -prune -o \
     -name '*.pyc' -prune -o \
     -print | \
-    sed "s|^${REPO_ROOT}/||" | \
-    sed "s|^${REPO_ROOT}\$|.|" | \
     sort
 echo "\`\`\`"
 echo ""
