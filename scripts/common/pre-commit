@@ -41,14 +41,14 @@ fi
 
 header "crlf"
 crlf_found=0
-for f in $STAGED_FILES; do
-    # Skip deleted files and binary files
+while IFS= read -r f; do
+    [ -z "$f" ] && continue
     [ -f "$f" ] || continue
-    if git diff --cached --diff-filter=d -- "$f" | grep -qP '\r$'; then
+    if git diff --cached -- "$f" | grep -qP '\r$'; then
         echo "  CRLF detected: $f"
         crlf_found=1
     fi
-done
+done <<< "$STAGED_FILES"
 if [ "$crlf_found" -eq 1 ]; then
     echo "  Fix: dos2unix <file> or configure git (core.autocrlf=input)"
     fail
@@ -60,12 +60,13 @@ header "shellcheck"
 sh_files=$(echo "$STAGED_FILES" | grep '\.sh$' || true)
 if [ -n "$sh_files" ]; then
     sc_failed=0
-    for f in $sh_files; do
+    while IFS= read -r f; do
+        [ -z "$f" ] && continue
         [ -f "$f" ] || continue
         if ! shellcheck "$f" 2>&1; then
             sc_failed=1
         fi
-    done
+    done <<< "$sh_files"
     if [ "$sc_failed" -eq 1 ]; then
         fail
     fi
@@ -80,19 +81,21 @@ py_files=$(echo "$STAGED_FILES" | grep '\.py$' || true)
 if [ -n "$py_files" ]; then
     lint_failed=0
     if command -v ruff &>/dev/null; then
-        for f in $py_files; do
+        while IFS= read -r f; do
+            [ -z "$f" ] && continue
             [ -f "$f" ] || continue
             if ! ruff check "$f" 2>&1; then
                 lint_failed=1
             fi
-        done
+        done <<< "$py_files"
     else
-        for f in $py_files; do
+        while IFS= read -r f; do
+            [ -z "$f" ] && continue
             [ -f "$f" ] || continue
             if ! flake8 "$f" 2>&1; then
                 lint_failed=1
             fi
-        done
+        done <<< "$py_files"
     fi
     if [ "$lint_failed" -eq 1 ]; then
         fail
