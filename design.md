@@ -49,15 +49,23 @@ plum/
 │   ├── workflow-subagents.md      # Subagent + worktree + PR + Docker workflow
 │   └── plans/                     # Implementation plans
 ├── scripts/
+│   ├── setup-hooks.sh             # Install git hooks for new clones
 │   ├── deploy/                    # Deployment automation
 │   ├── backup/                    # Backup tasks (data, media)
 │   │   └── backup-issues.sh       # GitHub Issues backup with size-based retention
 │   ├── monitor/                   # Monitoring tasks (Claude usage, etc.)
+│   ├── test/                      # Integration and hook tests
+│   │   ├── test-helpers.sh        # Shared test utilities
+│   │   ├── test-single-worktree-docker.sh
+│   │   ├── test-multi-agent-docker.sh
+│   │   ├── test-precommit-hook.sh
+│   │   └── run-workflow-tests.sh  # Test runner
 │   └── common/                    # Shared utilities
 │       ├── logging.sh             # Logging infrastructure
 │       ├── load-env.sh            # Environment variable loader
 │       ├── design-drift.sh        # Design drift detection helper
 │       ├── validate-secrets.py    # Pre-commit secret file blocker
+│       ├── pre-commit             # Master pre-commit hook (secrets, CRLF, shellcheck, ruff)
 │       └── test-logging.sh        # Logging test script
 ├── docker/
 │   ├── Dockerfile                 # VPS environment replica
@@ -163,6 +171,7 @@ All VPS system information documented in `docs/staging.md`:
 - `design-drift.sh` — Scan git history for design.md drift (used by `/plum-design-update`)
 - `validate-secrets.py` — Pre-commit hook blocking forbidden file types
 - `test-logging.sh` — Verify logging infrastructure works
+- `pre-commit` — Master pre-commit hook orchestrating secrets, CRLF, shellcheck, and ruff checks
 - Future: SSH/remote execution utilities, encryption helpers
 
 ## Logging Strategy
@@ -216,7 +225,7 @@ Automated guardrails in `.claude/hooks/`:
 
 ### Git Hooks
 - `pre-push` — Blocks pushes originating from `.claude/worktrees/` directories
-- `pre-commit` — Runs `validate-secrets.py` to block forbidden file types
+- `pre-commit` — Runs master hook (`scripts/common/pre-commit`): secrets, CRLF, shellcheck, ruff
 
 ### Design Drift Detection
 Keeps design.md in sync with reality:
@@ -241,12 +250,13 @@ Keeps design.md in sync with reality:
 4. **NO plaintext secret transmission** - Use encrypted channels only
 
 ### Enforcement Mechanisms
-1. **Pre-commit hook** — Blocks commits containing forbidden file types:
-   - `.env` files (except `.env.example`)
-   - `.key` and `.pem` files
-   - Files in `secrets/` or `credentials/` directories
-   - Also scans file contents for exact personal identifiers (real email, etc.) stored in `.env`
-   - Implemented in `scripts/common/validate-secrets.py`
+1. **Pre-commit hook** — Master hook (`scripts/common/pre-commit`) runs all checks, reports all failures:
+   - **Secrets** — calls `validate-secrets.py` to block `.env`, `.key`, `.pem`, `secrets/`, `credentials/` files, and scans for personal identifiers from `.env`
+   - **CRLF** — blocks Windows-style line endings in staged files
+   - **Shellcheck** — lints staged `.sh` files
+   - **Ruff** — lints staged `.py` files (fallback: flake8)
+   - Hard-fails if shellcheck or ruff/flake8 are not installed
+   - Install via: `bash scripts/setup-hooks.sh`
 
 2. **Claude Code hooks** — Automated guardrails during development:
    - `block-env.sh` (PreToolUse) — Denies any Claude edit/write to `.env` files
