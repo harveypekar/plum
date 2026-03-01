@@ -5,7 +5,6 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile
-    container_name: plum-dev
     volumes:
       - ..:/plum              # Mount entire project
       - /plum/logs           # Exclude logs volume
