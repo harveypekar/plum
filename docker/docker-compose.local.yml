@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  plum:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: plum-dev
+    volumes:
+      - ..:/plum              # Mount entire project
+      - /plum/logs           # Exclude logs volume
+    environment:
+      - HOME=/root
+      - LOGS_DIR=/plum/logs
+    working_dir: /plum
+    stdin_open: true
+    tty: true
