@@ -16,6 +16,9 @@ logs/
 .vscode/
 .idea/
 
+# Claude Code worktrees (subagent isolation)
+.claude/worktrees/
+
 # Backups & temp
 *.swp
 *.swo
