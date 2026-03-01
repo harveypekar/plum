@@ -274,7 +274,7 @@ Missing or empty pre-commit hook is [CRITICAL].
 ```bash
 gh auth status 2>&1
 ```
-If not authenticated, flag as [CRITICAL].
+If not authenticated, flag as [WARNING].
 
 ### Check 6: Stale worktrees and branches
 
@@ -297,7 +297,7 @@ for skill in .claude/skills/*/SKILL.md; do
   echo ""
 done
 ```
-Each SKILL.md must have `---` delimited frontmatter with `name:` and `description:` fields. Missing frontmatter is [CRITICAL]. Missing name or description is [WARNING].
+Each SKILL.md must have `---` delimited frontmatter with `name:` and `description:` fields. Missing frontmatter is [WARNING]. Missing name or description is [WARNING].
 
 ### Check 2: Hook/git hook redundancy
 
@@ -337,7 +337,7 @@ for skill in .claude/skills/*/SKILL.md; do
   echo "$skill: $wordcount words — $desc"
 done
 ```
-Descriptions under 5 words or that don't mention what the skill does are [WARNING].
+Descriptions under 10 words or that don't mention what the skill does are [WARNING].
 
 ### Check 6: Claude service metrics (optional)
 
@@ -391,8 +391,9 @@ Tests that don't correspond to any script are [INFO].
 
 ```bash
 find . -name 'test-*.sh' -not -path './.git/*' | xargs grep -nE '/(home|Users|mnt|tmp)/[a-zA-Z]' 2>/dev/null || true
+find . -name 'test-*.sh' -not -path './.git/*' | xargs grep -nE 'localhost|127\.0\.0\.1' 2>/dev/null || true
 ```
-Hardcoded absolute paths in tests are [WARNING].
+Hardcoded absolute paths or localhost references in tests are [WARNING].
 
 ---
 
