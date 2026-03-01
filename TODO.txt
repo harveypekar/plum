@@ -1,0 +1,5 @@
+Create a slash command /plum:todo-pop that pops the first line of this file, and does it
+Create a slash command /plum:todo-push that adds the rest of the command at the end of this file
+Propose a commit message format in design.
+Propose a commit strategy for subagents.
+Add a post commit 
