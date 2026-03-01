@@ -1,0 +1,23 @@
+#!/bin/bash
+# Pre-push hook: block direct pushes to master and pushes from worktrees
+
+# Block pushes from worktree directories
+cwd=$(pwd)
+if [[ "$cwd" == */.claude/worktrees/* ]]; then
+  echo "BLOCKED: Push not allowed from worktree directory."
+  echo "Worktree branches must be reviewed before pushing."
+  echo "Review the branch, then push from the main working directory."
+  exit 1
+fi
+
+# Block direct pushes to master — use PRs instead
+while read -r local_ref local_sha remote_ref remote_sha; do
+  if [[ "$remote_ref" == "refs/heads/master" || "$remote_ref" == "refs/heads/main" ]]; then
+    echo "BLOCKED: Direct push to master is not allowed."
+    echo "Create a feature branch and open a PR instead."
+    echo "(Use --no-verify to override in exceptional cases.)"
+    exit 1
+  fi
+done
+
+exit 0
