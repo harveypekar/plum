@@ -84,6 +84,23 @@ plum/
 2. **Centralized access** - Can query/aggregate logs from local machine
 3. **Retention** - Keep logs for debugging, archive older logs
 
+### Phase 4: Forensic Investigation
+
+Read-only access to the VPS for debugging, incident response, or auditing. Two complementary approaches:
+
+**Primary: Pull-based forensic snapshots**
+- Script (`scripts/monitor/forensic-snapshot.sh`) SSHes to VPS and collects a read-only snapshot locally
+- Snapshot stored at `~/.forensics/plum/YYYY-MM-DD-HHMMSS/` with: system info, logs, configs (not contents of .env), file tree, open ports, and sha256 checksums of key files
+- Zero risk of modifying VPS state — all examination happens locally
+- Can diff snapshots over time to detect changes or tampering
+
+**Secondary: Read-only SSH user for live investigation**
+- Dedicated `plum-readonly` user on VPS with `rbash` (restricted bash)
+- Read access to logs, configs, and web root via group membership
+- No sudo, no write permissions, restricted PATH
+- Separate SSH key stored in `.env` as `VPS_RO_SSH_KEY`
+- Use only when a live snapshot isn't sufficient
+
 ## Secrets Management
 
 ### Local Development
