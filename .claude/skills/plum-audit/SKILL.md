@@ -1,458 +1,346 @@
 ---
 name: plum-audit
-description: Use when the user invokes /plum-audit to run a comprehensive project health audit covering security, quality, docs, infra, claude, and testing sections
+description: Use when the user invokes /plum-audit to run a comprehensive project health audit across security, quality, docs, infra, claude, and testing sections
 ---
 
-# Project Health Audit
+# Plum Audit
 
-Run a comprehensive health audit of the Plum project. Checks six areas: security (secrets/enforcement/exposure), quality (code health beyond pre-commit), docs (documentation accuracy), infra (infrastructure health), claude (skill/hook efficiency), and testing (coverage and consistency).
+Critically audit the Plum project and produce a markdown report with findings and recommendations.
 
-## Current project state
+## Arguments
 
-!`git log --oneline -5`
+!`echo "ARGS: $ARGS"`
 
 ## Instructions
 
-### Argument parsing
+### Step 1: Parse arguments
 
-The user may provide an optional argument after `/plum-audit`:
+Valid section names: `security`, `quality`, `docs`, `infra`, `claude`, `testing`
 
-- **No argument** or **`all`**: run all six sections
-- **A section name** (`security`, `quality`, `docs`, `infra`, `claude`, `testing`): run only that section
+- If an argument was provided (e.g., `/plum-audit security`), run only that section
+- If no argument or `all`, run all 6 sections in order
+- If invalid argument, list valid sections and ask the user to pick
 
-If the argument doesn't match any valid section name, list the valid options and ask the user to pick one.
+### Step 2: Set up the report
 
-### Setup
+Determine the output file:
+- All sections: `docs/audits/YYYY-MM-DD-audit.md`
+- Single section: `docs/audits/YYYY-MM-DD-<section>.md`
 
-Determine today's date and the output file path:
-```bash
-AUDIT_DATE=$(date +%Y-%m-%d)
+Use today's date. If the file already exists, append a counter (e.g., `2026-03-01-audit-2.md`).
+
+Initialize an in-memory report with the header:
+
+```markdown
+# Plum Audit — YYYY-MM-DD
+
+**Ran:** <all | section-name> | **Generated at:** YYYY-MM-DDTHH:MM:SS
 ```
 
-- If running **all** sections: output to `docs/audits/${AUDIT_DATE}-audit.md`
-- If running a **single** section: output to `docs/audits/${AUDIT_DATE}-<section>.md`
+Initialize counters for each section: critical, warning, info.
 
-If the output file already exists, append a counter (e.g., `2026-03-01-audit-2.md`) to avoid overwriting a previous run.
+### Step 3: Run sections
 
-Create the `docs/audits/` directory if it doesn't exist:
+Run each requested section using the instructions below. For each finding, classify as CRITICAL, WARNING, or INFO.
+
+After all sections complete, write the Summary table and Recommendations section.
+
+### Step 4: Write the report
+
+Write the complete report to the output file using the Write tool. Then offer to commit:
+
 ```bash
-mkdir -p docs/audits
+git add docs/audits/<filename>
+git commit -m "docs: add plum-audit report YYYY-MM-DD"
 ```
-
-Initialize counters for CRITICAL, WARNING, and INFO findings across all sections. Track every finding as a tuple of (severity, section, description) for the summary table and recommendations.
 
 ---
 
-## Section: security — Secrets, enforcement, exposure
+## Section: security
 
-### Check 1: Hardcoded secrets scan
+Run these checks and report findings:
 
-Scan all tracked files for hardcoded secrets, API keys, tokens, and passwords:
+**1. Hardcoded secrets scan**
 ```bash
-git ls-files | xargs -d '\n' grep -inE '(api[_-]?key|secret[_-]?key|password|token|bearer)\s*[:=]\s*["\x27][^"\x27]{8,}' -- 2>/dev/null || true
+grep -rn --include='*.sh' --include='*.py' -iE '(api_key|api_secret|password|token|secret)\s*=' scripts/ services/ 2>/dev/null || true
 ```
-Exclude `.env.example` lines that have empty values. Flag any match as [CRITICAL].
+Flag any matches that aren't reading from env vars (i.e., have actual values assigned). Severity: CRITICAL.
 
-### Check 2: .env gitignored and .env.example clean
-
+**2. .env safety**
 ```bash
-git check-ignore .env
+# Check .env is gitignored
+grep -q '^\.env$' .gitignore && echo "OK" || echo "MISSING"
+# Check .env.example has no real values (values after = should be empty or placeholder)
+grep -E '=.+' .env.example | grep -vE '=(|your-|example-|changeme|50)' || echo "OK"
 ```
-If `.env` is NOT gitignored, flag as [CRITICAL].
+Missing gitignore: CRITICAL. Real values in .env.example: CRITICAL.
 
-Check `.env.example` for non-empty values:
+**3. Enforcement layers**
 ```bash
-grep -vE '^\s*#|^\s*$' .env.example 2>/dev/null | grep -E '=.+' | grep -vE '=\s*$|=your-|=example-|=changeme|=placeholder|=path/to' || true
+# Pre-commit hook installed?
+test -x .git/hooks/pre-commit && echo "OK" || echo "MISSING"
+# Pre-commit delegates to scripts/common/pre-commit?
+grep -q 'scripts/common/pre-commit' .git/hooks/pre-commit 2>/dev/null && echo "OK" || echo "WRONG"
+# Pre-push hook?
+test -x .git/hooks/pre-push && echo "OK" || echo "MISSING"
+# Claude hooks registered?
+jq '.hooks.PreToolUse' .claude/settings.local.json
+jq '.hooks.PostToolUse' .claude/settings.local.json
 ```
-Any line with a real-looking value (not just `=` or `=""`) is [CRITICAL].
+Missing hooks: WARNING. Wrong delegation: WARNING.
 
-### Check 3: Enforcement layers
-
-Check pre-commit hook is installed:
+**4. Plaintext HTTP**
 ```bash
-test -f .git/hooks/pre-commit && echo "pre-commit hook: installed" || echo "pre-commit hook: MISSING"
+grep -rn --include='*.sh' --include='*.py' 'http://' scripts/ services/ 2>/dev/null | grep -v 'https://' | grep -v '#' || true
 ```
-Missing pre-commit hook is [CRITICAL].
+Any matches: WARNING.
 
-Check Claude hooks are registered in `.claude/settings.local.json`:
+**5. Gitignore coverage**
 ```bash
-jq '.hooks' .claude/settings.local.json 2>/dev/null
-```
-If hooks section is missing or empty, flag as [WARNING].
-
-Check pre-push hook:
-```bash
-test -f .git/hooks/pre-push && echo "pre-push hook: installed" || echo "pre-push hook: not installed"
-```
-Missing pre-push hook is [INFO].
-
-### Check 4: Plaintext HTTP URLs in scripts
-
-```bash
-grep -rnE 'http://' scripts/ --include='*.sh' --include='*.py' 2>/dev/null | grep -v 'localhost\|127\.0\.0\.1\|0\.0\.0\.0' || true
-```
-Any match is [WARNING].
-
-### Check 5: Sensitive file patterns in .gitignore
-
-Check that `.gitignore` covers sensitive patterns:
-```bash
-for pattern in '*.key' '*.pem' '*.p12' 'secrets/' 'credentials/' '.env'; do
-  grep -qF "$pattern" .gitignore && echo "COVERED: $pattern" || echo "MISSING: $pattern"
+for pattern in '.env' '*.key' '*.pem' 'secrets/' 'credentials/'; do
+  grep -qF "$pattern" .gitignore && echo "OK: $pattern" || echo "MISSING: $pattern"
 done
 ```
-Any missing pattern is [WARNING].
+Missing patterns: WARNING.
 
-### Check 6: Sensitive file permissions
-
+**6. Sensitive file permissions**
 ```bash
-find . -name '*.key' -o -name '*.pem' -o -name '*.env' 2>/dev/null | while read f; do
-  stat -c '%a %n' "$f" 2>/dev/null || stat -f '%Lp %N' "$f" 2>/dev/null
+# Check if any .env, .key, .pem files exist and are world-readable
+find . -name '.env' -o -name '*.key' -o -name '*.pem' 2>/dev/null | while read f; do
+  stat -c '%a %n' "$f"
 done
 ```
-Files with permissions more open than 600 are [WARNING].
+World-readable sensitive files: WARNING.
 
 ---
 
-## Section: quality — Code health beyond pre-commit
+## Section: quality
 
-### Check 1: Shellcheck on all .sh files
-
+**1. Shellcheck all .sh files**
 ```bash
-find . -name '*.sh' -not -path './.git/*' -not -path './node_modules/*' | sort | while read f; do
-  shellcheck "$f" 2>&1 || true
-done
+find scripts/ .claude/hooks/ -name '*.sh' -exec shellcheck {} \; 2>&1
 ```
-Any error is [WARNING]. Any SC error in scripts/ directory with severity "error" is [CRITICAL].
+Any errors: WARNING per file.
 
-### Check 2: Ruff on all .py files
-
+**2. Ruff all .py files**
 ```bash
-find . -name '*.py' -not -path './.git/*' -not -path './node_modules/*' -not -path './.venv/*' | sort | while read f; do
-  ruff check "$f" 2>&1 || true
-done
+find scripts/ -name '*.py' -exec ruff check {} \; 2>&1
 ```
-Any finding is [WARNING].
+Any errors: WARNING per file.
 
-### Check 3: Template pattern adherence
-
-Check that scripts in `scripts/` source logging.sh and load-env.sh:
+**3. Script template adherence**
+For each `.sh` file in `scripts/deploy/`, `scripts/backup/`, `scripts/monitor/`:
 ```bash
-for f in $(find scripts/ -name '*.sh' -not -path 'scripts/common/*' -not -name 'test-*'); do
+for f in $(find scripts/deploy scripts/backup scripts/monitor -name '*.sh' 2>/dev/null); do
   echo "--- $f ---"
-  grep -l 'source.*logging.sh' "$f" >/dev/null 2>&1 || echo "  MISSING: source logging.sh"
-  grep -l 'source.*load-env.sh' "$f" >/dev/null 2>&1 || echo "  MISSING: source load-env.sh"
+  grep -c 'source.*logging.sh' "$f" || echo "MISSING: logging.sh"
+  grep -c 'source.*load-env.sh' "$f" || echo "MISSING: load-env.sh"
+  grep -c 'set -.*e' "$f" || echo "MISSING: set -e"
 done
 ```
-Missing sourcing is [WARNING].
+Missing sourcing or error flags: WARNING.
 
-### Check 4: Dead code and unused files
-
-Look for empty `.gitkeep`-only directories:
+**4. Dead files**
 ```bash
-find . -name '.gitkeep' -not -path './.git/*' | while read f; do
-  dir=$(dirname "$f")
-  count=$(ls -A "$dir" | wc -l)
-  if [ "$count" -eq 1 ]; then
-    echo "Empty dir (gitkeep only): $dir"
-  fi
+# Empty dirs with only .gitkeep that could have content
+find scripts/ -name '.gitkeep' -exec dirname {} \; | while read d; do
+  count=$(find "$d" -maxdepth 1 -not -name '.gitkeep' -not -name '.' | wc -l)
+  echo "$d: $count files besides .gitkeep"
 done
 ```
-Flag as [INFO].
+Directories with only .gitkeep that are expected to have scripts: INFO.
 
-Look for scripts not referenced anywhere else:
+**5. Commit message conventions**
 ```bash
-git ls-files scripts/ | while read f; do
-  base=$(basename "$f")
-  refs=$(git ls-files | xargs -d '\n' grep -l "$base" 2>/dev/null | grep -v "$f" | head -1)
-  if [ -z "$refs" ]; then
-    echo "Possibly unreferenced: $f"
-  fi
-done
+git log --oneline -20 | grep -vE '^[a-f0-9]+ (feat|fix|docs|chore|test|refactor|style|perf|ci):' || true
 ```
-Flag as [INFO] — these need human review.
-
-### Check 5: Commit message conventions
-
-```bash
-git log --oneline -20 | grep -vE '^[a-f0-9]+ (feat|fix|docs|chore|refactor|test|ci|style|perf)\(?.*\)?:' || true
-```
-Non-conforming messages are [INFO].
-
-### Check 6: Missing set -euo pipefail
-
-```bash
-for f in $(find scripts/ -name '*.sh' -not -path 'scripts/common/script-template.sh'); do
-  head -5 "$f" | grep -q 'set -euo pipefail\|set -e' || echo "Missing set -e: $f"
-done
-```
-Missing safety flags are [WARNING].
+Non-conforming messages: INFO.
 
 ---
 
-## Section: docs — Documentation accuracy
+## Section: docs
 
-### Check 1: design.md project structure vs actual filesystem
-
+**1. design.md structure tree vs reality**
 ```bash
-git ls-files | head -200
+# Get all tracked files
+git ls-files | head -80
 ```
-Compare the directory tree listed in `design.md` against actual `git ls-files` output. Flag directories in design.md that don't exist as [WARNING]. Flag significant directories on disk not mentioned in design.md as [INFO].
+Read `design.md` and compare the Project Structure tree against the actual file listing. Flag files that exist but aren't in the tree, and tree entries that no longer exist. Severity: WARNING for missing entries, INFO for extras.
 
-Read `design.md` with the Read tool and compare.
-
-### Check 2: MANUAL.md skill/hook descriptions
-
-Read `MANUAL.md` with the Read tool. Cross-reference:
+**2. MANUAL.md accuracy**
+Read `MANUAL.md` and cross-reference:
+- Each skill listed → does the SKILL.md exist with matching description?
+- Each hook listed → is it registered in `.claude/settings.local.json`?
 ```bash
-ls .claude/skills/*/SKILL.md 2>/dev/null
-ls .claude/hooks/* 2>/dev/null
+ls .claude/skills/*/SKILL.md
 ```
-Skills or hooks mentioned in MANUAL.md that no longer exist are [WARNING]. Skills or hooks that exist but aren't in MANUAL.md are [WARNING].
+Mismatches: WARNING.
 
-### Check 3: CLAUDE.md accuracy
+**3. CLAUDE.md accuracy**
+Read `CLAUDE.md` and verify:
+- Listed directories exist
+- Referenced tools/commands are correct
+- Conventions match actual practice
+Inaccuracies: WARNING.
 
-Read `CLAUDE.md` with the Read tool. Check if the conventions described (logging path, commit message format, script template, etc.) match actual project practices. Flag discrepancies as [WARNING].
-
-### Check 4: Stale plans in docs/plans/
-
+**4. Stale plans**
 ```bash
-ls -la docs/plans/ 2>/dev/null
+ls -la docs/plans/
 ```
-For each plan file, check its age and whether the feature it describes has been implemented. Plans older than 30 days for completed features are [INFO].
+Read each plan file's title. Check if the work described has been completed (look for corresponding commits, files, or closed issues). Completed plans with no further use: INFO.
 
-### Check 5: staging.md completeness
-
+**5. staging.md completeness**
 ```bash
-grep -cE '\[.*TODO.*\]|\[.*TBD.*\]|\[.*PLACEHOLDER.*\]|\[.*FIXME.*\]' docs/staging.md 2>/dev/null || echo "0"
+grep -c '\[.*\]' docs/staging.md
 ```
-If count > 0, flag as [WARNING] with the count of placeholder brackets.
+Count placeholder brackets. Report percentage filled. Many placeholders: WARNING.
 
 ---
 
-## Section: infra — Infrastructure health
+## Section: infra
 
-### Check 1: Docker build
-
+**1. Docker build**
 ```bash
-docker-compose -f docker/docker-compose.local.yml build --no-cache 2>&1 | tail -5
+docker-compose -f docker/docker-compose.local.yml build 2>&1 | tail -5
 ```
-If build fails, flag as [CRITICAL]. If build succeeds, flag as [INFO] with build time.
+Build failure: CRITICAL. Build warnings: INFO.
 
-### Check 2: .gitignore coverage
-
-Check for tracked files that probably shouldn't be:
+**2. Gitignore gaps**
 ```bash
-git ls-files | grep -iE '\.log$|\.tmp$|\.bak$|\.swp$|__pycache__|\.pyc$|node_modules|\.DS_Store' || true
+# Files that might shouldn't be tracked
+git ls-files | grep -iE '(\.log|\.pid|\.env\.|node_modules|__pycache__|\.pyc)' || echo "OK"
 ```
-Any match is [WARNING].
+Tracked files that look like they should be ignored: WARNING.
 
-### Check 3: Hooks registered in settings
-
+**3. Claude hooks registration**
 ```bash
-jq -r '.hooks | keys[]' .claude/settings.local.json 2>/dev/null
+# List all hook scripts on disk
+ls .claude/hooks/*.sh
+# Compare against what's registered
+jq -r '.hooks | to_entries[] | .value[] | .hooks[] | .command' .claude/settings.local.json
 ```
-Compare against expected hook events (PreToolUse, PostToolUse, etc.). Verify each registered hook script exists:
+Hook scripts on disk but not registered (or vice versa): WARNING.
+
+**4. Git hooks installed**
 ```bash
-jq -r '.hooks | to_entries[] | .value[] | .hooks[] | .command' .claude/settings.local.json 2>/dev/null | while read cmd; do
-  test -f "$cmd" && echo "OK: $cmd" || echo "MISSING: $cmd"
-done
+ls -la .git/hooks/pre-commit .git/hooks/pre-push 2>&1
+cat .git/hooks/pre-commit 2>/dev/null
 ```
-Missing hook scripts are [CRITICAL].
+Missing or wrong: WARNING.
 
-### Check 4: Git hooks installation
-
-```bash
-test -f .git/hooks/pre-commit && echo "pre-commit: OK" || echo "pre-commit: MISSING"
-```
-Check it delegates correctly (contains expected content):
-```bash
-head -10 .git/hooks/pre-commit 2>/dev/null
-```
-Missing or empty pre-commit hook is [CRITICAL].
-
-### Check 5: gh CLI authentication
-
+**5. gh CLI**
 ```bash
 gh auth status 2>&1
 ```
-If not authenticated, flag as [WARNING].
+Not authenticated: WARNING.
 
-### Check 6: Stale worktrees and branches
-
+**6. Stale worktrees and branches**
 ```bash
-git worktree list 2>/dev/null
-git branch --merged master 2>/dev/null | grep -v 'master\|main\|\*' || true
+git worktree list
+git branch --list | grep -v '^\*'
+git branch -vv | grep ': gone]' || echo "No gone branches"
 ```
-Stale worktrees or fully-merged branches that haven't been cleaned up are [INFO].
+Stale worktrees or gone branches: INFO.
 
 ---
 
-## Section: claude — Skill/hook efficiency and usage metrics
+## Section: claude
 
-### Check 1: Skill frontmatter validation
-
+**1. Skill frontmatter validation**
 ```bash
 for skill in .claude/skills/*/SKILL.md; do
   echo "--- $skill ---"
   head -5 "$skill"
-  echo ""
 done
 ```
-Each SKILL.md must have `---` delimited frontmatter with `name:` and `description:` fields. Missing frontmatter is [WARNING]. Missing name or description is [WARNING].
+Check each has `name:` and `description:` in frontmatter. Missing frontmatter: WARNING.
 
-### Check 2: Hook/git hook redundancy
+**2. Hook/git redundancy**
+Read `.claude/hooks/lint-shell.sh` and `scripts/common/pre-commit`. Identify checks that run in both (e.g., shellcheck). Redundancy isn't necessarily bad but should be documented. Severity: INFO.
 
-Read `.claude/settings.local.json` hooks section and `.git/hooks/pre-commit`. Identify overlapping checks (e.g., both running shellcheck, both checking for secrets). Flag overlaps as [INFO] with an explanation of whether the redundancy is intentional safety layering or wasteful duplication.
-
-### Check 3: Hook script executability and empty-input handling
-
+**3. Hook executability and output**
 ```bash
-jq -r '.hooks | to_entries[] | .value[] | .hooks[] | .command' .claude/settings.local.json 2>/dev/null | sort -u | while read cmd; do
-  if [ -f "$cmd" ]; then
-    test -x "$cmd" && echo "Executable: $cmd" || echo "NOT executable: $cmd"
-    echo '{}' | bash "$cmd" >/dev/null 2>&1
-    echo "Empty input exit code: $?"
-  else
-    echo "MISSING: $cmd"
-  fi
+for hook in .claude/hooks/*.sh; do
+  echo "--- $hook ---"
+  test -x "$hook" && echo "executable: yes" || echo "executable: NO"
+  # Check it handles empty input gracefully
+  echo '{}' | bash "$hook" 2>&1 | head -3
 done
 ```
-Non-executable hook scripts are [WARNING]. Scripts that crash on empty input are [WARNING].
+Non-executable hooks: WARNING. Hooks that crash on empty input: WARNING.
 
-### Check 4: Skills referencing deleted files or outdated conventions
-
+**4. Stale references in skills**
 ```bash
-for skill in .claude/skills/*/SKILL.md; do
-  echo "--- $skill ---"
-  grep -inE 'TODO\.txt|todo\.txt' "$skill" 2>/dev/null && echo "  References deleted TODO.txt" || true
-done
+grep -rn 'TODO\.txt' .claude/skills/ || echo "No TODO.txt references"
+grep -rn 'claude-manual\.md' .claude/skills/ || echo "No old manual references"
 ```
-Also check for references to files that no longer exist in the repo. Flag as [WARNING].
+References to deleted/renamed files: WARNING.
 
-### Check 5: Vague skill descriptions
+**5. Skill description quality**
+Read each skill's description field. Flag descriptions that are too vague (less than 10 words) or don't mention the trigger condition. Severity: INFO.
 
+**6. Claude service metrics (optional)**
 ```bash
-for skill in .claude/skills/*/SKILL.md; do
-  desc=$(grep '^description:' "$skill" | sed 's/^description: *//')
-  wordcount=$(echo "$desc" | wc -w)
-  echo "$skill: $wordcount words — $desc"
-done
+curl -sf http://localhost:9270/health 2>/dev/null
 ```
-Descriptions under 10 words or that don't mention what the skill does are [WARNING].
-
-### Check 6: Claude service metrics (optional)
-
-```bash
-curl -sf http://localhost:9270/metrics 2>/dev/null || echo "Claude metrics endpoint not available (skipping)"
-```
-If available, report interesting metrics as [INFO]. If not available, silently skip — this is not a finding.
+If the service is running, query usage endpoints and report:
+- Recent session token counts
+- Any rate limit warnings
+If not running, report: INFO — "Claude service not running, metrics unavailable."
 
 ---
 
-## Section: testing — Coverage and consistency
+## Section: testing
 
-### Check 1: Script-to-test mapping
-
+**1. Coverage map**
 ```bash
-echo "=== Scripts ==="
-find scripts/ -name '*.sh' -not -path 'scripts/common/test-helpers.sh' -not -name 'test-*' | sort
-
-echo "=== Tests ==="
-find . -name 'test-*.sh' -not -path './.git/*' | sort
+# List all scripts that should have tests
+find scripts/deploy scripts/backup scripts/monitor scripts/common -name '*.sh' -not -name 'test-*' 2>/dev/null
+# List all test files
+find scripts/test -name 'test-*.sh' 2>/dev/null
 ```
-For each script, check if a corresponding `test-*.sh` exists. Scripts without tests are [WARNING].
+Build a mapping: script → test file. Flag scripts with no corresponding test. Severity: WARNING for operational scripts, INFO for utilities.
 
-### Check 2: Test file patterns
-
-For each test file found:
+**2. Test consistency**
+Read each test file in `scripts/test/`. Check:
+- Does it source `test-helpers.sh`?
+- Does it use the standard assertion functions (`assert_eq`, `assert_contains`, etc.)?
+- Does it have a cleanup trap?
+- Does it use `print_header` / `print_step` formatting?
 ```bash
-find . -name 'test-*.sh' -not -path './.git/*' | while read t; do
+for t in scripts/test/test-*.sh; do
   echo "--- $t ---"
-  grep -c 'test-helpers.sh' "$t" || echo "  Missing test-helpers.sh import"
-  grep -cE 'assert_|expect_' "$t" || echo "  No assertions found"
-  grep -c 'trap.*cleanup\|trap.*EXIT' "$t" || echo "  No cleanup trap"
+  grep -c 'source.*test-helpers' "$t" || echo "MISSING: test-helpers"
+  grep -c 'trap.*cleanup' "$t" || echo "MISSING: cleanup trap"
+  grep -c 'assert_' "$t" || echo "MISSING: assertions"
 done
 ```
-Tests missing helpers import, assertions, or cleanup traps are [WARNING].
+Inconsistencies: WARNING.
 
-### Check 3: Naming conventions
-
+**3. Naming conventions**
 ```bash
-find . -name 'test-*.sh' -not -path './.git/*' | while read t; do
-  base=$(basename "$t" | sed 's/^test-//' | sed 's/\.sh$//')
-  match=$(find scripts/ -name "${base}.sh" -o -name "${base}" 2>/dev/null | head -1)
-  if [ -z "$match" ]; then
-    echo "No matching script for test: $t"
-  fi
-done
+ls scripts/test/
 ```
-Tests that don't correspond to any script are [INFO].
+Check that test files follow `test-<thing-being-tested>.sh` pattern and the runner is `run-*.sh`. Odd names: INFO.
 
-### Check 4: Hardcoded absolute paths
-
+**4. Hardcoded values**
 ```bash
-find . -name 'test-*.sh' -not -path './.git/*' | xargs -d '\n' grep -nE '/(home|Users|mnt|tmp)/[a-zA-Z]' 2>/dev/null || true
-find . -name 'test-*.sh' -not -path './.git/*' | xargs -d '\n' grep -nE 'localhost|127\.0\.0\.1' 2>/dev/null || true
+grep -n '/mnt/d/prg/plum' scripts/test/*.sh || echo "OK"
+grep -n 'localhost' scripts/test/*.sh || echo "OK"
 ```
-Hardcoded absolute paths or localhost references in tests are [WARNING].
+Hardcoded absolute paths or hosts: WARNING.
 
 ---
 
 ## Report finalization
 
-### Summary table
+After all sections complete:
 
-Write the audit report to the output file. Start with a summary table:
-
-```markdown
-# Plum Project Audit — YYYY-MM-DD
-
-## Summary
-
-| Section   | Critical | Warning | Info |
-|-----------|----------|---------|------|
-| security  |        0 |       1 |    2 |
-| quality   |        0 |       3 |    1 |
-| ...       |      ... |     ... |  ... |
-| **Total** |    **0** |   **4** | **3** |
-```
-
-If running a single section, the table has only that section's row plus a total.
-
-### Detailed findings
-
-Below the summary, write each section's findings grouped under `## Section: <name>` headings. Each finding is a bullet prefixed with its severity tag:
-
-```markdown
-## Section: security
-
-- [CRITICAL] `.env` is not in .gitignore
-- [WARNING] Missing `*.pem` pattern in .gitignore
-- [INFO] Pre-push hook not installed (optional)
-```
-
-### Recommendations
-
-At the end, add a `## Recommendations` section. For every CRITICAL and WARNING finding, generate a copy-pasteable `gh issue create` command:
-
-- **CRITICAL** findings:
-  ```bash
-  gh issue create --title "AUDIT: <brief description>" --body "<details>" --label "security" --label "P0-critical"
-  ```
-- **WARNING** findings:
-  ```bash
-  gh issue create --title "AUDIT: <brief description>" --body "<details>" --label "<relevant-category>" --label "P2-normal"
-  ```
-
-Choose the category label (`security`, `deploy`, `backup`, `monitor`, `common`, `research`) based on the section and nature of the finding.
-
-**INFO findings are NOT included in recommendations** — they are informational only.
-
-### Commit
-
-After writing the report, tell the user the results and offer to commit:
-```bash
-git add docs/audits/<report-file>.md
-git commit -m "docs: add project health audit for YYYY-MM-DD"
-```
+1. Build the Summary table with counts per section
+2. Collect all CRITICAL and WARNING findings into the Recommendations section
+3. For each recommendation, generate a `gh issue create` command:
+   - CRITICAL → `--label "security" --label "P0-critical"` (or appropriate category)
+   - WARNING → `--label "<category>" --label "P2-normal"`
+   - INFO findings are NOT included in recommendations (report-only)
+4. Write the full report to the output file
+5. Offer to commit
