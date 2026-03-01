@@ -11,7 +11,7 @@ Sysadmin scripts for Windows/WSL2 and a single Linux VPS. Bash and Python.
 - `docker/` - Docker setup replicating VPS environment
 - `docs/` - Documentation and plans
 - `design.md` - Architecture and design decisions (read before major changes)
-- `TODO.txt` - Task queue (use `/plum-todo-pop` and `/plum-todo-push`)
+- Task queue managed via GitHub Issues (use `/plum-todo-pop` and `/plum-todo-push`)
 
 ## Writing Scripts
 

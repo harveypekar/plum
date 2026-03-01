@@ -24,13 +24,16 @@ Plum is a lightweight framework for managing sysadmin tasks across two environme
 4. **Mixed execution** - Some scripts manual, some automated/scheduled
 5. **Reproducibility** - Docker ensures consistency between local and remote
 
+## Services
+
+As much as possible, things should be implemented as services, that can be queried for data. StaticData services only fetch from local file system. Dynamic data maintain a cache filled from somewhere else. Claude MCP's should be implemented on top
+
 ## Project Structure
 
 ```
 plum/
 ├── design.md                      # This document
 ├── CLAUDE.md                      # Claude Code project instructions
-├── TODO.txt                       # Task queue (/plum-todo-pop, /plum-todo-push)
 ├── claude-quad.bat                # Windows Terminal multi-pane launcher
 ├── .claude/
 │   ├── hooks/                     # Claude Code hooks (block-env, lint-shell)
@@ -48,6 +51,7 @@ plum/
 ├── scripts/
 │   ├── deploy/                    # Deployment automation
 │   ├── backup/                    # Backup tasks (data, media)
+│   │   └── backup-issues.sh       # GitHub Issues backup with size-based retention
 │   ├── monitor/                   # Monitoring tasks (Claude usage, etc.)
 │   └── common/                    # Shared utilities
 │       ├── logging.sh             # Logging infrastructure
@@ -198,11 +202,11 @@ Example:
 
 ### Skills (Slash Commands)
 Custom skills in `.claude/skills/`:
-- `/plum-todo-pop` — Pop first task from TODO.txt and execute it
-- `/plum-todo-push <task>` — Append a new task to TODO.txt with random 6-letter ID
+- `/plum-todo-pop [issue-number]` — Pick an open GitHub Issue and execute it
+- `/plum-todo-push <task>` — Create a new GitHub Issue with labels and priority
 - `/plum-design-update` — Detect design.md drift from git history, interactively propose fixes
 - `/plum-postmortem` — Same as design-update, intended for post-merge checks
-- `/plum-churn` — Dispatch all TODO.txt tasks as parallel subagents in isolated worktrees
+- `/plum-churn` — Dispatch all open GitHub Issues as parallel subagents in isolated worktrees
 
 ### Hooks
 Automated guardrails in `.claude/hooks/`:

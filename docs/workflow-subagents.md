@@ -7,7 +7,7 @@
 
 | Actor | Role |
 |-------|------|
-| **Orchestrator** | Main Claude session. Owns TODO.txt, dispatches subagents, merges PRs, runs `/plum-postmortem` |
+| **Orchestrator** | Main Claude session. Manages GitHub Issues, dispatches subagents, merges PRs, runs `/plum-postmortem` |
 | **Subagent** | Spawned via `Agent` tool with `isolation: "worktree"`. Works in `.claude/worktrees/<name>/` on its own branch |
 | **Human** | Reviews PRs, edits `.env`, makes final merge decisions |
 
@@ -19,19 +19,19 @@ PLAN → DISPATCH → WORK → TEST → PR → REVIEW → MERGE → CLEANUP
 
 ### 1. PLAN (Orchestrator)
 
-- Read TODO.txt, analyze task dependencies
+- List open GitHub Issues, analyze task dependencies
 - Group into parallelizable batches (max 3 subagents)
 - **Serialization rule:** tasks touching `scripts/common/` are never parallelized
 - Tasks in different categories (`deploy/`, `backup/`, `monitor/`) are safe to parallelize
 
 ### 2. DISPATCH (Orchestrator)
 
-- Pop tasks from TODO.txt
+- Pick issues from GitHub Issues (via `gh issue list`)
 - Spawn subagents with `isolation: "worktree"`, passing:
-  - Task ID + description
-  - Branch name: `<type>/<task-id>-<short-description>` (e.g., `feat/kxmvqf-backup-small-data`)
-  - Docker project name: branch name with `/` replaced by `-` (e.g., `feat-kxmvqf-backup-small-data`)
-  - Constraints: don't touch TODO.txt, .env, or design.md
+  - Issue number + title
+  - Branch name: `<type>/<issue-number>-<short-description>` (e.g., `feat/12-backup-small-data`)
+  - Docker project name: branch name with `/` replaced by `-` (e.g., `feat-12-backup-small-data`)
+  - Constraints: don't create/close issues, don't touch .env or design.md
 
 Example dispatch:
 ```
@@ -40,7 +40,7 @@ Agent(
   prompt: "Task kxmvqf: implement small data backup script.
     Branch: feat/kxmvqf-backup-small-data
     Test with: docker-compose -f docker/docker-compose.local.yml -p feat-kxmvqf-backup-small-data run --rm plum bash scripts/backup/backup-small-data.sh
-    Do NOT edit: TODO.txt, .env, design.md"
+    Do NOT edit: .env, design.md. Do NOT create/close GitHub Issues."
 )
 ```
 
@@ -68,7 +68,7 @@ docker-compose -f docker/docker-compose.local.yml -p "$PROJECT_NAME" run --rm pl
 - Push branch, create PR via `gh pr create`
 - One task = one PR (no batching multiple tasks into one PR)
 - PR title follows commit convention (`feat:`, `fix:`, `docs:`, `chore:`)
-- If subagent discovered new tasks, list them in the PR description (orchestrator pushes to TODO.txt after merge)
+- If subagent discovered new tasks, list them in the PR description (orchestrator creates issues after merge)
 
 ### 6. REVIEW (Orchestrator)
 
@@ -102,11 +102,11 @@ Merges are **strictly sequential** — one at a time:
 - **Parallel safety:** Different scripts write to different log files (no conflict). Same-script parallel tests are isolated by Docker project name
 - **No changes needed** to `logging.sh`
 
-### TODO.txt
+### GitHub Issues
 
-- **Single-writer rule:** Only the orchestrator reads/writes TODO.txt
-- Other Claude panes (from `claude-quad.bat`) should not independently pop tasks
-- If a subagent discovers a new task, it reports in the PR description — orchestrator pushes it after merge
+- **Single-writer rule:** Only the orchestrator creates and closes issues
+- Subagents do NOT run `gh issue create` or `gh issue close`
+- If a subagent discovers a new task, it reports in commit messages or findings files — orchestrator creates the issue after review
 
 ### .env
 
@@ -142,13 +142,13 @@ Plum may grow beyond scripts to include project work (websites, infra, etc.):
 - Directory structure grows naturally: `website/`, `infra/`, etc. alongside `scripts/`
 - Docker grows with additional services in compose (e.g., `web:` service)
 - The `-p` project naming handles multi-service compose files
-- TODO.txt, design.md drift detection, and this workflow are all domain-agnostic
+- GitHub Issues, design.md drift detection, and this workflow are all domain-agnostic
 
 ## Quick Reference
 
 | Resource | Owner | Parallel-safe? | Notes |
 |----------|-------|----------------|-------|
-| TODO.txt | Orchestrator only | N/A (single writer) | Subagents report new tasks in PRs |
+| GitHub Issues | Orchestrator only | N/A (single writer) | Subagents report new tasks in commits/findings |
 | .env | Human only | Yes (read-only symlink) | Never edited by Claude |
 | design.md | Orchestrator only | N/A (single writer) | Updated via `/plum-postmortem` |
 | Logs | Per-script | Yes | Isolated by script name + Docker project |

@@ -8,11 +8,11 @@ These are specific to Plum (defined in `.claude/skills/`):
 
 | Command | What It Does |
 |---------|-------------|
-| `/plum-todo-pop` | Pops the first line from TODO.txt and executes it as a task |
-| `/plum-todo-push <task>` | Appends a new task to the end of TODO.txt |
+| `/plum-todo-pop [issue-number]` | Picks an open GitHub Issue and executes it |
+| `/plum-todo-push <task>` | Creates a new GitHub Issue with labels and priority |
 | `/plum-design-update` | Detects drift between design.md and git history, proposes updates |
 | `/plum-postmortem` | After merging a PR, checks if design.md needs updating |
-| `/plum-churn` | Dispatch all TODO.txt tasks as parallel subagents in isolated worktrees |
+| `/plum-churn` | Dispatches all open GitHub Issues as parallel subagents in isolated worktrees |
 
 ## Workflow Slash Commands
 
@@ -85,10 +85,16 @@ Configured in `.claude/settings.local.json`. Active next session.
 - **Effect:** Blocks the push, tells you to review and push from the main working directory
 - **Script:** `.git/hooks/pre-push`
 
-### Pre-commit: Secret validation
+### Pre-commit: Master hook
 - **Trigger:** Every git commit
-- **Effect:** Blocks commits containing `.env`, `.key`, `.pem`, `secrets/`, or `credentials/` files
-- **Script:** `scripts/common/validate-secrets.py`
+- **Effect:** Runs all checks (reports all failures at once):
+  1. **Secrets** — blocks `.env`, `.key`, `.pem`, `secrets/`, `credentials/` files
+  2. **CRLF** — blocks Windows-style line endings
+  3. **Shellcheck** — lints staged `.sh` files
+  4. **Ruff** — lints staged `.py` files
+- **Hard fails** if shellcheck or ruff are not installed
+- **Script:** `scripts/common/pre-commit` (install via `bash scripts/setup-hooks.sh`)
+- **Requires:** shellcheck, ruff (or flake8)
 
 ## MCP Servers
 
