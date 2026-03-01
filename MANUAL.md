@@ -12,6 +12,7 @@ These are specific to Plum (defined in `.claude/skills/`):
 | `/plum-todo-push <task>` | Appends a new task to the end of TODO.txt |
 | `/plum-design-update` | Detects drift between design.md and git history, proposes updates |
 | `/plum-postmortem` | After merging a PR, checks if design.md needs updating |
+| `/plum-churn` | Dispatch all TODO.txt tasks as parallel subagents in isolated worktrees |
 
 ## Workflow Slash Commands
 
@@ -73,6 +74,16 @@ Configured in `.claude/settings.local.json`. Active next session.
 - **Effect:** Runs shellcheck and reports warnings to Claude for fixing
 - **Script:** `.claude/hooks/lint-shell.sh`
 - **Requires:** shellcheck installed at `~/.local/bin/shellcheck`
+
+### PreToolUse: Block dangerous git in worktrees
+- **Trigger:** Any Bash command inside a `.claude/worktrees/` directory
+- **Effect:** Blocks git push, git merge, git checkout main/master, gh pr create
+- **Script:** `.claude/hooks/block-worktree-danger.sh`
+
+### Pre-push: Block worktree pushes
+- **Trigger:** Any git push from a `.claude/worktrees/` directory
+- **Effect:** Blocks the push, tells you to review and push from the main working directory
+- **Script:** `.git/hooks/pre-push`
 
 ### Pre-commit: Secret validation
 - **Trigger:** Every git commit

@@ -38,7 +38,8 @@ plum/
 │       ├── plum-design-update/    # /plum-design-update
 │       ├── plum-postmortem/       # /plum-postmortem
 │       ├── plum-todo-pop/         # /plum-todo-pop
-│       └── plum-todo-push/        # /plum-todo-push
+│       ├── plum-todo-push/        # /plum-todo-push
+│       └── plum-churn/            # /plum-churn
 ├── MANUAL.md                      # Claude Code command reference
 ├── docs/
 │   ├── staging.md                 # VPS inventory & staging environment
@@ -201,11 +202,17 @@ Custom skills in `.claude/skills/`:
 - `/plum-todo-push <task>` — Append a new task to TODO.txt with random 6-letter ID
 - `/plum-design-update` — Detect design.md drift from git history, interactively propose fixes
 - `/plum-postmortem` — Same as design-update, intended for post-merge checks
+- `/plum-churn` — Dispatch all TODO.txt tasks as parallel subagents in isolated worktrees
 
 ### Hooks
 Automated guardrails in `.claude/hooks/`:
 - `block-env.sh` (PreToolUse) — Prevents Claude from editing `.env` files
+- `block-worktree-danger.sh` (PreToolUse) — Blocks git push/merge/checkout main inside worktrees
 - `lint-shell.sh` (PostToolUse) — Runs shellcheck after `.sh` file edits
+
+### Git Hooks
+- `pre-push` — Blocks pushes originating from `.claude/worktrees/` directories
+- `pre-commit` — Runs `validate-secrets.py` to block forbidden file types
 
 ### Design Drift Detection
 Keeps design.md in sync with reality:
