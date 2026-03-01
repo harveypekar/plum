@@ -32,6 +32,8 @@ AUDIT_DATE=$(date +%Y-%m-%d)
 - If running **all** sections: output to `docs/audits/${AUDIT_DATE}-audit.md`
 - If running a **single** section: output to `docs/audits/${AUDIT_DATE}-<section>.md`
 
+If the output file already exists, append a counter (e.g., `2026-03-01-audit-2.md`) to avoid overwriting a previous run.
+
 Create the `docs/audits/` directory if it doesn't exist:
 ```bash
 mkdir -p docs/audits
@@ -47,7 +49,7 @@ Initialize counters for CRITICAL, WARNING, and INFO findings across all sections
 
 Scan all tracked files for hardcoded secrets, API keys, tokens, and passwords:
 ```bash
-git ls-files | xargs grep -inE '(api[_-]?key|secret[_-]?key|password|token|bearer)\s*[:=]\s*["\x27][^"\x27]{8,}' -- 2>/dev/null || true
+git ls-files | xargs -d '\n' grep -inE '(api[_-]?key|secret[_-]?key|password|token|bearer)\s*[:=]\s*["\x27][^"\x27]{8,}' -- 2>/dev/null || true
 ```
 Exclude `.env.example` lines that have empty values. Flag any match as [CRITICAL].
 
@@ -60,7 +62,7 @@ If `.env` is NOT gitignored, flag as [CRITICAL].
 
 Check `.env.example` for non-empty values:
 ```bash
-grep -vE '^\s*#|^\s*$' .env.example 2>/dev/null | grep -E '=.+' | grep -vE '=\s*$' || true
+grep -vE '^\s*#|^\s*$' .env.example 2>/dev/null | grep -E '=.+' | grep -vE '=\s*$|=your-|=example-|=changeme|=placeholder|=path/to' || true
 ```
 Any line with a real-looking value (not just `=` or `=""`) is [CRITICAL].
 
@@ -162,7 +164,7 @@ Look for scripts not referenced anywhere else:
 ```bash
 git ls-files scripts/ | while read f; do
   base=$(basename "$f")
-  refs=$(git ls-files | xargs grep -l "$base" 2>/dev/null | grep -v "$f" | head -1)
+  refs=$(git ls-files | xargs -d '\n' grep -l "$base" 2>/dev/null | grep -v "$f" | head -1)
   if [ -z "$refs" ]; then
     echo "Possibly unreferenced: $f"
   fi
@@ -252,7 +254,7 @@ jq -r '.hooks | keys[]' .claude/settings.local.json 2>/dev/null
 ```
 Compare against expected hook events (PreToolUse, PostToolUse, etc.). Verify each registered hook script exists:
 ```bash
-jq -r '.hooks[][] | .hooks[] | .command' .claude/settings.local.json 2>/dev/null | while read cmd; do
+jq -r '.hooks | to_entries[] | .value[] | .hooks[] | .command' .claude/settings.local.json 2>/dev/null | while read cmd; do
   test -f "$cmd" && echo "OK: $cmd" || echo "MISSING: $cmd"
 done
 ```
@@ -306,7 +308,7 @@ Read `.claude/settings.local.json` hooks section and `.git/hooks/pre-commit`. Id
 ### Check 3: Hook script executability and empty-input handling
 
 ```bash
-jq -r '.hooks[][] | .hooks[] | .command' .claude/settings.local.json 2>/dev/null | sort -u | while read cmd; do
+jq -r '.hooks | to_entries[] | .value[] | .hooks[] | .command' .claude/settings.local.json 2>/dev/null | sort -u | while read cmd; do
   if [ -f "$cmd" ]; then
     test -x "$cmd" && echo "Executable: $cmd" || echo "NOT executable: $cmd"
     echo '{}' | bash "$cmd" >/dev/null 2>&1
@@ -390,8 +392,8 @@ Tests that don't correspond to any script are [INFO].
 ### Check 4: Hardcoded absolute paths
 
 ```bash
-find . -name 'test-*.sh' -not -path './.git/*' | xargs grep -nE '/(home|Users|mnt|tmp)/[a-zA-Z]' 2>/dev/null || true
-find . -name 'test-*.sh' -not -path './.git/*' | xargs grep -nE 'localhost|127\.0\.0\.1' 2>/dev/null || true
+find . -name 'test-*.sh' -not -path './.git/*' | xargs -d '\n' grep -nE '/(home|Users|mnt|tmp)/[a-zA-Z]' 2>/dev/null || true
+find . -name 'test-*.sh' -not -path './.git/*' | xargs -d '\n' grep -nE 'localhost|127\.0\.0\.1' 2>/dev/null || true
 ```
 Hardcoded absolute paths or localhost references in tests are [WARNING].
 
