@@ -1,0 +1,23 @@
+# Environment & Secrets (NEVER commit)
+.env
+.env.local
+.env.*.local
+*.key
+*.pem
+secrets/
+credentials/
+
+# Logs (local only)
+logs/
+~/.logs/
+
+# System files
+.DS_Store
+.vscode/
+.idea/
+
+# Backups & temp
+*.swp
+*.swo
+*~
+*.tmp
