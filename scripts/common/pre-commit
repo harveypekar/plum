@@ -1,0 +1,113 @@
+#!/bin/bash
+# Master pre-commit hook — runs all checks, reports all failures.
+set -uo pipefail
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+STAGED_FILES=$(git diff --cached --name-only)
+FAILED=0
+
+header() { echo ""; echo "── $1 ──"; }
+fail()   { FAILED=1; }
+
+# ── Check: required tools ───────────────────────────────────────────
+
+check_tools() {
+    local missing=0
+    if ! command -v shellcheck &>/dev/null; then
+        echo "  ERROR: shellcheck not installed (apt install shellcheck / brew install shellcheck)"
+        missing=1
+    fi
+    if ! command -v ruff &>/dev/null && ! command -v flake8 &>/dev/null; then
+        echo "  ERROR: ruff not installed (pipx install ruff)"
+        missing=1
+    fi
+    return $missing
+}
+
+header "tool check"
+if ! check_tools; then
+    echo "  Install missing tools and retry."
+    exit 1
+fi
+
+# ── Check 1: secrets ────────────────────────────────────────────────
+
+header "secrets"
+if ! python3 "$REPO_ROOT/scripts/common/validate-secrets.py"; then
+    fail
+fi
+
+# ── Check 2: CRLF line endings ─────────────────────────────────────
+
+header "crlf"
+crlf_found=0
+for f in $STAGED_FILES; do
+    # Skip deleted files and binary files
+    [ -f "$f" ] || continue
+    if git diff --cached --diff-filter=d -- "$f" | grep -qP '\r$'; then
+        echo "  CRLF detected: $f"
+        crlf_found=1
+    fi
+done
+if [ "$crlf_found" -eq 1 ]; then
+    echo "  Fix: dos2unix <file> or configure git (core.autocrlf=input)"
+    fail
+fi
+
+# ── Check 3: shellcheck ────────────────────────────────────────────
+
+header "shellcheck"
+sh_files=$(echo "$STAGED_FILES" | grep '\.sh$' || true)
+if [ -n "$sh_files" ]; then
+    sc_failed=0
+    for f in $sh_files; do
+        [ -f "$f" ] || continue
+        if ! shellcheck "$f" 2>&1; then
+            sc_failed=1
+        fi
+    done
+    if [ "$sc_failed" -eq 1 ]; then
+        fail
+    fi
+else
+    echo "  (no .sh files staged)"
+fi
+
+# ── Check 4: Python lint ───────────────────────────────────────────
+
+header "ruff"
+py_files=$(echo "$STAGED_FILES" | grep '\.py$' || true)
+if [ -n "$py_files" ]; then
+    lint_failed=0
+    if command -v ruff &>/dev/null; then
+        for f in $py_files; do
+            [ -f "$f" ] || continue
+            if ! ruff check "$f" 2>&1; then
+                lint_failed=1
+            fi
+        done
+    else
+        for f in $py_files; do
+            [ -f "$f" ] || continue
+            if ! flake8 "$f" 2>&1; then
+                lint_failed=1
+            fi
+        done
+    fi
+    if [ "$lint_failed" -eq 1 ]; then
+        fail
+    fi
+else
+    echo "  (no .py files staged)"
+fi
+
+# ── Result ──────────────────────────────────────────────────────────
+
+echo ""
+if [ "$FAILED" -eq 1 ]; then
+    echo "Pre-commit: FAILED (fix errors above)"
+    exit 1
+else
+    echo "Pre-commit: OK"
+    exit 0
+fi
