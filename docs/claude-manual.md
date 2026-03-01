@@ -1,0 +1,146 @@
+# Claude Code Manual for Plum
+
+Quick reference for all slash commands, hooks, and features configured for this project.
+
+## Project Slash Commands
+
+These are specific to Plum (defined in `.claude/skills/`):
+
+| Command | What It Does |
+|---------|-------------|
+| `/plum-todo-pop` | Pops the first line from TODO.txt and executes it as a task |
+| `/plum-todo-push <task>` | Appends a new task to the end of TODO.txt |
+| `/plum-design-update` | Detects drift between design.md and git history, proposes updates |
+| `/plum-postmortem` | After merging a PR, checks if design.md needs updating |
+
+## Workflow Slash Commands
+
+From installed plugins - the ones you'll use most often:
+
+### Git & PRs
+
+| Command | Plugin | What It Does |
+|---------|--------|-------------|
+| `/commit` | commit-commands | Create a git commit with proper message |
+| `/commit-push-pr` | commit-commands | Commit, push, and open a PR in one step |
+| `/clean-gone` | commit-commands | Delete local branches that are gone on remote |
+| `/review-pr` | pr-review-toolkit | Run multi-agent PR review (silent failures, test coverage, types) |
+| `/code-review` | code-review | Review a PR against project guidelines |
+| `/coderabbit:review` | coderabbit | Run CodeRabbit AI code review on changes |
+
+### Development
+
+| Command | Plugin | What It Does |
+|---------|--------|-------------|
+| `/feature-dev` | feature-dev | Guided feature development with architecture analysis |
+| `/simplify` | code-simplifier | Review changed code for reuse, quality, efficiency |
+| `/frontend-design` | frontend-design | Build polished web UIs (not relevant for Plum) |
+
+### Planning & Debugging
+
+| Command | Plugin | What It Does |
+|---------|--------|-------------|
+| `/ralph-loop` | ralph-loop | Start autonomous development loop in current session |
+| `/cancel-ralph` | ralph-loop | Stop an active Ralph Loop |
+
+### Project Maintenance
+
+| Command | Plugin | What It Does |
+|---------|--------|-------------|
+| `/revise-claude-md` | claude-md-management | Update CLAUDE.md with learnings from this session |
+| `/claude-md-improver` | claude-md-management | Audit and improve CLAUDE.md files |
+
+### Skill & Hook Management
+
+| Command | Plugin | What It Does |
+|---------|--------|-------------|
+| `/hookify` | hookify | Create hooks from conversation analysis |
+| `/hookify:configure` | hookify | Enable/disable hookify rules |
+| `/hookify:list` | hookify | List all configured hookify rules |
+| `/skill-creator` | skill-creator | Create, modify, and test skills |
+
+## Active Hooks
+
+Configured in `.claude/settings.local.json`. Active next session.
+
+### PreToolUse: Block .env edits
+- **Trigger:** Any Edit or Write targeting a `.env` file
+- **Effect:** Blocks the operation, tells Claude to let you edit .env manually
+- **Script:** `.claude/hooks/block-env.sh`
+
+### PostToolUse: ShellCheck linting
+- **Trigger:** After any Edit or Write to a `.sh` file
+- **Effect:** Runs shellcheck and reports warnings to Claude for fixing
+- **Script:** `.claude/hooks/lint-shell.sh`
+- **Requires:** shellcheck installed at `~/.local/bin/shellcheck`
+
+### Pre-commit: Secret validation
+- **Trigger:** Every git commit
+- **Effect:** Blocks commits containing `.env`, `.key`, `.pem`, `secrets/`, or `credentials/` files
+- **Script:** `scripts/common/validate-secrets.py`
+
+## MCP Servers
+
+### Not yet installed (needs Node.js in WSL2)
+
+**context7** - Live documentation lookup for Docker, bash, Python APIs:
+```bash
+# First install node in WSL2:
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.0/install.sh | bash
+nvm install --lts
+
+# Then add the MCP server:
+claude mcp add context7 -- npx -y @upwind-media/context7-mcp@latest
+```
+
+## Superpowers (Auto-Triggered)
+
+These are NOT slash commands - Claude invokes them automatically when relevant. But you can also request them explicitly:
+
+| Skill | When It Triggers |
+|-------|-----------------|
+| brainstorming | Before creative work (new features, components) |
+| writing-plans | When you have specs for a multi-step task |
+| executing-plans | When implementing a written plan |
+| test-driven-development | When implementing any feature or bugfix |
+| systematic-debugging | When encountering bugs or test failures |
+| verification-before-completion | Before claiming work is done |
+| dispatching-parallel-agents | When facing 2+ independent tasks |
+| finishing-a-development-branch | When implementation is complete and ready to merge |
+| writing-skills | When creating or editing skills |
+| using-git-worktrees | When starting isolated feature work |
+| requesting-code-review | After completing tasks or before merging |
+| receiving-code-review | When processing code review feedback |
+
+**Tip:** Say "use brainstorming" or "use TDD" to explicitly trigger these.
+
+## Built-in Commands
+
+These are part of Claude Code itself (not plugins):
+
+| Command | What It Does |
+|---------|-------------|
+| `/help` | Show help |
+| `/clear` | Clear conversation |
+| `/compact` | Summarize and compress conversation context |
+| `/cost` | Show token usage and cost |
+| `/config` | View/edit settings |
+| `/model` | Switch Claude model |
+| `/fast` | Toggle fast mode (same model, faster output) |
+| `/plugins` | Manage plugins |
+| `/mcp` | Manage MCP servers |
+| `/tasks` | Show background tasks |
+| Shift+Tab | Toggle plan mode (explore before implementing) |
+
+## Tips You Might Forget
+
+1. **Start with `/plum-todo-pop`** to grab your next task
+2. **Use `/commit` instead of manual git** - it handles message formatting
+3. **Say "use TDD"** when building new scripts to follow test-first workflow
+4. **Run `/revise-claude-md`** at the end of sessions that establish new patterns
+5. **Check `docs/staging.md`** before writing scripts that touch the VPS
+6. **Test in Docker first:** `docker-compose -f docker/docker-compose.local.yml run plum bash scripts/...`
+7. **ShellCheck runs automatically** on .sh file edits (after next session restart)
+8. **`.env` edits are blocked** - edit that file manually outside Claude
+9. **Use `/simplify`** after writing a chunk of code to clean it up
+10. **Use `/hookify`** when Claude keeps making a mistake you want to prevent permanently

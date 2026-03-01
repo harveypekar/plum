@@ -27,6 +27,10 @@ WORKDIR /plum
 COPY scripts/ /plum/scripts/
 COPY .env.example /plum/.env.example
 
+# Copy .env if it exists (for local development)
+# Note: This is only for local testing, never in production
+COPY .env /plum/.env 2>/dev/null || true
+
 # Make scripts executable
 RUN chmod +x /plum/scripts/**/*.sh
 
