@@ -24,3 +24,7 @@ logs/
 *.swo
 *~
 *.tmp
+*.bak
+
+bak
+tmp
