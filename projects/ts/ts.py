@@ -921,6 +921,25 @@ class TwilightStruggle:
                 if card_id == 6:
                     continue  # China Card cannot be played in headline
                 actions.append(Action(ActionType.HEADLINE_SELECT, card_id=card_id))
+            if not actions:
+                # No playable headline cards; skip headline and go to action rounds
+                if gs.phasing_player == Side.USSR:
+                    gs.ussr_headline = None
+                    gs.phasing_player = Side.US
+                    return self.legal_actions()
+                else:
+                    gs.us_headline = None
+                    # Both have selected (or been skipped); resolve
+                    if gs.ussr_headline is None:
+                        # Both skipped; go straight to action rounds
+                        gs.phase = Phase.ACTION_ROUND
+                        gs.action_round = 1
+                        gs.phasing_player = Side.USSR
+                        return self.legal_actions()
+                    self._resolve_headlines()
+                    if gs.game_over:
+                        return []
+                    return self.legal_actions()
             return actions
 
         if gs.phase == Phase.ACTION_ROUND:
@@ -950,6 +969,13 @@ class TwilightStruggle:
                     actions.append(Action(ActionType.PLAY_OPS_COUP, card_id=6))
                     if can_attempt_space_race(gs, side, 4) and not gs.space_race_used[side]:
                         actions.append(Action(ActionType.PLAY_OPS_SPACE, card_id=6))
+
+            # If player has no cards and no China Card available, auto-advance
+            if not actions:
+                self._advance_action_round()
+                if gs.game_over:
+                    return []
+                return self.legal_actions()
 
             return actions
 
@@ -1011,6 +1037,30 @@ class TwilightStruggle:
 
     def _resolve_headlines(self):
         gs = self.state
+        # Handle cases where one or both players had no headline card
+        if gs.ussr_headline is None and gs.us_headline is None:
+            gs.phase = Phase.ACTION_ROUND
+            gs.action_round = 1
+            gs.phasing_player = Side.USSR
+            return
+        if gs.ussr_headline is None or gs.us_headline is None:
+            # Only one player has a headline; resolve it alone
+            card_id = gs.ussr_headline if gs.ussr_headline is not None else gs.us_headline
+            card = card_by_id(card_id)
+            side = Side.USSR if gs.ussr_headline is not None else Side.US
+            if card.scoring:
+                self._resolve_scoring_card(card_id, side)
+            if card.removed_after_event:
+                gs.removed_pile.append(card_id)
+            else:
+                gs.discard_pile.append(card_id)
+            gs.ussr_headline = None
+            gs.us_headline = None
+            if not gs.game_over:
+                gs.phase = Phase.ACTION_ROUND
+                gs.action_round = 1
+                gs.phasing_player = Side.USSR
+            return
         first, second = headline_order(gs.ussr_headline, gs.us_headline)
         for side in (first, second):
             card_id = gs.ussr_headline if side == Side.USSR else gs.us_headline

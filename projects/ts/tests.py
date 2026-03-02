@@ -704,3 +704,20 @@ class TestGameLoop:
             action = actions[game.rng.randint(0, len(actions) - 1)]
             game.step(action)
         assert gs.game_over is True
+
+
+class TestStress:
+    def test_100_random_games(self):
+        from ts import TwilightStruggle
+        for seed in range(100):
+            game = TwilightStruggle(seed=seed)
+            gs = game.reset()
+            for _ in range(5000):
+                if gs.game_over:
+                    break
+                actions = game.legal_actions()
+                if not actions:
+                    break
+                action = actions[game.rng.randint(0, len(actions) - 1)]
+                game.step(action)
+            assert gs.game_over, f"Game {seed} did not complete"
