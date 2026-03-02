@@ -604,3 +604,77 @@ def controls_country(gs: GameState, country_id: int, side: Side) -> bool:
     own = gs.influence[country_id][side]
     opp = gs.influence[country_id][other]
     return own >= c.stability and (own - opp) >= c.stability
+
+
+# -- Scoring Engine ----------------------------------------------------------
+
+def _countries_in_region(region: Region) -> list[Country]:
+    return [c for c in COUNTRIES if c.region == region]
+
+
+def score_region(gs: GameState, region: Region) -> tuple[int, int]:
+    """Score a region. Returns (us_vp, ussr_vp).
+
+    Scoring levels:
+    - Presence: at least 1 country controlled
+    - Domination: more battlegrounds, more total countries, at least 1 BG and 1 non-BG
+    - Control: ALL battlegrounds and more total countries
+
+    Bonuses: +1 per BG controlled, +1 per enemy-superpower-adjacent country controlled.
+    """
+    countries = _countries_in_region(region)
+    scoring = SCORING_TABLE[region]
+
+    us_controlled: list[Country] = []
+    ussr_controlled: list[Country] = []
+    us_bg = 0
+    ussr_bg = 0
+
+    for c in countries:
+        if controls_country(gs, c.id, Side.US):
+            us_controlled.append(c)
+            if c.battleground:
+                us_bg += 1
+        elif controls_country(gs, c.id, Side.USSR):
+            ussr_controlled.append(c)
+            if c.battleground:
+                ussr_bg += 1
+
+    total_bg = sum(1 for c in countries if c.battleground)
+
+    def calc_vp(controlled: list[Country], bg_count: int, opp_bg: int,
+                opp_count: int, side: Side) -> int:
+        if not controlled:
+            return 0
+
+        vp = 0
+        has_all_bg = (bg_count == total_bg and total_bg > 0)
+        more_countries = len(controlled) > opp_count
+        more_bg = bg_count > opp_bg
+        has_bg = bg_count > 0
+        has_non_bg = any(not c.battleground for c in controlled)
+
+        if has_all_bg and more_countries:
+            vp += scoring.control
+        elif more_countries and more_bg and has_bg and has_non_bg:
+            vp += scoring.domination
+        else:
+            vp += scoring.presence
+
+        # Bonuses
+        for c in controlled:
+            if c.battleground:
+                vp += 1
+            # +1 for country adjacent to OPPONENT'S superpower
+            if (side == Side.US and c.ussr_adjacent) or \
+               (side == Side.USSR and c.us_adjacent):
+                vp += 1
+
+        return vp
+
+    us_vp = calc_vp(us_controlled, us_bg, ussr_bg,
+                     len(ussr_controlled), Side.US)
+    ussr_vp = calc_vp(ussr_controlled, ussr_bg, us_bg,
+                       len(us_controlled), Side.USSR)
+
+    return us_vp, ussr_vp

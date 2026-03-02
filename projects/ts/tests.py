@@ -194,3 +194,60 @@ class TestCountryControl:
         from ts import COUNTRIES, Region
         me_countries = [c for c in COUNTRIES if c.region == Region.MIDDLE_EAST]
         assert len(me_countries) == 10
+
+
+class TestScoring:
+    def test_no_presence(self):
+        from ts import GameState, Region, score_region
+        gs = GameState.new()
+        us_vp, ussr_vp = score_region(gs, Region.MIDDLE_EAST)
+        assert us_vp == 0
+        assert ussr_vp == 0
+
+    def test_us_presence(self):
+        from ts import GameState, Side, Region, score_region, country_by_name
+        gs = GameState.new()
+        iran = country_by_name("Iran")
+        gs.influence[iran.id][Side.US] = 2
+        us_vp, ussr_vp = score_region(gs, Region.MIDDLE_EAST)
+        # Presence(3) + 1 BG bonus = 4
+        assert us_vp == 4
+        assert ussr_vp == 0
+
+    def test_domination(self):
+        from ts import GameState, Side, Region, score_region, country_by_name
+        gs = GameState.new()
+        # USSR controls Cuba(BG,stab3), Haiti(non-BG,stab1), DR(non-BG,stab1)
+        # US controls Guatemala(non-BG,stab1)
+        for name, inf in [("Cuba", 3), ("Haiti", 1), ("Dominican Rep", 1)]:
+            c = country_by_name(name)
+            gs.influence[c.id][Side.USSR] = inf
+        guat = country_by_name("Guatemala")
+        gs.influence[guat.id][Side.US] = 1
+        us_vp, ussr_vp = score_region(gs, Region.CENTRAL_AMERICA)
+        # USSR: Domination(3) + 1(Cuba BG) + 1(Cuba adj to US) = 5
+        assert ussr_vp == 5
+        # US: Presence(1)
+        assert us_vp == 1
+
+    def test_control(self):
+        from ts import GameState, Side, Region, score_region, country_by_name
+        gs = GameState.new()
+        # US controls all CA battlegrounds + more countries total
+        for name in ["Mexico", "Cuba", "Panama", "Guatemala", "Honduras"]:
+            c = country_by_name(name)
+            gs.influence[c.id][Side.US] = c.stability
+        us_vp, ussr_vp = score_region(gs, Region.CENTRAL_AMERICA)
+        # US has Control: 5 VP + 3 BG bonus = 8
+        # (Cuba is US-adjacent, not USSR-adjacent, so no adjacency bonus for US)
+        assert us_vp == 8
+        assert ussr_vp == 0
+
+    def test_adjacency_bonus(self):
+        from ts import GameState, Side, Region, score_region, country_by_name
+        gs = GameState.new()
+        nk = country_by_name("N.Korea")
+        gs.influence[nk.id][Side.US] = 3  # stability 3
+        us_vp, _ = score_region(gs, Region.ASIA)
+        # Presence(3) + 1(BG) + 1(adj to USSR) = 5
+        assert us_vp == 5
