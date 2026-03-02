@@ -845,6 +845,15 @@ def deal_cards(gs: GameState, hand_size: int):
         gs.us_hand.append(gs.draw_pile.pop())
 
 
+# -- Action ------------------------------------------------------------------
+
+@dataclass
+class Action:
+    type: ActionType
+    card_id: int | None = None
+    country_id: int | None = None
+
+
 # -- Game Engine -------------------------------------------------------------
 
 class TwilightStruggle:
@@ -896,6 +905,292 @@ class TwilightStruggle:
         new.rng.setstate(self.rng.getstate())
         new.state = copy.deepcopy(self.state)
         return new
+
+    # -- legal_actions / step ------------------------------------------------
+
+    def legal_actions(self) -> list[Action]:
+        gs = self.state
+        actions: list[Action] = []
+
+        if gs.game_over:
+            return []
+
+        if gs.phase == Phase.HEADLINE:
+            hand = gs.ussr_hand if gs.phasing_player == Side.USSR else gs.us_hand
+            for card_id in hand:
+                if card_id == 6:
+                    continue  # China Card cannot be played in headline
+                actions.append(Action(ActionType.HEADLINE_SELECT, card_id=card_id))
+            return actions
+
+        if gs.phase == Phase.ACTION_ROUND:
+            hand = gs.ussr_hand if gs.phasing_player == Side.USSR else gs.us_hand
+            side = gs.phasing_player
+
+            for card_id in hand:
+                card = card_by_id(card_id)
+                if card.scoring:
+                    actions.append(Action(ActionType.PLAY_EVENT, card_id=card_id))
+                    continue
+                actions.append(Action(ActionType.PLAY_EVENT, card_id=card_id))
+                if card.ops > 0:
+                    actions.append(Action(ActionType.PLAY_OPS_INFLUENCE, card_id=card_id))
+                    actions.append(Action(ActionType.PLAY_OPS_REALIGN, card_id=card_id))
+                    actions.append(Action(ActionType.PLAY_OPS_COUP, card_id=card_id))
+                    if can_attempt_space_race(gs, side, card.ops) and not gs.space_race_used[side]:
+                        actions.append(Action(ActionType.PLAY_OPS_SPACE, card_id=card_id))
+
+            # China Card
+            if (gs.china_card_holder == side and gs.china_card_face_up
+                    and gs.china_card_playable):
+                has_scoring = any(card_by_id(c).scoring for c in hand)
+                if not has_scoring:
+                    actions.append(Action(ActionType.PLAY_OPS_INFLUENCE, card_id=6))
+                    actions.append(Action(ActionType.PLAY_OPS_REALIGN, card_id=6))
+                    actions.append(Action(ActionType.PLAY_OPS_COUP, card_id=6))
+                    if can_attempt_space_race(gs, side, 4) and not gs.space_race_used[side]:
+                        actions.append(Action(ActionType.PLAY_OPS_SPACE, card_id=6))
+
+            return actions
+
+        if gs.phase == Phase.OPS_INFLUENCE:
+            side = gs.phasing_player
+            for c in COUNTRIES:
+                if can_place_influence(gs, c.id, side):
+                    cost = influence_cost(gs, c.id, side)
+                    if cost <= gs.ops_remaining:
+                        actions.append(Action(ActionType.PLACE_INFLUENCE, country_id=c.id))
+            if gs.ops_remaining == 0 or not actions:
+                return [Action(ActionType.DONE_PLACING)]
+            actions.append(Action(ActionType.DONE_PLACING))
+            return actions
+
+        if gs.phase == Phase.OPS_REALIGN:
+            side = gs.phasing_player
+            for c in COUNTRIES:
+                other = Side.USSR if side == Side.US else Side.US
+                if gs.influence[c.id][other] > 0:
+                    if not defcon_restricts_region(gs.defcon, c.region):
+                        if gs.ops_remaining > 0:
+                            actions.append(Action(ActionType.REALIGN_TARGET, country_id=c.id))
+            if gs.ops_remaining == 0 or not actions:
+                return [Action(ActionType.DONE_REALIGNING)]
+            actions.append(Action(ActionType.DONE_REALIGNING))
+            return actions
+
+        return []
+
+    def step(self, action: Action) -> tuple[GameState, float, bool, dict]:
+        gs = self.state
+
+        if gs.phase == Phase.HEADLINE:
+            self._step_headline(action)
+        elif gs.phase == Phase.ACTION_ROUND:
+            self._step_action_round(action)
+        elif gs.phase == Phase.OPS_INFLUENCE:
+            self._step_ops_influence(action)
+        elif gs.phase == Phase.OPS_REALIGN:
+            self._step_ops_realign(action)
+
+        if not gs.game_over:
+            check_victory(gs)
+
+        reward = gs.vp / 20.0 if gs.game_over else 0.0
+        return gs, reward, gs.game_over, {}
+
+    def _step_headline(self, action: Action):
+        gs = self.state
+        if gs.phasing_player == Side.USSR:
+            gs.ussr_headline = action.card_id
+            gs.ussr_hand.remove(action.card_id)
+            gs.phasing_player = Side.US
+        else:
+            gs.us_headline = action.card_id
+            gs.us_hand.remove(action.card_id)
+            self._resolve_headlines()
+
+    def _resolve_headlines(self):
+        gs = self.state
+        first, second = headline_order(gs.ussr_headline, gs.us_headline)
+        for side in (first, second):
+            card_id = gs.ussr_headline if side == Side.USSR else gs.us_headline
+            card = card_by_id(card_id)
+            if card.scoring:
+                self._resolve_scoring_card(card_id, side)
+            if card.removed_after_event:
+                gs.removed_pile.append(card_id)
+            else:
+                gs.discard_pile.append(card_id)
+            if gs.game_over:
+                return
+        gs.ussr_headline = None
+        gs.us_headline = None
+        gs.phase = Phase.ACTION_ROUND
+        gs.action_round = 1
+        gs.phasing_player = Side.USSR
+
+    def _resolve_scoring_card(self, card_id: int, side: Side):
+        gs = self.state
+        region_map = {
+            1: Region.ASIA, 2: Region.EUROPE, 3: Region.MIDDLE_EAST,
+            37: Region.CENTRAL_AMERICA, 38: Region.ASIA,
+            79: Region.AFRICA, 81: Region.SOUTH_AMERICA,
+        }
+        region = region_map.get(card_id)
+        if region:
+            if card_id == 2:
+                winner = check_europe_control_victory(gs)
+                if winner:
+                    gs.game_over = True
+                    gs.winner = winner
+                    return
+            us_vp, ussr_vp = score_region(gs, region)
+            gs.vp += (us_vp - ussr_vp)
+
+    def _step_action_round(self, action: Action):
+        gs = self.state
+        side = gs.phasing_player
+        hand = gs.ussr_hand if side == Side.USSR else gs.us_hand
+        card = card_by_id(action.card_id)
+
+        if action.card_id != 6 and action.card_id in hand:
+            hand.remove(action.card_id)
+
+        ops = card.ops
+        if action.card_id == 6:
+            ops = 4
+            pass_china_card(gs, from_side=side)
+
+        if action.type == ActionType.PLAY_EVENT:
+            if card.scoring:
+                self._resolve_scoring_card(action.card_id, side)
+            if card.removed_after_event:
+                gs.removed_pile.append(action.card_id)
+            else:
+                gs.discard_pile.append(action.card_id)
+            self._advance_action_round()
+
+        elif action.type == ActionType.PLAY_OPS_INFLUENCE:
+            gs.active_card = action.card_id
+            gs.ops_remaining = ops
+            gs.phase = Phase.OPS_INFLUENCE
+            self._maybe_trigger_opponent_event(action.card_id, side)
+
+        elif action.type == ActionType.PLAY_OPS_COUP:
+            gs.active_card = action.card_id
+            other = Side.USSR if side == Side.US else Side.US
+            for c in COUNTRIES:
+                if gs.influence[c.id][other] > 0:
+                    if not defcon_restricts_region(gs.defcon, c.region):
+                        die = self.rng.randint(1, 6)
+                        resolve_coup(gs, c.id, side, ops, die)
+                        break
+            self._maybe_trigger_opponent_event(action.card_id, side)
+            gs.phase = Phase.ACTION_ROUND
+            self._advance_action_round()
+
+        elif action.type == ActionType.PLAY_OPS_REALIGN:
+            gs.active_card = action.card_id
+            gs.ops_remaining = ops
+            gs.phase = Phase.OPS_REALIGN
+            self._maybe_trigger_opponent_event(action.card_id, side)
+
+        elif action.type == ActionType.PLAY_OPS_SPACE:
+            die = self.rng.randint(1, 6)
+            vp = resolve_space_race(gs, side, ops, die)
+            if vp > 0:
+                if side == Side.US:
+                    gs.vp += vp
+                else:
+                    gs.vp -= vp
+            gs.space_race_used[side] = True
+            if action.card_id != 6:
+                gs.discard_pile.append(action.card_id)
+            self._advance_action_round()
+
+    def _step_ops_influence(self, action: Action):
+        gs = self.state
+        if action.type == ActionType.DONE_PLACING:
+            gs.ops_remaining = 0
+            gs.phase = Phase.ACTION_ROUND
+            self._advance_action_round()
+            return
+        side = gs.phasing_player
+        cost = influence_cost(gs, action.country_id, side)
+        place_influence(gs, action.country_id, side)
+        gs.ops_remaining -= cost
+        if gs.ops_remaining <= 0:
+            gs.ops_remaining = 0
+            gs.phase = Phase.ACTION_ROUND
+            self._advance_action_round()
+
+    def _step_ops_realign(self, action: Action):
+        gs = self.state
+        if action.type == ActionType.DONE_REALIGNING:
+            gs.ops_remaining = 0
+            gs.phase = Phase.ACTION_ROUND
+            self._advance_action_round()
+            return
+        us_roll = self.rng.randint(1, 6)
+        ussr_roll = self.rng.randint(1, 6)
+        resolve_realignment(gs, action.country_id, gs.phasing_player, us_roll, ussr_roll)
+        gs.ops_remaining -= 1
+        if gs.ops_remaining <= 0:
+            gs.ops_remaining = 0
+            gs.phase = Phase.ACTION_ROUND
+            self._advance_action_round()
+
+    def _maybe_trigger_opponent_event(self, card_id: int, side: Side):
+        gs = self.state
+        card = card_by_id(card_id)
+        if card_id == 6:
+            return
+        other = Side.USSR if side == Side.US else Side.US
+        if card.side == other:
+            if card.removed_after_event:
+                if card_id not in gs.removed_pile:
+                    gs.removed_pile.append(card_id)
+            elif card_id not in gs.discard_pile:
+                gs.discard_pile.append(card_id)
+
+    def _advance_action_round(self):
+        gs = self.state
+        if gs.game_over:
+            return
+        gs.active_card = None
+        max_rounds = action_rounds_for_turn(gs.turn)
+
+        if gs.phasing_player == Side.USSR:
+            gs.phasing_player = Side.US
+        else:
+            gs.phasing_player = Side.USSR
+            gs.action_round += 1
+
+        if gs.action_round > max_rounds:
+            self._end_turn()
+
+    def _end_turn(self):
+        gs = self.state
+        apply_milops_penalty(gs)
+        check_victory(gs)
+        if gs.game_over:
+            return
+
+        flip_china_card(gs)
+
+        if gs.turn >= 10:
+            final_scoring(gs)
+            return
+
+        advance_turn(gs)
+
+        if gs.defcon < 5:
+            gs.defcon += 1
+
+        deal_cards(gs, hand_size_for_turn(gs.turn))
+
+        gs.phase = Phase.HEADLINE
+        gs.phasing_player = Side.USSR
 
 
 # -- Headline Phase ----------------------------------------------------------

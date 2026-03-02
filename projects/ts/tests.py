@@ -667,3 +667,40 @@ class TestTurnFlow:
         mid_cards = {c.id for c in CARDS if c.war_period == Period.MID}
         draw_set = set(gs.draw_pile)
         assert mid_cards.issubset(draw_set)
+
+
+class TestGameLoop:
+    def test_legal_actions_headline(self):
+        from ts import TwilightStruggle, Phase, ActionType
+        game = TwilightStruggle(seed=42)
+        gs = game.reset()
+        assert gs.phase == Phase.HEADLINE
+        actions = game.legal_actions()
+        assert all(a.type == ActionType.HEADLINE_SELECT for a in actions)
+        assert len(actions) == len(gs.ussr_hand)
+
+    def test_step_headline_transitions(self):
+        from ts import TwilightStruggle, Phase, ActionType, Action, Side
+        game = TwilightStruggle(seed=42)
+        gs = game.reset()
+        ussr_card = gs.ussr_hand[0]
+        game.step(Action(ActionType.HEADLINE_SELECT, card_id=ussr_card))
+        assert gs.phasing_player == Side.US
+        us_card = gs.us_hand[0]
+        game.step(Action(ActionType.HEADLINE_SELECT, card_id=us_card))
+        assert gs.phase in (Phase.HEADLINE_RESOLVE, Phase.ACTION_ROUND)
+
+    def test_random_game_completes(self):
+        """Play a random game to completion -- no crashes."""
+        from ts import TwilightStruggle
+        game = TwilightStruggle(seed=123)
+        gs = game.reset()
+        for _ in range(5000):
+            if gs.game_over:
+                break
+            actions = game.legal_actions()
+            if not actions:
+                break
+            action = actions[game.rng.randint(0, len(actions) - 1)]
+            game.step(action)
+        assert gs.game_over is True
