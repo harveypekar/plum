@@ -251,3 +251,55 @@ class TestScoring:
         us_vp, _ = score_region(gs, Region.ASIA)
         # Presence(3) + 1(BG) + 1(adj to USSR) = 5
         assert us_vp == 5
+
+
+class TestInfluencePlacement:
+    def test_cost_uncontrolled(self):
+        from ts import GameState, Side, influence_cost, country_by_name
+        gs = GameState.new()
+        iran = country_by_name("Iran")
+        assert influence_cost(gs, iran.id, Side.US) == 1
+
+    def test_cost_enemy_controlled(self):
+        from ts import GameState, Side, influence_cost, country_by_name
+        gs = GameState.new()
+        turkey = country_by_name("Turkey")
+        gs.influence[turkey.id][Side.USSR] = 2
+        assert influence_cost(gs, turkey.id, Side.US) == 2
+
+    def test_cost_friendly_controlled(self):
+        from ts import GameState, Side, influence_cost, country_by_name
+        gs = GameState.new()
+        turkey = country_by_name("Turkey")
+        gs.influence[turkey.id][Side.US] = 2
+        assert influence_cost(gs, turkey.id, Side.US) == 1
+
+    def test_can_place_adjacent_to_friendly(self):
+        from ts import GameState, Side, can_place_influence, country_by_name
+        gs = GameState.new()
+        iran = country_by_name("Iran")
+        gs.influence[iran.id][Side.US] = 1
+        pakistan = country_by_name("Pakistan")
+        assert can_place_influence(gs, pakistan.id, Side.US) is True
+
+    def test_cannot_place_nonadjacent(self):
+        from ts import GameState, Side, can_place_influence, country_by_name
+        gs = GameState.new()
+        iran = country_by_name("Iran")
+        gs.influence[iran.id][Side.US] = 1
+        brazil = country_by_name("Brazil")
+        assert can_place_influence(gs, brazil.id, Side.US) is False
+
+    def test_can_place_adjacent_to_superpower(self):
+        from ts import GameState, Side, can_place_influence, country_by_name
+        gs = GameState.new()
+        canada = country_by_name("Canada")
+        assert can_place_influence(gs, canada.id, Side.US) is True
+
+    def test_place_influence(self):
+        from ts import GameState, Side, place_influence, country_by_name
+        gs = GameState.new()
+        iran = country_by_name("Iran")
+        gs.influence[iran.id][Side.US] = 1
+        place_influence(gs, iran.id, Side.US)
+        assert gs.influence[iran.id][Side.US] == 2
