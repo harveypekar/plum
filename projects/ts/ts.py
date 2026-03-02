@@ -536,3 +536,71 @@ SCORING_TABLE: dict[Region, RegionScoring] = {
     Region.SOUTH_AMERICA: RegionScoring(2, 5, 6),
     Region.AFRICA: RegionScoring(1, 4, 6),
 }
+
+
+# -- GameState ---------------------------------------------------------------
+
+@dataclass
+class GameState:
+    influence: list[list[int]]        # [country_id][Side.US or Side.USSR]
+    defcon: int
+    vp: int                           # positive = US leading
+    turn: int
+    action_round: int
+    phase: Phase
+    phasing_player: Side
+    space_race: list[int]             # [us_pos, ussr_pos]
+    mil_ops: list[int]                # [us_milops, ussr_milops]
+    us_hand: list[int]
+    ussr_hand: list[int]
+    china_card_holder: Side
+    china_card_face_up: bool
+    china_card_playable: bool
+    draw_pile: list[int]
+    discard_pile: list[int]
+    removed_pile: list[int]
+    us_headline: int | None
+    ussr_headline: int | None
+    space_race_used: list[bool]       # [us_used_this_turn, ussr_used_this_turn]
+    game_over: bool
+    winner: Side | None
+    ops_remaining: int
+    active_card: int | None
+
+    @staticmethod
+    def new() -> GameState:
+        return GameState(
+            influence=[[0, 0] for _ in range(len(COUNTRIES))],
+            defcon=5,
+            vp=0,
+            turn=0,
+            action_round=0,
+            phase=Phase.SETUP,
+            phasing_player=Side.USSR,
+            space_race=[0, 0],
+            mil_ops=[0, 0],
+            us_hand=[],
+            ussr_hand=[],
+            china_card_holder=Side.USSR,
+            china_card_face_up=True,
+            china_card_playable=True,
+            draw_pile=[],
+            discard_pile=[],
+            removed_pile=[],
+            us_headline=None,
+            ussr_headline=None,
+            space_race_used=[False, False],
+            game_over=False,
+            winner=None,
+            ops_remaining=0,
+            active_card=None,
+        )
+
+
+def controls_country(gs: GameState, country_id: int, side: Side) -> bool:
+    """Control requires influence >= stability AND margin >= stability."""
+    c = COUNTRIES[country_id]
+    other = Side.USSR if side == Side.US else Side.US
+    own = gs.influence[country_id][side]
+    opp = gs.influence[country_id][other]
+    return own >= c.stability and (own - opp) >= c.stability

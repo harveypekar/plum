@@ -155,3 +155,42 @@ class TestScoringTable:
         assert ca.presence == 1
         assert ca.domination == 3
         assert ca.control == 5
+
+
+class TestCountryControl:
+    def test_uncontrolled(self):
+        from ts import GameState, Side, controls_country, country_by_name
+        gs = GameState.new()
+        israel = country_by_name("Israel")
+        assert controls_country(gs, israel.id, Side.US) is False
+        assert controls_country(gs, israel.id, Side.USSR) is False
+
+    def test_us_controls(self):
+        from ts import GameState, Side, controls_country, country_by_name
+        gs = GameState.new()
+        israel = country_by_name("Israel")
+        gs.influence[israel.id][Side.US] = 4
+        assert controls_country(gs, israel.id, Side.US) is True
+
+    def test_control_requires_margin(self):
+        from ts import GameState, Side, controls_country, country_by_name
+        gs = GameState.new()
+        israel = country_by_name("Israel")
+        gs.influence[israel.id][Side.US] = 5
+        gs.influence[israel.id][Side.USSR] = 2
+        # US has 5, USSR has 2. Margin = 3 < stability 4.
+        assert controls_country(gs, israel.id, Side.US) is False
+
+    def test_control_with_margin(self):
+        from ts import GameState, Side, controls_country, country_by_name
+        gs = GameState.new()
+        turkey = country_by_name("Turkey")  # stability 2
+        gs.influence[turkey.id][Side.US] = 4
+        gs.influence[turkey.id][Side.USSR] = 2
+        # US has 4 >= 2 stability, margin = 2 >= 2 stability
+        assert controls_country(gs, turkey.id, Side.US) is True
+
+    def test_countries_in_region(self):
+        from ts import COUNTRIES, Region
+        me_countries = [c for c in COUNTRIES if c.region == Region.MIDDLE_EAST]
+        assert len(me_countries) == 10
