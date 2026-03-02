@@ -1,12 +1,7 @@
 # Twilight Struggle — 2nd Edition Deluxe — Rule Book
 
-*By Jason Matthews & Ananda Gupta*
-*GMT Games, LLC*
-
 ## Table of Contents
 
-1. [Introduction](#10-introduction)
-2. [Components](#20-components)
 3. [Game Setup](#30-game-setup)
 4. [Game Sequence](#40-game-sequence)
 5. [Card Play](#50-card-play)
@@ -16,53 +11,12 @@
 9. [China](#90-china)
 10. [Scoring and Victory](#100-scoring-and-victory)
 11. [Tournament Play](#110-tournament-play)
-12. [The Chinese Civil War Variant](#120-the-chinese-civil-war-variant)
 - [A Late War Scenario](#a-late-war-scenario)
 - [Game Credits](#game-credits)
 - [Designer Optional Rules](#designer-optional-rules)
 - [Extended Example of Play](#extended-example-of-play)
-- [Card Histories](#card-histories)
-- [Designer's Notes](#designers-notes)
 
----
 
-## 1.0 Introduction
-
-“Now the trumpet summons us again — not as a call to bear
-arms, though arms we need, not as a call to battle, though
-embattled we are — but a call to bear the burden of a long
-twilight struggle...”
-—John F. Kennedy, Inaugural Speech, January 1961
-In 1945, unlikely allies slew the Nazi beast, while humanity’s
-most devastating weapons forced the proud Japanese Empire to
-its knees in a storm of fire. Where once there stood many great
-powers, now stood only two. The world had scant time to sigh
-relief before a new conflict threatened. Unlike the titanic conflicts
-of the preceding decades, this conflict would be waged primarily
-not by soldiers and tanks, but by spies and politicians, scientists
-and intellectuals, artists and traitors.
-Twilight Struggle is a two-player game simulating the forty-fiveyear dance of intrigue, prestige, and occasional flares of warfare
-between the Soviet Union and the United States. The entire world
-is the stage on which these two titans fight to make the world
-safe for their own ideologies and ways of life. The game begins
-amidst the ruins of Europe as the two new ‘superpowers’ struggle
-over the wreckage of the Second World War, and ends in 1989,
-when only the United States remained standing.
-Twilight Struggle inherits its fundamental systems from the carddriven classics We the People and Hannibal: Rome vs. Carthage.
-It is a quick-playing, low-complexity game in that tradition.
-Event cards cover a vast array of historical happenings, from
-the Arab-Israeli conflicts of 1948 and 1967, to Vietnam and the
-U.S. peace movement, to the Cuban Missile Crisis and other
-such incidents that brought the world to the brink of nuclear
-annihilation. Subsystems capture the prestige-laden Space Race
-as well as nuclear tensions, with the possibility of nuclear war
-ending the game.
-These rules are organized into numbered sections, with some
-sections further subdivided into subsections (for example, 2.1
-and 2.2). In a number of places in the rules, you will see references made to rules sections and subsections that are related to
-the one you are reading.
-Additionally, terms that have specialized meaning within these
-rules, such as ‘Influence’ or ‘Battleground’, are consistently capitalized to allude to their specialized context within the rules.
 
 ## 2.0 Components
 
@@ -76,9 +30,6 @@ A complete game of Twilight Struggle includes the following:
 
 ### 2.1 The Game Map
 
-“From Stettin in the Baltic to Trieste in the Adriatic, an iron
-curtain has descended across the continent.”
-—Winston Churchill
 
 **2.1.1** The map is divided into six Regions: Europe, Asia, Central
 America, South America, Africa, and the Middle East. A region
@@ -166,18 +117,13 @@ an Operations Point value, an Event Title and an Event Description. Some cards a
 sometime during the turn they are drawn.
 
 **2.2.2** Each card has a symbol to indicate which superpower is
-associated with its Event, as follows:
+associated with its event, as follows:
 - Cards with a Red star only are associated with the USSR
 - Cards with a White star only are associated with the US
-- Cards with a split Red/White star are not associated with either
-side.
+- Cards with a split Red/White star are associated with both.
 (See 5.2 for the effect of playing cards whose Events are associated with your opponent’s superpower.)
 
-**2.2.3** Cards may be played in one of two ways, as Events or
-Operations.
-Space
-
-
+**2.2.3** Cards may be played in one of three ways, as Events, on the space race, or as operations.
 
 ## 3.0 Game Setup
 
