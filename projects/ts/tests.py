@@ -545,3 +545,50 @@ class TestHeadline:
         from ts import headline_order, Side
         order = headline_order(ussr_card_id=1, us_card_id=3)
         assert order == (Side.US, Side.USSR)
+
+
+class TestVictory:
+    def test_us_20vp_auto_win(self):
+        from ts import GameState, Side, check_victory
+        gs = GameState.new()
+        gs.vp = 20
+        check_victory(gs)
+        assert gs.game_over is True
+        assert gs.winner == Side.US
+
+    def test_ussr_20vp_auto_win(self):
+        from ts import GameState, Side, check_victory
+        gs = GameState.new()
+        gs.vp = -20
+        check_victory(gs)
+        assert gs.game_over is True
+        assert gs.winner == Side.USSR
+
+    def test_no_auto_win_at_19(self):
+        from ts import GameState, check_victory
+        gs = GameState.new()
+        gs.vp = 19
+        check_victory(gs)
+        assert gs.game_over is False
+
+    def test_europe_control_us_wins(self):
+        from ts import GameState, Side, check_europe_control_victory, country_by_name, COUNTRIES, Region
+        gs = GameState.new()
+        europe_bgs = [c for c in COUNTRIES if c.region == Region.EUROPE and c.battleground]
+        for c in europe_bgs:
+            gs.influence[c.id][Side.US] = c.stability
+        # Also control some non-BG to ensure "more countries"
+        for name in ["UK", "Benelux", "Norway", "Denmark", "Greece"]:
+            c = country_by_name(name)
+            gs.influence[c.id][Side.US] = c.stability
+        result = check_europe_control_victory(gs)
+        assert result == Side.US
+
+    def test_final_scoring(self):
+        from ts import GameState, Side, final_scoring, country_by_name
+        gs = GameState.new()
+        gs.vp = 0
+        iran = country_by_name("Iran")
+        gs.influence[iran.id][Side.US] = 2
+        final_scoring(gs)
+        assert gs.vp != 0 or gs.game_over
