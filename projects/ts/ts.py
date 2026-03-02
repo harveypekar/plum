@@ -738,3 +738,48 @@ def resolve_coup(gs: GameState, country_id: int, side: Side, ops: int, die_roll:
         gs.influence[country_id][other] -= removed
         remaining = diff - removed
         gs.influence[country_id][side] += remaining
+
+
+# -- Realignment Rolls -------------------------------------------------------
+
+def realignment_modifiers(gs: GameState, country_id: int) -> tuple[int, int]:
+    """Calculate realignment die modifiers for both sides."""
+    c = COUNTRIES[country_id]
+    us_mod = 0
+    ussr_mod = 0
+
+    # +1 for each adjacent controlled country
+    for adj_id in c.adjacent:
+        if controls_country(gs, adj_id, Side.US):
+            us_mod += 1
+        if controls_country(gs, adj_id, Side.USSR):
+            ussr_mod += 1
+
+    # +1 if more influence in target
+    if gs.influence[country_id][Side.US] > gs.influence[country_id][Side.USSR]:
+        us_mod += 1
+    elif gs.influence[country_id][Side.USSR] > gs.influence[country_id][Side.US]:
+        ussr_mod += 1
+
+    # +1 if superpower adjacent
+    if c.us_adjacent:
+        us_mod += 1
+    if c.ussr_adjacent:
+        ussr_mod += 1
+
+    return us_mod, ussr_mod
+
+
+def resolve_realignment(gs: GameState, country_id: int, acting_side: Side,
+                        us_roll: int, ussr_roll: int):
+    """Resolve realignment roll. Only removes influence, never adds."""
+    us_mod, ussr_mod = realignment_modifiers(gs, country_id)
+    us_total = us_roll + us_mod
+    ussr_total = ussr_roll + ussr_mod
+
+    if us_total > ussr_total:
+        diff = us_total - ussr_total
+        gs.influence[country_id][Side.USSR] = max(0, gs.influence[country_id][Side.USSR] - diff)
+    elif ussr_total > us_total:
+        diff = ussr_total - us_total
+        gs.influence[country_id][Side.US] = max(0, gs.influence[country_id][Side.US] - diff)
