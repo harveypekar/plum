@@ -520,3 +520,28 @@ class TestGameSetup:
         iran = country_by_name("Iran")
         assert gs.influence[iran.id][Side.US] == 1
         assert gs.phase == Phase.HEADLINE
+
+
+class TestHeadline:
+    def test_headline_higher_ops_first(self):
+        from ts import headline_order, Side
+        # NATO(4) vs Olympic(2): higher ops goes first
+        order = headline_order(ussr_card_id=21, us_card_id=20)
+        assert order == (Side.USSR, Side.US)
+
+    def test_headline_tie_us_first(self):
+        from ts import headline_order, Side
+        # Both 3 ops: US goes first on ties
+        order = headline_order(ussr_card_id=7, us_card_id=4)
+        assert order == (Side.US, Side.USSR)
+
+    def test_headline_scoring_card_last(self):
+        from ts import headline_order, Side
+        # Scoring(0 ops) always second
+        order = headline_order(ussr_card_id=1, us_card_id=20)
+        assert order == (Side.US, Side.USSR)
+
+    def test_both_scoring_us_first(self):
+        from ts import headline_order, Side
+        order = headline_order(ussr_card_id=1, us_card_id=3)
+        assert order == (Side.US, Side.USSR)

@@ -896,3 +896,18 @@ class TwilightStruggle:
         new.rng.setstate(self.rng.getstate())
         new.state = copy.deepcopy(self.state)
         return new
+
+
+# -- Headline Phase ----------------------------------------------------------
+
+def headline_order(ussr_card_id: int, us_card_id: int) -> tuple[Side, Side]:
+    """Higher ops value goes first. Ties: US first."""
+    ussr_card = card_by_id(ussr_card_id)
+    us_card = card_by_id(us_card_id)
+    ussr_val = 0 if ussr_card.scoring else ussr_card.ops
+    us_val = 0 if us_card.scoring else us_card.ops
+
+    if ussr_val > us_val:
+        return (Side.USSR, Side.US)
+    else:
+        return (Side.US, Side.USSR)
