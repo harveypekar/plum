@@ -479,3 +479,44 @@ class TestSpaceRaceAttempt:
         gs = GameState.new()
         gs.space_race[Side.US] = 8
         assert can_attempt_space_race(gs, Side.US, ops=4) is False
+
+
+class TestDeckManagement:
+    def test_early_war_deck(self):
+        from ts import build_early_war_deck, CARDS, Period
+        deck = build_early_war_deck()
+        assert 6 not in deck  # China Card excluded
+        assert all(CARDS[i-1].war_period == Period.EARLY for i in deck
+                   if CARDS[i-1].war_period == Period.EARLY)
+
+    def test_deal_cards(self):
+        from ts import GameState, deal_cards
+        gs = GameState.new()
+        gs.draw_pile = list(range(1, 36))  # early war card IDs
+        gs.draw_pile.remove(6)  # remove China Card
+        deal_cards(gs, hand_size=8)
+        assert len(gs.us_hand) == 8
+        assert len(gs.ussr_hand) == 8
+
+
+class TestGameSetup:
+    def test_initial_setup(self):
+        from ts import TwilightStruggle, Side, Phase, country_by_name
+        game = TwilightStruggle()
+        gs = game.reset()
+        assert gs.defcon == 5
+        assert gs.vp == 0
+        assert gs.turn == 1
+        assert gs.china_card_holder == Side.USSR
+        assert gs.china_card_face_up is True
+        assert len(gs.us_hand) == 8
+        assert len(gs.ussr_hand) == 8
+        syria = country_by_name("Syria")
+        assert gs.influence[syria.id][Side.USSR] == 1
+        eger = country_by_name("E.Germany")
+        assert gs.influence[eger.id][Side.USSR] == 3
+        uk = country_by_name("UK")
+        assert gs.influence[uk.id][Side.US] == 5
+        iran = country_by_name("Iran")
+        assert gs.influence[iran.id][Side.US] == 1
+        assert gs.phase == Phase.HEADLINE

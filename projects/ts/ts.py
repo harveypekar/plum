@@ -827,3 +827,72 @@ def resolve_space_race(gs: GameState, side: Side, ops: int, die_roll: int) -> in
             return target_box.second_vp
         return target_box.first_vp
     return 0
+
+
+# -- Deck Management ---------------------------------------------------------
+
+def build_early_war_deck() -> list[int]:
+    """Build the early war draw pile (excludes China Card #6)."""
+    return [c.id for c in CARDS if c.war_period == Period.EARLY and c.id != 6]
+
+
+def deal_cards(gs: GameState, hand_size: int):
+    """Deal cards to bring both players to hand_size."""
+    random.shuffle(gs.draw_pile)
+    while len(gs.ussr_hand) < hand_size and gs.draw_pile:
+        gs.ussr_hand.append(gs.draw_pile.pop())
+    while len(gs.us_hand) < hand_size and gs.draw_pile:
+        gs.us_hand.append(gs.draw_pile.pop())
+
+
+# -- Game Engine -------------------------------------------------------------
+
+class TwilightStruggle:
+    """Core game engine."""
+
+    def __init__(self, seed: int | None = None):
+        self.rng = random.Random(seed)
+        self.state = GameState.new()
+
+    def reset(self, seed: int | None = None) -> GameState:
+        if seed is not None:
+            self.rng = random.Random(seed)
+        gs = GameState.new()
+        self.state = gs
+
+        # Build and shuffle early war deck
+        gs.draw_pile = build_early_war_deck()
+        self.rng.shuffle(gs.draw_pile)
+
+        # Deal 8 cards each
+        deal_cards(gs, hand_size=8)
+
+        # USSR initial influence
+        _cn = country_by_name
+        for name, inf in [("Syria", 1), ("Iraq", 1), ("N.Korea", 3),
+                          ("E.Germany", 3), ("Finland", 1)]:
+            gs.influence[_cn(name).id][Side.USSR] = inf
+        # Default Eastern Europe placement (6 points)
+        for name, inf in [("Poland", 4), ("Czechoslovakia", 1), ("Yugoslavia", 1)]:
+            gs.influence[_cn(name).id][Side.USSR] = inf
+
+        # US initial influence
+        for name, inf in [("Canada", 2), ("Iran", 1), ("Israel", 1), ("Japan", 1),
+                          ("Australia", 4), ("Philippines", 1), ("S.Korea", 1),
+                          ("Panama", 1), ("South Africa", 1), ("UK", 5)]:
+            gs.influence[_cn(name).id][Side.US] = inf
+        # Default Western Europe placement (7 points)
+        for name, inf in [("W.Germany", 4), ("Italy", 2), ("France", 1)]:
+            gs.influence[_cn(name).id][Side.US] = inf
+
+        gs.turn = 1
+        gs.phase = Phase.HEADLINE
+        gs.phasing_player = Side.USSR
+        return gs
+
+    def clone(self) -> TwilightStruggle:
+        new = TwilightStruggle.__new__(TwilightStruggle)
+        new.rng = random.Random()
+        new.rng.setstate(self.rng.getstate())
+        new.state = copy.deepcopy(self.state)
+        return new
