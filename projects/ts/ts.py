@@ -994,3 +994,36 @@ def flip_china_card(gs: GameState):
     if not gs.china_card_face_up:
         gs.china_card_face_up = True
         gs.china_card_playable = True
+
+
+# -- Turn Flow Helpers -------------------------------------------------------
+
+def action_rounds_for_turn(turn: int) -> int:
+    return 6 if turn <= 3 else 7
+
+
+def hand_size_for_turn(turn: int) -> int:
+    return 8 if turn <= 3 else 9
+
+
+def apply_milops_penalty(gs: GameState):
+    us_penalty = milops_penalty(gs.defcon, gs.mil_ops[Side.US])
+    ussr_penalty = milops_penalty(gs.defcon, gs.mil_ops[Side.USSR])
+    gs.vp -= us_penalty
+    gs.vp += ussr_penalty
+
+
+def advance_turn(gs: GameState):
+    gs.turn += 1
+    if gs.turn == 4:
+        mid_cards = [c.id for c in CARDS if c.war_period == Period.MID]
+        gs.draw_pile.extend(mid_cards)
+    if gs.turn == 8:
+        late_cards = [c.id for c in CARDS if c.war_period == Period.LATE]
+        gs.draw_pile.extend(late_cards)
+    # Reshuffle discards into draw pile
+    gs.draw_pile.extend(gs.discard_pile)
+    gs.discard_pile.clear()
+    gs.mil_ops = [0, 0]
+    gs.space_race_used = [False, False]
+    gs.action_round = 0
