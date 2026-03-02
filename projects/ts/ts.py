@@ -678,3 +678,33 @@ def score_region(gs: GameState, region: Region) -> tuple[int, int]:
                        len(us_controlled), Side.USSR)
 
     return us_vp, ussr_vp
+
+
+# -- Influence Placement -----------------------------------------------------
+
+def influence_cost(gs: GameState, country_id: int, side: Side) -> int:
+    """1 op for friendly/uncontrolled, 2 for enemy-controlled."""
+    other = Side.USSR if side == Side.US else Side.US
+    if controls_country(gs, country_id, other):
+        return 2
+    return 1
+
+
+def can_place_influence(gs: GameState, country_id: int, side: Side) -> bool:
+    """Must be adjacent to existing friendly influence or superpower."""
+    c = COUNTRIES[country_id]
+    if side == Side.US and c.us_adjacent:
+        return True
+    if side == Side.USSR and c.ussr_adjacent:
+        return True
+    for adj_id in c.adjacent:
+        if gs.influence[adj_id][side] > 0:
+            return True
+    if gs.influence[country_id][side] > 0:
+        return True
+    return False
+
+
+def place_influence(gs: GameState, country_id: int, side: Side) -> None:
+    """Place one influence marker."""
+    gs.influence[country_id][side] += 1
