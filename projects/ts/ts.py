@@ -968,3 +968,29 @@ def final_scoring(gs: GameState):
             gs.winner = Side.USSR
         else:
             gs.winner = None  # draw
+
+
+# -- China Card Mechanics ----------------------------------------------------
+
+def china_card_ops(all_in_asia: bool) -> int:
+    """China Card ops value (4 base, +1 if all ops in Asia)."""
+    return 5 if all_in_asia else 4
+
+
+def pass_china_card(gs: GameState, from_side: Side, via_event: bool = False):
+    """Pass China Card to opponent."""
+    other = Side.USSR if from_side == Side.US else Side.US
+    gs.china_card_holder = other
+    if via_event:
+        gs.china_card_face_up = True
+        gs.china_card_playable = True
+    else:
+        gs.china_card_face_up = False
+        gs.china_card_playable = False
+
+
+def flip_china_card(gs: GameState):
+    """Flip China Card face-up at end of turn."""
+    if not gs.china_card_face_up:
+        gs.china_card_face_up = True
+        gs.china_card_playable = True
