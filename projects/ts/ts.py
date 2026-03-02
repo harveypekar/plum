@@ -348,3 +348,148 @@ _COUNTRY_BY_NAME: dict[str, Country] = {c.name: c for c in COUNTRIES}
 
 def country_by_name(name: str) -> Country:
     return _COUNTRY_BY_NAME[name]
+
+
+# -- Card Definitions --------------------------------------------------------
+
+@dataclass(frozen=True)
+class CardDef:
+    id: int
+    name: str
+    ops: int
+    side: Side
+    war_period: Period
+    removed_after_event: bool
+    scoring: bool
+
+
+def _build_cards() -> tuple[CardDef, ...]:
+    S = Side
+    P = Period
+    cards = [
+        # Early War (1-35)
+        CardDef(1, "Asia Scoring", 0, S.NEUTRAL, P.EARLY, False, True),
+        CardDef(2, "Europe Scoring", 0, S.NEUTRAL, P.EARLY, False, True),
+        CardDef(3, "Middle East Scoring", 0, S.NEUTRAL, P.EARLY, False, True),
+        CardDef(4, "Duck and Cover", 3, S.US, P.EARLY, False, False),
+        CardDef(5, "Five Year Plan", 3, S.USSR, P.EARLY, False, False),
+        CardDef(6, "The China Card", 4, S.NEUTRAL, P.EARLY, False, False),
+        CardDef(7, "Socialist Governments", 3, S.USSR, P.EARLY, False, False),
+        CardDef(8, "Fidel", 2, S.USSR, P.EARLY, True, False),
+        CardDef(9, "Vietnam Revolts", 2, S.USSR, P.EARLY, True, False),
+        CardDef(10, "Blockade", 1, S.USSR, P.EARLY, True, False),
+        CardDef(11, "Korean War", 2, S.USSR, P.EARLY, True, False),
+        CardDef(12, "Romanian Abdication", 1, S.USSR, P.EARLY, True, False),
+        CardDef(13, "Arab-Israeli War", 2, S.USSR, P.EARLY, False, False),
+        CardDef(14, "Comecon", 3, S.USSR, P.EARLY, True, False),
+        CardDef(15, "Nasser", 1, S.USSR, P.EARLY, True, False),
+        CardDef(16, "Warsaw Pact Formed", 3, S.USSR, P.EARLY, True, False),
+        CardDef(17, "De Gaulle Leads France", 3, S.USSR, P.EARLY, True, False),
+        CardDef(18, "Captured Nazi Scientist", 1, S.NEUTRAL, P.EARLY, True, False),
+        CardDef(19, "Truman Doctrine", 1, S.US, P.EARLY, True, False),
+        CardDef(20, "Olympic Games", 2, S.NEUTRAL, P.EARLY, False, False),
+        CardDef(21, "NATO", 4, S.US, P.EARLY, True, False),
+        CardDef(22, "Independent Reds", 2, S.US, P.EARLY, True, False),
+        CardDef(23, "Marshall Plan", 4, S.US, P.EARLY, True, False),
+        CardDef(24, "Indo-Pakistani War", 2, S.NEUTRAL, P.EARLY, False, False),
+        CardDef(25, "Containment", 3, S.US, P.EARLY, True, False),
+        CardDef(26, "CIA Created", 1, S.US, P.EARLY, True, False),
+        CardDef(27, "US/Japan Mutual Defense Pact", 4, S.US, P.EARLY, True, False),
+        CardDef(28, "Suez Crisis", 3, S.USSR, P.EARLY, True, False),
+        CardDef(29, "East European Unrest", 3, S.US, P.EARLY, False, False),
+        CardDef(30, "Decolonization", 2, S.USSR, P.EARLY, False, False),
+        CardDef(31, "Red Scare/Purge", 4, S.NEUTRAL, P.EARLY, False, False),
+        CardDef(32, "UN Intervention", 1, S.NEUTRAL, P.EARLY, False, False),
+        CardDef(33, "De-Stalinization", 3, S.USSR, P.EARLY, True, False),
+        CardDef(34, "Nuclear Test Ban", 4, S.NEUTRAL, P.EARLY, False, False),
+        CardDef(35, "Formosan Resolution", 2, S.US, P.EARLY, True, False),
+        # Mid War (36-81)
+        CardDef(36, "Brush War", 3, S.NEUTRAL, P.MID, False, False),
+        CardDef(37, "Central America Scoring", 0, S.NEUTRAL, P.MID, False, True),
+        CardDef(38, "Southeast Asia Scoring", 0, S.NEUTRAL, P.MID, True, True),
+        CardDef(39, "Arms Race", 3, S.NEUTRAL, P.MID, False, False),
+        CardDef(40, "Cuban Missile Crisis", 3, S.NEUTRAL, P.MID, True, False),
+        CardDef(41, "Nuclear Subs", 2, S.US, P.MID, True, False),
+        CardDef(42, "Quagmire", 3, S.USSR, P.MID, True, False),
+        CardDef(43, "SALT Negotiations", 3, S.NEUTRAL, P.MID, True, False),
+        CardDef(44, "Bear Trap", 3, S.US, P.MID, True, False),
+        CardDef(45, "Summit", 1, S.NEUTRAL, P.MID, False, False),
+        CardDef(46, "How I Learned to Stop Worrying", 2, S.NEUTRAL, P.MID, True, False),
+        CardDef(47, "Junta", 2, S.NEUTRAL, P.MID, False, False),
+        CardDef(48, "Kitchen Debates", 1, S.US, P.MID, True, False),
+        CardDef(49, "Missile Envy", 2, S.NEUTRAL, P.MID, False, False),
+        CardDef(50, "We Will Bury You", 4, S.USSR, P.MID, True, False),
+        CardDef(51, "Brezhnev Doctrine", 3, S.USSR, P.MID, True, False),
+        CardDef(52, "Portuguese Empire Crumbles", 2, S.USSR, P.MID, True, False),
+        CardDef(53, "South African Unrest", 2, S.USSR, P.MID, False, False),
+        CardDef(54, "Allende", 1, S.USSR, P.MID, True, False),
+        CardDef(55, "Willy Brandt", 2, S.USSR, P.MID, True, False),
+        CardDef(56, "Muslim Revolution", 4, S.USSR, P.MID, False, False),
+        CardDef(57, "ABM Treaty", 4, S.NEUTRAL, P.MID, False, False),
+        CardDef(58, "Cultural Revolution", 3, S.USSR, P.MID, True, False),
+        CardDef(59, "Flower Power", 4, S.USSR, P.MID, True, False),
+        CardDef(60, "U2 Incident", 3, S.USSR, P.MID, True, False),
+        CardDef(61, "OPEC", 3, S.USSR, P.MID, False, False),
+        CardDef(62, "Lone Gunman", 1, S.USSR, P.MID, True, False),
+        CardDef(63, "Colonial Rear Guards", 2, S.NEUTRAL, P.MID, False, False),
+        CardDef(64, "Panama Canal Returned", 1, S.US, P.MID, True, False),
+        CardDef(65, "Camp David Accords", 2, S.US, P.MID, True, False),
+        CardDef(66, "Puppet Governments", 2, S.US, P.MID, True, False),
+        CardDef(67, "Grain Sales to Soviets", 2, S.US, P.MID, False, False),
+        CardDef(68, "John Paul II Elected Pope", 2, S.US, P.MID, True, False),
+        CardDef(69, "Latin American Death Squads", 2, S.NEUTRAL, P.MID, False, False),
+        CardDef(70, "OAS Founded", 1, S.US, P.MID, True, False),
+        CardDef(71, "Nixon Plays the China Card", 2, S.US, P.MID, True, False),
+        CardDef(72, "Sadat Expels Soviets", 1, S.US, P.MID, True, False),
+        CardDef(73, "Shuttle Diplomacy", 3, S.US, P.MID, False, False),
+        CardDef(74, "The Voice of America", 2, S.US, P.MID, False, False),
+        CardDef(75, "Liberation Theology", 2, S.USSR, P.MID, False, False),
+        CardDef(76, "Ussuri River Skirmish", 3, S.US, P.MID, True, False),
+        CardDef(77, "Ask Not What Your Country Can Do For You", 3, S.US, P.MID, True, False),
+        CardDef(78, "Alliance for Progress", 3, S.US, P.MID, True, False),
+        CardDef(79, "Africa Scoring", 0, S.NEUTRAL, P.MID, False, True),
+        CardDef(80, "One Small Step", 2, S.NEUTRAL, P.MID, False, False),
+        CardDef(81, "South America Scoring", 0, S.NEUTRAL, P.MID, False, True),
+        # Late War (82-102)
+        CardDef(82, "Iranian Hostage Crisis", 3, S.USSR, P.LATE, True, False),
+        CardDef(83, "The Iron Lady", 3, S.US, P.LATE, True, False),
+        CardDef(84, "Reagan Bombs Libya", 2, S.US, P.LATE, True, False),
+        CardDef(85, "Star Wars", 2, S.US, P.LATE, True, False),
+        CardDef(86, "North Sea Oil", 3, S.US, P.LATE, True, False),
+        CardDef(87, "The Reformer", 3, S.USSR, P.LATE, True, False),
+        CardDef(88, "Marine Barracks Bombing", 2, S.NEUTRAL, P.LATE, True, False),
+        CardDef(89, "Soviets Shoot Down KAL-007", 4, S.US, P.LATE, True, False),
+        CardDef(90, "Glasnost", 4, S.USSR, P.LATE, True, False),
+        CardDef(91, "Ortega Elected in Nicaragua", 2, S.USSR, P.LATE, True, False),
+        CardDef(92, "Terrorism", 2, S.NEUTRAL, P.LATE, False, False),
+        CardDef(93, "Iran-Contra Scandal", 2, S.USSR, P.LATE, True, False),
+        CardDef(94, "Chernobyl", 3, S.US, P.LATE, True, False),
+        CardDef(95, "Latin American Debt Crisis", 2, S.NEUTRAL, P.LATE, False, False),
+        CardDef(96, "Tear Down This Wall", 3, S.US, P.LATE, True, False),
+        CardDef(97, "An Evil Empire", 3, S.US, P.LATE, True, False),
+        CardDef(98, "Aldrich Ames Remix", 3, S.USSR, P.LATE, True, False),
+        CardDef(99, "Pershing II Deployed", 3, S.USSR, P.LATE, True, False),
+        CardDef(100, "Wargames", 4, S.NEUTRAL, P.LATE, True, False),
+        CardDef(101, "Solidarity", 2, S.US, P.LATE, True, False),
+        CardDef(102, "Iran-Iraq War", 2, S.NEUTRAL, P.LATE, True, False),
+        # Early War extra
+        CardDef(103, "Defectors", 2, S.US, P.EARLY, False, False),
+        # Optional (104-110)
+        CardDef(104, "The Cambridge Five", 2, S.USSR, P.OPTIONAL, False, False),
+        CardDef(105, "Special Relationship", 2, S.US, P.OPTIONAL, False, False),
+        CardDef(106, "NORAD", 3, S.US, P.OPTIONAL, True, False),
+        CardDef(107, "Che", 3, S.USSR, P.OPTIONAL, False, False),
+        CardDef(108, "Our Man in Tehran", 2, S.US, P.OPTIONAL, True, False),
+        CardDef(109, "Yuri and Samantha", 2, S.USSR, P.OPTIONAL, True, False),
+        CardDef(110, "AWACS Sale to Saudis", 3, S.US, P.OPTIONAL, True, False),
+    ]
+    return tuple(cards)
+
+
+CARDS: tuple[CardDef, ...] = _build_cards()
+
+_CARD_BY_ID: dict[int, CardDef] = {c.id: c for c in CARDS}
+
+
+def card_by_id(card_id: int) -> CardDef:
+    return _CARD_BY_ID[card_id]
