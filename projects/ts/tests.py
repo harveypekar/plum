@@ -592,3 +592,40 @@ class TestVictory:
         gs.influence[iran.id][Side.US] = 2
         final_scoring(gs)
         assert gs.vp != 0 or gs.game_over
+
+
+class TestChinaCard:
+    def test_china_ops_base(self):
+        from ts import china_card_ops
+        assert china_card_ops(all_in_asia=False) == 4
+
+    def test_china_ops_asia_bonus(self):
+        from ts import china_card_ops
+        assert china_card_ops(all_in_asia=True) == 5
+
+    def test_china_pass_after_play(self):
+        from ts import GameState, Side, pass_china_card
+        gs = GameState.new()
+        gs.china_card_holder = Side.USSR
+        pass_china_card(gs, from_side=Side.USSR)
+        assert gs.china_card_holder == Side.US
+        assert gs.china_card_face_up is False
+        assert gs.china_card_playable is False
+
+    def test_china_pass_by_event(self):
+        from ts import GameState, Side, pass_china_card
+        gs = GameState.new()
+        gs.china_card_holder = Side.US
+        pass_china_card(gs, from_side=Side.US, via_event=True)
+        assert gs.china_card_holder == Side.USSR
+        assert gs.china_card_face_up is True
+        assert gs.china_card_playable is True
+
+    def test_china_flip_at_end_of_turn(self):
+        from ts import GameState, flip_china_card
+        gs = GameState.new()
+        gs.china_card_face_up = False
+        gs.china_card_playable = False
+        flip_china_card(gs)
+        assert gs.china_card_face_up is True
+        assert gs.china_card_playable is True
