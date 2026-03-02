@@ -493,3 +493,46 @@ _CARD_BY_ID: dict[int, CardDef] = {c.id: c for c in CARDS}
 
 def card_by_id(card_id: int) -> CardDef:
     return _CARD_BY_ID[card_id]
+
+
+# -- Space Race Track --------------------------------------------------------
+
+@dataclass(frozen=True)
+class SpaceBox:
+    name: str
+    ops_required: int
+    roll_max: int
+    first_vp: int
+    second_vp: int
+
+
+SPACE_RACE_TRACK: tuple[SpaceBox, ...] = (
+    SpaceBox("Start", 0, 0, 0, 0),
+    SpaceBox("Satellite", 2, 3, 2, 1),
+    SpaceBox("Animal in Space", 2, 4, 0, 0),
+    SpaceBox("Man in Space", 2, 3, 2, 0),
+    SpaceBox("Man in Earth Orbit", 2, 4, 0, 0),
+    SpaceBox("Lunar Orbit", 3, 3, 3, 1),
+    SpaceBox("Eagle/Bear Has Landed", 3, 4, 0, 0),
+    SpaceBox("Space Shuttle", 3, 3, 4, 2),
+    SpaceBox("Station", 4, 2, 2, 0),
+)
+
+
+# -- Scoring Tables ----------------------------------------------------------
+
+@dataclass(frozen=True)
+class RegionScoring:
+    presence: int
+    domination: int
+    control: int
+
+
+SCORING_TABLE: dict[Region, RegionScoring] = {
+    Region.EUROPE: RegionScoring(3, 7, 1000),
+    Region.ASIA: RegionScoring(3, 7, 9),
+    Region.MIDDLE_EAST: RegionScoring(3, 5, 7),
+    Region.CENTRAL_AMERICA: RegionScoring(1, 3, 5),
+    Region.SOUTH_AMERICA: RegionScoring(2, 5, 6),
+    Region.AFRICA: RegionScoring(1, 4, 6),
+}
