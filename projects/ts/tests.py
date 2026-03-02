@@ -629,3 +629,41 @@ class TestChinaCard:
         flip_china_card(gs)
         assert gs.china_card_face_up is True
         assert gs.china_card_playable is True
+
+
+class TestTurnFlow:
+    def test_action_rounds_early_war(self):
+        from ts import action_rounds_for_turn
+        assert action_rounds_for_turn(1) == 6
+        assert action_rounds_for_turn(3) == 6
+
+    def test_action_rounds_mid_war(self):
+        from ts import action_rounds_for_turn
+        assert action_rounds_for_turn(4) == 7
+        assert action_rounds_for_turn(10) == 7
+
+    def test_hand_size(self):
+        from ts import hand_size_for_turn
+        assert hand_size_for_turn(1) == 8
+        assert hand_size_for_turn(3) == 8
+        assert hand_size_for_turn(4) == 9
+        assert hand_size_for_turn(10) == 9
+
+    def test_end_of_turn_milops_penalty(self):
+        from ts import GameState, Side, apply_milops_penalty
+        gs = GameState.new()
+        gs.defcon = 4
+        gs.mil_ops = [2, 4]
+        apply_milops_penalty(gs)
+        assert gs.vp == -2
+
+    def test_advance_turn_mid_war_shuffle(self):
+        from ts import GameState, advance_turn, Period, CARDS
+        gs = GameState.new()
+        gs.turn = 3
+        gs.discard_pile = [4, 5]
+        advance_turn(gs)
+        assert gs.turn == 4
+        mid_cards = {c.id for c in CARDS if c.war_period == Period.MID}
+        draw_set = set(gs.draw_pile)
+        assert mid_cards.issubset(draw_set)
