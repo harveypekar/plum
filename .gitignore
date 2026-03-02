@@ -14,7 +14,6 @@ logs/
 # Python
 __pycache__/
 *.pyc
-.venv/
 
 # System files
 .DS_Store
