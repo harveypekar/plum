@@ -303,3 +303,64 @@ class TestInfluencePlacement:
         gs.influence[iran.id][Side.US] = 1
         place_influence(gs, iran.id, Side.US)
         assert gs.influence[iran.id][Side.US] == 2
+
+
+class TestCoup:
+    def test_successful_coup(self):
+        from ts import GameState, Side, resolve_coup, country_by_name
+        gs = GameState.new()
+        mexico = country_by_name("Mexico")  # stability 2
+        gs.influence[mexico.id][Side.USSR] = 2
+        # die=4, ops=3: 4+3=7 > 2*2=4, result=3
+        # Remove 2 USSR, add 1 US
+        resolve_coup(gs, mexico.id, Side.US, ops=3, die_roll=4)
+        assert gs.influence[mexico.id][Side.USSR] == 0
+        assert gs.influence[mexico.id][Side.US] == 1
+
+    def test_failed_coup(self):
+        from ts import GameState, Side, resolve_coup, country_by_name
+        gs = GameState.new()
+        mexico = country_by_name("Mexico")
+        gs.influence[mexico.id][Side.USSR] = 2
+        # die=1, ops=2: 1+2=3 <= 2*2=4, no effect
+        resolve_coup(gs, mexico.id, Side.US, ops=2, die_roll=1)
+        assert gs.influence[mexico.id][Side.USSR] == 2
+        assert gs.influence[mexico.id][Side.US] == 0
+
+    def test_coup_defcon_degradation(self):
+        from ts import GameState, Side, resolve_coup, country_by_name
+        gs = GameState.new()
+        gs.defcon = 5
+        iran = country_by_name("Iran")  # battleground
+        gs.influence[iran.id][Side.USSR] = 1
+        resolve_coup(gs, iran.id, Side.US, ops=3, die_roll=1)
+        assert gs.defcon == 4
+
+    def test_coup_no_defcon_for_non_bg(self):
+        from ts import GameState, Side, resolve_coup, country_by_name
+        gs = GameState.new()
+        gs.defcon = 5
+        lebanon = country_by_name("Lebanon")
+        gs.influence[lebanon.id][Side.USSR] = 1
+        resolve_coup(gs, lebanon.id, Side.US, ops=2, die_roll=1)
+        assert gs.defcon == 5
+
+    def test_coup_milops_tracking(self):
+        from ts import GameState, Side, resolve_coup, country_by_name
+        gs = GameState.new()
+        iran = country_by_name("Iran")
+        gs.influence[iran.id][Side.USSR] = 1
+        resolve_coup(gs, iran.id, Side.US, ops=3, die_roll=1)
+        assert gs.mil_ops[Side.US] == 3
+
+    def test_defcon_1_game_over(self):
+        from ts import GameState, Side, resolve_coup, country_by_name
+        gs = GameState.new()
+        gs.defcon = 2
+        iran = country_by_name("Iran")  # BG
+        gs.influence[iran.id][Side.USSR] = 1
+        gs.phasing_player = Side.US
+        resolve_coup(gs, iran.id, Side.US, ops=3, die_roll=1)
+        assert gs.defcon == 1
+        assert gs.game_over is True
+        assert gs.winner == Side.USSR  # phasing player loses
