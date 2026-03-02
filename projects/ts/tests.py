@@ -414,3 +414,32 @@ class TestRealignment:
         gs.influence[syria.id][Side.USSR] = 1
         us_mod, ussr_mod = realignment_modifiers(gs, syria.id)
         assert us_mod == 2  # Turkey + Jordan controlled adj
+
+
+class TestDefcon:
+    def test_defcon_restrictions(self):
+        from ts import defcon_restricts_region, Region
+        assert defcon_restricts_region(5, Region.EUROPE) is False
+        assert defcon_restricts_region(4, Region.EUROPE) is True
+        assert defcon_restricts_region(4, Region.ASIA) is False
+        assert defcon_restricts_region(3, Region.EUROPE) is True
+        assert defcon_restricts_region(3, Region.ASIA) is True
+        assert defcon_restricts_region(3, Region.MIDDLE_EAST) is False
+        assert defcon_restricts_region(2, Region.EUROPE) is True
+        assert defcon_restricts_region(2, Region.ASIA) is True
+        assert defcon_restricts_region(2, Region.MIDDLE_EAST) is True
+        assert defcon_restricts_region(2, Region.CENTRAL_AMERICA) is False
+
+
+class TestMilOps:
+    def test_penalty_none(self):
+        from ts import milops_penalty
+        assert milops_penalty(defcon=4, milops=4) == 0
+
+    def test_penalty_deficit(self):
+        from ts import milops_penalty
+        assert milops_penalty(defcon=4, milops=2) == 2
+
+    def test_penalty_excess(self):
+        from ts import milops_penalty
+        assert milops_penalty(defcon=3, milops=5) == 0
