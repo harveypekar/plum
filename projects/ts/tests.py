@@ -112,3 +112,46 @@ class TestCards:
         assert d.ops == 2
         assert d.side == Side.US
         assert d.war_period == Period.EARLY
+
+
+class TestSpaceRace:
+    def test_track_length(self):
+        from ts import SPACE_RACE_TRACK
+        assert len(SPACE_RACE_TRACK) == 9
+
+    def test_satellite(self):
+        from ts import SPACE_RACE_TRACK
+        sat = SPACE_RACE_TRACK[1]
+        assert sat.name == "Satellite"
+        assert sat.ops_required == 2
+        assert sat.roll_max == 3
+        assert sat.first_vp == 2
+        assert sat.second_vp == 1
+
+    def test_station(self):
+        from ts import SPACE_RACE_TRACK
+        station = SPACE_RACE_TRACK[8]
+        assert station.name == "Station"
+        assert station.ops_required == 4
+        assert station.roll_max == 2
+
+
+class TestScoringTable:
+    def test_europe_control_auto_win(self):
+        from ts import SCORING_TABLE, Region
+        europe = SCORING_TABLE[Region.EUROPE]
+        assert europe.control == 1000
+
+    def test_asia_scoring(self):
+        from ts import SCORING_TABLE, Region
+        asia = SCORING_TABLE[Region.ASIA]
+        assert asia.presence == 3
+        assert asia.domination == 7
+        assert asia.control == 9
+
+    def test_central_america_scoring(self):
+        from ts import SCORING_TABLE, Region
+        ca = SCORING_TABLE[Region.CENTRAL_AMERICA]
+        assert ca.presence == 1
+        assert ca.domination == 3
+        assert ca.control == 5
