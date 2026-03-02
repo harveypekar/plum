@@ -343,6 +343,10 @@ def _build_countries() -> tuple[Country, ...]:
 
 COUNTRIES: tuple[Country, ...] = _build_countries()
 
+_COUNTRIES_BY_REGION: dict[Region, list[Country]] = {}
+for _c in COUNTRIES:
+    _COUNTRIES_BY_REGION.setdefault(_c.region, []).append(_c)
+
 _COUNTRY_BY_NAME: dict[str, Country] = {c.name: c for c in COUNTRIES}
 
 
@@ -609,7 +613,7 @@ def controls_country(gs: GameState, country_id: int, side: Side) -> bool:
 # -- Scoring Engine ----------------------------------------------------------
 
 def _countries_in_region(region: Region) -> list[Country]:
-    return [c for c in COUNTRIES if c.region == region]
+    return _COUNTRIES_BY_REGION[region]
 
 
 def score_region(gs: GameState, region: Region) -> tuple[int, int]:
@@ -836,9 +840,12 @@ def build_early_war_deck() -> list[int]:
     return [c.id for c in CARDS if c.war_period == Period.EARLY and c.id != 6]
 
 
-def deal_cards(gs: GameState, hand_size: int):
+def deal_cards(gs: GameState, hand_size: int, rng: random.Random | None = None):
     """Deal cards to bring both players to hand_size."""
-    random.shuffle(gs.draw_pile)
+    if rng:
+        rng.shuffle(gs.draw_pile)
+    else:
+        random.shuffle(gs.draw_pile)
     while len(gs.ussr_hand) < hand_size and gs.draw_pile:
         gs.ussr_hand.append(gs.draw_pile.pop())
     while len(gs.us_hand) < hand_size and gs.draw_pile:
@@ -874,7 +881,7 @@ class TwilightStruggle:
         self.rng.shuffle(gs.draw_pile)
 
         # Deal 8 cards each
-        deal_cards(gs, hand_size=8)
+        deal_cards(gs, hand_size=8, rng=self.rng)
 
         # USSR initial influence
         _cn = country_by_name
@@ -955,7 +962,11 @@ class TwilightStruggle:
                 if card.ops > 0:
                     actions.append(Action(ActionType.PLAY_OPS_INFLUENCE, card_id=card_id))
                     actions.append(Action(ActionType.PLAY_OPS_REALIGN, card_id=card_id))
-                    actions.append(Action(ActionType.PLAY_OPS_COUP, card_id=card_id))
+                    other = Side.USSR if side == Side.US else Side.US
+                    for c in COUNTRIES:
+                        if gs.influence[c.id][other] > 0:
+                            if not defcon_restricts_region(gs.defcon, c.region):
+                                actions.append(Action(ActionType.PLAY_OPS_COUP, card_id=card_id, country_id=c.id))
                     if can_attempt_space_race(gs, side, card.ops) and not gs.space_race_used[side]:
                         actions.append(Action(ActionType.PLAY_OPS_SPACE, card_id=card_id))
 
@@ -966,7 +977,11 @@ class TwilightStruggle:
                 if not has_scoring:
                     actions.append(Action(ActionType.PLAY_OPS_INFLUENCE, card_id=6))
                     actions.append(Action(ActionType.PLAY_OPS_REALIGN, card_id=6))
-                    actions.append(Action(ActionType.PLAY_OPS_COUP, card_id=6))
+                    other = Side.USSR if side == Side.US else Side.US
+                    for c in COUNTRIES:
+                        if gs.influence[c.id][other] > 0:
+                            if not defcon_restricts_region(gs.defcon, c.region):
+                                actions.append(Action(ActionType.PLAY_OPS_COUP, card_id=6, country_id=c.id))
                     if can_attempt_space_race(gs, side, 4) and not gs.space_race_used[side]:
                         actions.append(Action(ActionType.PLAY_OPS_SPACE, card_id=6))
 
@@ -1128,13 +1143,8 @@ class TwilightStruggle:
 
         elif action.type == ActionType.PLAY_OPS_COUP:
             gs.active_card = action.card_id
-            other = Side.USSR if side == Side.US else Side.US
-            for c in COUNTRIES:
-                if gs.influence[c.id][other] > 0:
-                    if not defcon_restricts_region(gs.defcon, c.region):
-                        die = self.rng.randint(1, 6)
-                        resolve_coup(gs, c.id, side, ops, die)
-                        break
+            die = self.rng.randint(1, 6)
+            resolve_coup(gs, action.country_id, side, ops, die)
             self._maybe_trigger_opponent_event(action.card_id, side)
             gs.phase = Phase.ACTION_ROUND
             self._advance_action_round()
@@ -1237,7 +1247,7 @@ class TwilightStruggle:
         if gs.defcon < 5:
             gs.defcon += 1
 
-        deal_cards(gs, hand_size_for_turn(gs.turn))
+        deal_cards(gs, hand_size_for_turn(gs.turn), rng=self.rng)
 
         gs.phase = Phase.HEADLINE
         gs.phasing_player = Side.USSR
