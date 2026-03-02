@@ -708,3 +708,33 @@ def can_place_influence(gs: GameState, country_id: int, side: Side) -> bool:
 def place_influence(gs: GameState, country_id: int, side: Side) -> None:
     """Place one influence marker."""
     gs.influence[country_id][side] += 1
+
+
+# -- Coup Resolution --------------------------------------------------------
+
+def resolve_coup(gs: GameState, country_id: int, side: Side, ops: int, die_roll: int):
+    """Resolve coup attempt. Mutates gs."""
+    c = COUNTRIES[country_id]
+    other = Side.USSR if side == Side.US else Side.US
+
+    # Track mil ops
+    gs.mil_ops[side] += ops
+
+    # DEFCON degradation for battleground coups
+    if c.battleground:
+        gs.defcon -= 1
+        if gs.defcon <= 1:
+            gs.defcon = 1
+            gs.game_over = True
+            gs.winner = other  # phasing player loses
+            return
+
+    # Resolve
+    roll_plus_ops = die_roll + ops
+    target = c.stability * 2
+    if roll_plus_ops > target:
+        diff = roll_plus_ops - target
+        removed = min(diff, gs.influence[country_id][other])
+        gs.influence[country_id][other] -= removed
+        remaining = diff - removed
+        gs.influence[country_id][side] += remaining
