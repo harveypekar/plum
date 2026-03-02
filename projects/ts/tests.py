@@ -364,3 +364,53 @@ class TestCoup:
         assert gs.defcon == 1
         assert gs.game_over is True
         assert gs.winner == Side.USSR  # phasing player loses
+
+
+class TestRealignment:
+    def test_realignment_modifiers(self):
+        from ts import GameState, Side, realignment_modifiers, country_by_name
+        gs = GameState.new()
+        nk = country_by_name("N.Korea")
+        gs.influence[nk.id][Side.USSR] = 3
+        us_mod, ussr_mod = realignment_modifiers(gs, nk.id)
+        # USSR: +1 adjacent superpower, +1 more influence
+        assert ussr_mod == 2
+        assert us_mod == 0
+
+    def test_realignment_us_wins(self):
+        from ts import GameState, Side, resolve_realignment, country_by_name
+        gs = GameState.new()
+        nk = country_by_name("N.Korea")
+        gs.influence[nk.id][Side.USSR] = 3
+        # US rolls 5, USSR rolls 2 (mod +2 = 4). US wins by 1.
+        resolve_realignment(gs, nk.id, Side.US, us_roll=5, ussr_roll=2)
+        assert gs.influence[nk.id][Side.USSR] == 2
+
+    def test_realignment_tie(self):
+        from ts import GameState, Side, resolve_realignment, country_by_name
+        gs = GameState.new()
+        nk = country_by_name("N.Korea")
+        gs.influence[nk.id][Side.USSR] = 3
+        resolve_realignment(gs, nk.id, Side.US, us_roll=4, ussr_roll=2)
+        # USSR mod +2: 2+2=4 = US 4. Tie, no change.
+        assert gs.influence[nk.id][Side.USSR] == 3
+
+    def test_realignment_no_add(self):
+        from ts import GameState, Side, resolve_realignment, country_by_name
+        gs = GameState.new()
+        iran = country_by_name("Iran")
+        gs.influence[iran.id][Side.USSR] = 1
+        resolve_realignment(gs, iran.id, Side.US, us_roll=6, ussr_roll=1)
+        assert gs.influence[iran.id][Side.US] == 0
+
+    def test_adjacent_controlled_modifier(self):
+        from ts import GameState, Side, realignment_modifiers, country_by_name
+        gs = GameState.new()
+        turkey = country_by_name("Turkey")
+        jordan = country_by_name("Jordan")
+        syria = country_by_name("Syria")
+        gs.influence[turkey.id][Side.US] = 2
+        gs.influence[jordan.id][Side.US] = 2
+        gs.influence[syria.id][Side.USSR] = 1
+        us_mod, ussr_mod = realignment_modifiers(gs, syria.id)
+        assert us_mod == 2  # Turkey + Jordan controlled adj
