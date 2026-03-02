@@ -783,3 +783,23 @@ def resolve_realignment(gs: GameState, country_id: int, acting_side: Side,
     elif ussr_total > us_total:
         diff = ussr_total - us_total
         gs.influence[country_id][Side.US] = max(0, gs.influence[country_id][Side.US] - diff)
+
+
+# -- DEFCON Restrictions -----------------------------------------------------
+
+def defcon_restricts_region(defcon: int, region: Region) -> bool:
+    """DEFCON 4: Europe restricted. DEFCON 3: +Asia. DEFCON 2: +Middle East."""
+    if defcon <= 4 and region == Region.EUROPE:
+        return True
+    if defcon <= 3 and region == Region.ASIA:
+        return True
+    if defcon <= 2 and region == Region.MIDDLE_EAST:
+        return True
+    return False
+
+
+# -- Military Ops Penalty ----------------------------------------------------
+
+def milops_penalty(defcon: int, milops: int) -> int:
+    """VP penalty for insufficient military operations."""
+    return max(0, defcon - milops)
