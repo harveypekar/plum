@@ -803,3 +803,27 @@ def defcon_restricts_region(defcon: int, region: Region) -> bool:
 def milops_penalty(defcon: int, milops: int) -> int:
     """VP penalty for insufficient military operations."""
     return max(0, defcon - milops)
+
+
+# -- Space Race Resolution ---------------------------------------------------
+
+def can_attempt_space_race(gs: GameState, side: Side, ops: int) -> bool:
+    pos = gs.space_race[side]
+    if pos >= 8:
+        return False
+    target = SPACE_RACE_TRACK[pos + 1]
+    return ops >= target.ops_required
+
+
+def resolve_space_race(gs: GameState, side: Side, ops: int, die_roll: int) -> int:
+    """Attempt space race advance. Returns VP gained."""
+    pos = gs.space_race[side]
+    target_box = SPACE_RACE_TRACK[pos + 1]
+
+    if die_roll <= target_box.roll_max:
+        gs.space_race[side] = pos + 1
+        other = Side.USSR if side == Side.US else Side.US
+        if gs.space_race[other] >= pos + 1:
+            return target_box.second_vp
+        return target_box.first_vp
+    return 0

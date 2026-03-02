@@ -443,3 +443,39 @@ class TestMilOps:
     def test_penalty_excess(self):
         from ts import milops_penalty
         assert milops_penalty(defcon=3, milops=5) == 0
+
+
+class TestSpaceRaceAttempt:
+    def test_successful_advance(self):
+        from ts import GameState, Side, resolve_space_race
+        gs = GameState.new()
+        vp = resolve_space_race(gs, Side.US, ops=2, die_roll=2)
+        assert gs.space_race[Side.US] == 1
+        assert vp == 2
+
+    def test_failed_roll(self):
+        from ts import GameState, Side, resolve_space_race
+        gs = GameState.new()
+        vp = resolve_space_race(gs, Side.US, ops=2, die_roll=5)
+        assert gs.space_race[Side.US] == 0
+        assert vp == 0
+
+    def test_second_player_vp(self):
+        from ts import GameState, Side, resolve_space_race
+        gs = GameState.new()
+        gs.space_race[Side.USSR] = 1
+        vp = resolve_space_race(gs, Side.US, ops=2, die_roll=2)
+        assert gs.space_race[Side.US] == 1
+        assert vp == 1
+
+    def test_insufficient_ops(self):
+        from ts import GameState, Side, can_attempt_space_race
+        gs = GameState.new()
+        assert can_attempt_space_race(gs, Side.US, ops=1) is False
+        assert can_attempt_space_race(gs, Side.US, ops=2) is True
+
+    def test_already_at_end(self):
+        from ts import GameState, Side, can_attempt_space_race
+        gs = GameState.new()
+        gs.space_race[Side.US] = 8
+        assert can_attempt_space_race(gs, Side.US, ops=4) is False
