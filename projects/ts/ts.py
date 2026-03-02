@@ -911,3 +911,60 @@ def headline_order(ussr_card_id: int, us_card_id: int) -> tuple[Side, Side]:
         return (Side.USSR, Side.US)
     else:
         return (Side.US, Side.USSR)
+
+
+# -- Victory Conditions ------------------------------------------------------
+
+def check_victory(gs: GameState):
+    """Check for automatic VP victory (20 VP)."""
+    if gs.vp >= 20:
+        gs.game_over = True
+        gs.winner = Side.US
+    elif gs.vp <= -20:
+        gs.game_over = True
+        gs.winner = Side.USSR
+
+
+def check_europe_control_victory(gs: GameState) -> Side | None:
+    """Check if either side Controls Europe (auto-win)."""
+    countries = _countries_in_region(Region.EUROPE)
+    total_bg = sum(1 for c in countries if c.battleground)
+
+    for side in (Side.US, Side.USSR):
+        other = Side.USSR if side == Side.US else Side.US
+        controlled = [c for c in countries if controls_country(gs, c.id, side)]
+        bg_count = sum(1 for c in controlled if c.battleground)
+        opp_count = len([c for c in countries if controls_country(gs, c.id, other)])
+        if bg_count == total_bg and len(controlled) > opp_count:
+            return side
+    return None
+
+
+def final_scoring(gs: GameState):
+    """Score all regions at end of Turn 10."""
+    europe_winner = check_europe_control_victory(gs)
+    if europe_winner:
+        gs.game_over = True
+        gs.winner = europe_winner
+        return
+
+    for region in Region:
+        us_vp, ussr_vp = score_region(gs, region)
+        gs.vp += (us_vp - ussr_vp)
+
+    # China card holder gets 1 VP
+    if gs.china_card_holder == Side.US:
+        gs.vp += 1
+    elif gs.china_card_holder == Side.USSR:
+        gs.vp -= 1
+
+    check_victory(gs)
+
+    if not gs.game_over:
+        gs.game_over = True
+        if gs.vp > 0:
+            gs.winner = Side.US
+        elif gs.vp < 0:
+            gs.winner = Side.USSR
+        else:
+            gs.winner = None  # draw
