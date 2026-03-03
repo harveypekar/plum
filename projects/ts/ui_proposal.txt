@@ -1,0 +1,64 @@
+TWILIGHT STRUGGLE — TERMINAL UI PROPOSAL v5 (ISO 3166 CODES)
+=============================================================
+
+KEY IDEA: Use box drawing corners (└┘┌┐├┤┬┴┼─│) for adjacency lines.
+2-letter ISO 3166-1 alpha-2 country codes (historical codes for dissolved states).
+
+Country format:  NA*S ##/##
+  2-char ISO code, * if BG, stability digit, space, 2-digit influence each
+
+
+COUNTRY CODES (ISO 3166-1 alpha-2)
+  Europe:    CA GB BX  FR SP  NO DK DE SE IT GR TR FI AT DD PL CS HU YU RO BG
+  Mid East:  LB SY IL IQ IR JO SA GS EG LY
+  Asia:      AF PK IN KP KR JP TW TH LA VN MY ID PH MM AU
+  Africa:    MA DZ TN WA XS SD CI NG CM ET KE SO ZR AO ZW BW ZA XF
+  C.America: MX GT SV HN CR PA CU HT DO JM NI
+  S.America: CO VE BR EC PE BO CL AR PY UY
+
+  Non-standard:  BX=Benelux  SP=Spain/Portugal  DD=E.Germany (hist.)
+    CS=Czechoslovakia (hist.)  YU=Yugoslavia (hist.)  ZR=Zaire (hist.)
+    GS=Gulf States  WA=W.African States  XS=Saharan States  XF=SE African States
+
+
+COLORS
+  Controlled:     BLUE = US        RED = USSR
+  Uncontrolled:   WHITE = Europe   YELLOW = Mid East   GREEN = Asia
+                  ORANGE = Africa  CYAN = C.America    PINK = S.America
+  Other:          GOLD = BG star   DIM = stability/lines  MAGENTA = thinking
+
+
+=== USSR ======T2=AR3=DEFCON 4=VP:-2=Mil:2/3=Spc:1/0=China:USSR*=14:23:07Z=q8===
+CA 4  2/ 0┐           NO 4  0/ 0─SE 4  0/ 0─FI 4  0/ 1   AF 2  0/ 0─PK*2  0/ 0─IN*3  0/ 0
+          └GB 5  5/ 0─DK 3  0/ 0┘           │        │    │            │           │
+┌BX 3  0/ 0┘FR*3  3/ 1─DE*4  5/ 0─DD*3  0/ 4┼PL*3  0/ 4  LB 1  0/ 0─SY 2  0/ 0  KP*3  0/ 0─JP*4  4/ 0
+│           ├SP 2  0/ 0┤AT 4  0/ 0┤CS 3  0/ 3┘═USSR═      IL*4  1/ 0┤IQ*3  0/ 0  │IR 2  0/ 0 KR*3  0/ 0│TW 3  0/ 0
+│           └IT*2  2/ 0┘HU 3  0/ 1┘                       JO 2  0/ 0┤SA 1  0/ 0─GS 3  0/ 0  │          │
+│            ├GR 2  0/ 0─YU 3  1/ 2─RO 3  0/ 3            EG*2  0/ 0│           MM 2  0/ 0   │          │
+│            │TR 2  0/ 0─BG 3  0/ 2┘        │             LY*2  0/ 0│TH 2  0/ 0─LA 1  0/ 0  │          │
+│            │           │                   │                       │VN 1  0/ 0┤MY 2  0/ 0  │          │
+═USA═        │           │                   │                       │ID 1  0/ 0─PH*2  0/ 0  │          │
+MX 2  0/ 0─GT 1  0/ 0   │                   │ MA 3  0/ 0─DZ*2  0/ 0─TN 2  0/ 0 AU 4  0/ 0  │          │
+├CU*3  0/ 0┤SV 1  0/ 0─HN 2  0/ 0           │ WA 2  0/ 0─XS 1  0/ 0─SD 1  0/ 0            │          │
+├HT 1  0/ 0┤CR 3  0/ 0─PA 2  0/ 0─CO 1  0/ 0┤ CI 2  0/ 0─NG*1  0/ 0─CM 1  0/ 0─ET 1  0/ 0─KE 2  0/ 0─SO 2  0/ 0
+├DO 1  0/ 0│           VE 2  0/ 0─BR*2  0/ 0┘ ZR*1  0/ 0─AO*1  0/ 0│           │XF 1  0/ 0
+├JM 1  0/ 0│NI 1  0/ 0 EC 2  0/ 0│            ZW 1  0/ 0┤BW 2  0/ 0│           ZA*3  0/ 0
+│           │           PE 2  0/ 0│            └──────────┘
+│           │           BO 2  0/ 0─CL*3  0/ 0
+│           │                      AR*2  0/ 0─PY 2  0/ 0─UY 2  0/ 0
+═══════════════════════════════════════════════════════════════════════════════════════════════
+ USSR: Five Year Plan, Duck and Cover, Socialist Governments, De-Stalinization, Blockade...
+ [move] US: influence "Marshall Plan" "France" "France" "Italy"
+ [think] US controls W.Germany at 5/0. Contest France? Push Balkans?
+ USSR> /play influence "De-Stalinization" "Hungary" "Yugoslavia" "Yugoslavia"
+
+
+NOTES
+  - ISO 3166-1 alpha-2 codes; historical codes for dissolved states (DD, CS, YU, ZR)
+  - X-prefix for TS-specific composite regions (XS=Saharan, XF=SE African)
+  - Box drawing └┘┌┐├┤┬┴┼─│ route connections with corners
+  - No gap rows needed — corners turn inline
+  - Map area: ~17 rows. Total with status+hand+LLM: ~23 rows
+  - Width: ~100 cols (down from ~110 with 3-char names). Africa chain widest.
+  - Connection lines in DIM color so country data stands out
+  - Region identity from name color (no headers)
