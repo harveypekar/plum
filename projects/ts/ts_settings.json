@@ -1,0 +1,14 @@
+{
+  "_models": {
+    "q06":    "qwen3:0.6b — Fastest, worst quality. Testing only.",
+    "q17":    "qwen3:1.7b — Fast, poor quality. Quick iteration.",
+    "q4":     "qwen3:4b — Balanced speed/quality. Good for dev.",
+    "q8":     "qwen3:8b — Best local model. Native thinking.",
+    "q25":    "qwen2.5:7b — No thinking support. Set think=false.",
+    "haiku":  "claude-haiku-4-5 — Fast, cheap. Needs Ollama proxy.",
+    "sonnet": "claude-sonnet-4-6 — Strong all-rounder. Needs Ollama proxy.",
+    "opus":   "claude-opus-4-6 — Best reasoning. Needs Ollama proxy."
+  },
+  "model": "q8",
+  "think": true
+}
