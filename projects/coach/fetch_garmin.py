@@ -352,6 +352,87 @@ def fetch_activity_details(garmin: Garmin, activities: list, full: bool = False)
     print("  Activity details complete")
 
 
+DAILY_ENDPOINTS = [
+    ("summary.json", "summary", lambda g, d: g.get_user_summary(d)),
+    ("heart_rates.json", "heart rates", lambda g, d: g.get_heart_rates(d)),
+    ("stress.json", "stress", lambda g, d: g.get_all_day_stress(d)),
+    ("stress_detail.json", "stress detail", lambda g, d: g.get_stress_data(d)),
+    ("events.json", "events", lambda g, d: g.get_all_day_events(d)),
+    ("steps.json", "steps", lambda g, d: g.get_steps_data(d)),
+    ("floors.json", "floors", lambda g, d: g.get_floors(d)),
+    ("sleep.json", "sleep", lambda g, d: g.get_sleep_data(d)),
+    ("body_battery.json", "body battery", lambda g, d: g.get_body_battery(d)),
+    ("body_battery_events.json", "body battery events", lambda g, d: g.get_body_battery_events(d)),
+    ("rhr.json", "resting HR", lambda g, d: g.get_rhr_day(d)),
+    ("hrv.json", "HRV", lambda g, d: g.get_hrv_data(d)),
+    ("spo2.json", "SpO2", lambda g, d: g.get_spo2_data(d)),
+    ("respiration.json", "respiration", lambda g, d: g.get_respiration_data(d)),
+    ("intensity_minutes.json", "intensity minutes", lambda g, d: g.get_intensity_minutes_data(d)),
+    ("training_readiness.json", "training readiness", lambda g, d: g.get_training_readiness(d)),
+    ("training_status.json", "training status", lambda g, d: g.get_training_status(d)),
+    ("endurance_score.json", "endurance score", lambda g, d: g.get_endurance_score(d)),
+    ("hill_score.json", "hill score", lambda g, d: g.get_hill_score(d)),
+    ("max_metrics.json", "max metrics", lambda g, d: g.get_max_metrics(d)),
+    ("race_predictions.json", "race predictions", lambda g, d: g.get_race_predictions(d)),
+    ("body_composition.json", "body composition", lambda g, d: g.get_body_composition(d)),
+    ("weigh_ins.json", "weigh-ins", lambda g, d: g.get_daily_weigh_ins(d)),
+    ("hydration.json", "hydration", lambda g, d: g.get_hydration_data(d)),
+    ("fitness_age.json", "fitness age", lambda g, d: g.get_fitnessage_data(d)),
+    ("lifestyle.json", "lifestyle", lambda g, d: g.get_lifestyle_logging_data(d)),
+]
+
+
+def fetch_daily(garmin: Garmin, activities: list, today: date, full: bool = False) -> None:
+    """Fetch daily wellness data for every date that has activity data, plus recent 90 days."""
+    daily_dir = DATA_DIR / "daily"
+
+    activity_dates = []
+    for a in activities:
+        d = a.get("startTimeLocal", "")[:10]
+        if d:
+            try:
+                activity_dates.append(date.fromisoformat(d))
+            except ValueError:
+                pass
+
+    if not activity_dates:
+        start = today - timedelta(days=90)
+    else:
+        start = min(activity_dates)
+
+    dates_to_fetch = set(activity_dates)
+    for i in range(90):
+        dates_to_fetch.add(today - timedelta(days=i))
+    dates_to_fetch = sorted(dates_to_fetch)
+
+    total = len(dates_to_fetch)
+    print(f"Fetching daily data for {total} dates ({dates_to_fetch[0]} to {dates_to_fetch[-1]})...")
+
+    for i, d in enumerate(dates_to_fetch):
+        d_str = str(d)
+        day_dir = daily_dir / d_str
+
+        if not full and day_dir.exists():
+            existing = set(f.name for f in day_dir.iterdir())
+            expected = set(fname for fname, _, _ in DAILY_ENDPOINTS)
+            if expected.issubset(existing):
+                continue
+
+        if (i + 1) % 30 == 0 or i == 0:
+            print(f"  [{i + 1}/{total}] {d_str}")
+
+        for filename, desc, func in DAILY_ENDPOINTS:
+            if not full and (day_dir / filename).exists():
+                continue
+            data = api_call(f"{d_str} {desc}", func, garmin, d_str)
+            if data is not None:
+                save_json(day_dir / filename, data)
+
+        time.sleep(0.5)
+
+    print("  Daily data complete")
+
+
 def main():
     args = parse_args()
     garmin = authenticate()
