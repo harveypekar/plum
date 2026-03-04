@@ -433,6 +433,63 @@ def fetch_daily(garmin: Garmin, activities: list, today: date, full: bool = Fals
     print("  Daily data complete")
 
 
+def fetch_weekly(garmin: Garmin, today: date, full: bool = False) -> None:
+    """Fetch weekly aggregated data."""
+    print("Fetching weekly data...")
+    weekly_dir = DATA_DIR / "weekly"
+    today_str = str(today)
+
+    steps = api_call("weekly steps", garmin.get_weekly_steps, today_str, 52)
+    if steps is not None:
+        save_json(weekly_dir / "steps.json", steps)
+
+    stress = api_call("weekly stress", garmin.get_weekly_stress, today_str, 52)
+    if stress is not None:
+        save_json(weekly_dir / "stress.json", stress)
+
+    start_str = str(today - timedelta(weeks=52))
+    intensity = api_call("weekly intensity minutes",
+                         garmin.get_weekly_intensity_minutes, start_str, today_str)
+    if intensity is not None:
+        save_json(weekly_dir / "intensity_minutes.json", intensity)
+
+    print("  Weekly data complete")
+
+
+def fetch_range_data(garmin: Garmin, activities: list, today: date) -> None:
+    """Fetch data that spans a date range (blood pressure, weight, progress)."""
+    print("Fetching range data...")
+
+    earliest = today - timedelta(days=365)
+    for a in activities:
+        d = a.get("startTimeLocal", "")[:10]
+        if d:
+            try:
+                dt = date.fromisoformat(d)
+                if dt < earliest:
+                    earliest = dt
+            except ValueError:
+                pass
+
+    earliest_str = str(earliest)
+    today_str = str(today)
+
+    bp = api_call("blood pressure", garmin.get_blood_pressure, earliest_str, today_str)
+    if bp is not None:
+        save_json(DATA_DIR / "blood_pressure" / "all.json", bp)
+
+    weight = api_call("weight", garmin.get_weigh_ins, earliest_str, today_str)
+    if weight is not None:
+        save_json(DATA_DIR / "weight" / "all.json", weight)
+
+    progress = api_call("progress summary",
+                        garmin.get_progress_summary_between_dates, earliest_str, today_str)
+    if progress is not None:
+        save_json(DATA_DIR / "progress" / "summary.json", progress)
+
+    print("  Range data complete")
+
+
 def main():
     args = parse_args()
     garmin = authenticate()
