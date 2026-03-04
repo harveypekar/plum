@@ -1,0 +1,2692 @@
+{
+  "metadata": {
+    "source": "Twilight Struggle Steam Game",
+    "extracted_from": [
+      "twilight_cards.lua",
+      "twilight_turnzero.lua",
+      "twilight_promos.lua",
+      "twilight_map.lua"
+    ]
+  },
+  "summary": {
+    "total_cards": 140,
+    "total_countries": 87,
+    "card_types": {
+      "Scoring": 8,
+      "Event": 116,
+      "Statecraft": 10,
+      "Crisis": 6
+    },
+    "ops_distribution": {
+      "0": 24,
+      "1": 17,
+      "2": 46,
+      "3": 39,
+      "4": 14
+    },
+    "geographic_regions": 10
+  },
+  "cards": [
+    {
+      "name": "Asia Scoring",
+      "id": 1,
+      "type": "Scoring",
+      "war": "TS_EARLY",
+      "description": "Both sides score:\nPresence: 3\nDomination: 7\nControl: 9\n",
+      "scoring_region": "Asia"
+    },
+    {
+      "name": "Europe Scoring",
+      "id": 2,
+      "type": "Scoring",
+      "war": "TS_EARLY",
+      "description": "Both sides score:\nPresence: 3\nDomination: 7\nControl: VICTORY\n",
+      "scoring_region": "Europe"
+    },
+    {
+      "name": "Middle East Scoring",
+      "id": 3,
+      "type": "Scoring",
+      "war": "TS_EARLY",
+      "description": "Both sides score:\nPresence: 3\nDomination: 5\nControl: 7\n",
+      "scoring_region": "Middle East"
+    },
+    {
+      "name": "Duck and Cover",
+      "id": 4,
+      "type": "Event",
+      "war": "TS_EARLY",
+      "ops": 3,
+      "side": "US",
+      "description": "Degrade DEFCON one level.\n",
+      "defcon_change": [
+        -1,
+        -1
+      ]
+    },
+    {
+      "name": "Five-Year Plan",
+      "id": 5,
+      "type": "Event",
+      "war": "TS_EARLY",
+      "ops": 3,
+      "side": "US",
+      "description": "USSR player must randomly discard one card. ",
+      "defcon_change": [
+        -1,
+        0
+      ]
+    },
+    {
+      "name": "The China Card",
+      "id": 6,
+      "type": "Event",
+      "war": "TS_EARLY",
+      "ops": 4,
+      "side": "NONE",
+      "description": "Begins the game with the USSR player.\n",
+      "can_headline": false
+    },
+    {
+      "name": "Socialist Governments",
+      "id": 7,
+      "type": "Event",
+      "war": "TS_EARLY",
+      "ops": 3,
+      "side": "USSR",
+      "description": "Unplayable as an event if \\'The Iron Lady\\' is in effect.\n"
+    },
+    {
+      "name": "Fidel",
+      "id": 8,
+      "type": "Event",
+      "war": "TS_EARLY",
+      "ops": 2,
+      "side": "USSR",
+      "description": "Remove all US Influence in Cuba. "
+    },
+    {
+      "name": "Vietnam Revolts",
+      "id": 9,
+      "type": "Event",
+      "war": "TS_EARLY",
+      "ops": 2,
+      "side": "USSR",
+      "description": "Add 2 USSR Influence in Vietnam. "
+    },
+    {
+      "name": "Blockade",
+      "id": 10,
+      "type": "Event",
+      "war": "TS_EARLY",
+      "ops": 1,
+      "side": "USSR",
+      "description": "Unless US Player immediately discards a \\'3\\' or more value Operations card, "
+    },
+    {
+      "name": "Korean War",
+      "id": 11,
+      "type": "Event",
+      "war": "TS_EARLY",
+      "ops": 2,
+      "side": "USSR",
+      "description": "North Korea invades South Korea. "
+    },
+    {
+      "name": "Romanian Abdication",
+      "id": 12,
+      "type": "Event",
+      "war": "TS_EARLY",
+      "ops": 1,
+      "side": "USSR",
+      "description": "Remove all US Influence in Romania. "
+    },
+    {
+      "name": "Arab-Israeli War",
+      "id": 13,
+      "type": "Event",
+      "war": "TS_EARLY",
+      "ops": 2,
+      "side": "USSR",
+      "description": "A Pan-Arab Coalition invades Israel. "
+    },
+    {
+      "name": "COMECON",
+      "id": 14,
+      "type": "Event",
+      "war": "TS_EARLY",
+      "ops": 3,
+      "side": "USSR",
+      "description": "Add 1 USSR Influence in each of four non-US Controlled countries in Eastern Europe."
+    },
+    {
+      "name": "Nasser",
+      "id": 15,
+      "type": "Event",
+      "war": "TS_EARLY",
+      "ops": 1,
+      "side": "USSR",
+      "description": "Add 2 USSR Influence in Egypt. "
+    },
+    {
+      "name": "Warsaw Pact Formed",
+      "id": 16,
+      "type": "Event",
+      "war": "TS_EARLY",
+      "ops": 3,
+      "side": "USSR",
+      "description": "Remove all US Influence from four countries in Eastern Europe, "
+    },
+    {
+      "name": "De Gaulle Leads France",
+      "id": 17,
+      "type": "Event",
+      "war": "TS_EARLY",
+      "ops": 3,
+      "side": "USSR",
+      "description": "Remove 2 US Influence in France, add 1 USSR Influence. "
+    },
+    {
+      "name": "Captured Nazi Scientist",
+      "id": 18,
+      "type": "Event",
+      "war": "TS_EARLY",
+      "ops": 1,
+      "side": "NONE",
+      "description": "Advance player's Space Race marker one box."
+    },
+    {
+      "name": "Truman Doctrine",
+      "id": 19,
+      "type": "Event",
+      "war": "TS_EARLY",
+      "ops": 1,
+      "side": "US",
+      "description": "Remove all USSR Influence markers in one uncontrolled country in Europe."
+    },
+    {
+      "name": "Olympic Games",
+      "id": 20,
+      "type": "Event",
+      "war": "TS_EARLY",
+      "ops": 2,
+      "side": "NONE",
+      "description": "Player sponsors Olympics. ",
+      "defcon_change": [
+        -1,
+        -1
+      ]
+    },
+    {
+      "name": "NATO",
+      "id": 21,
+      "type": "Event",
+      "war": "TS_EARLY",
+      "ops": 4,
+      "side": "US",
+      "description": "Play after \\'Marshall Plan\\' or \\'Warsaw Pact\\'.\n"
+    },
+    {
+      "name": "Independent Reds",
+      "id": 22,
+      "type": "Event",
+      "war": "TS_EARLY",
+      "ops": 2,
+      "side": "US",
+      "description": "Adds sufficient US Influence in either Yugoslavia, Romania, Bulgaria, Hungary, "
+    },
+    {
+      "name": "Marshall Plan",
+      "id": 23,
+      "type": "Event",
+      "war": "TS_EARLY",
+      "ops": 4,
+      "side": "US",
+      "description": "Allows play of NATO.\n"
+    },
+    {
+      "name": "Indo-Pakistani War",
+      "id": 24,
+      "type": "Event",
+      "war": "TS_EARLY",
+      "ops": 2,
+      "side": "NONE",
+      "description": "India or Pakistan invades the other (player's choice). "
+    },
+    {
+      "name": "Containment",
+      "id": 25,
+      "type": "Event",
+      "war": "TS_EARLY",
+      "ops": 3,
+      "side": "US",
+      "description": "All further Operations cards played by US this turn "
+    },
+    {
+      "name": "CIA Created",
+      "id": 26,
+      "type": "Event",
+      "war": "TS_EARLY",
+      "ops": 1,
+      "side": "US",
+      "description": "USSR reveals hand this turn.\n",
+      "defcon_change": [
+        -1,
+        0
+      ]
+    },
+    {
+      "name": "US/Japan Mutual Defense Pact",
+      "id": 27,
+      "type": "Event",
+      "war": "TS_EARLY",
+      "ops": 4,
+      "side": "US",
+      "description": "US gains sufficient Influence in Japan for Control. "
+    },
+    {
+      "name": "Suez Crisis",
+      "id": 28,
+      "type": "Event",
+      "war": "TS_EARLY",
+      "ops": 3,
+      "side": "USSR",
+      "description": "Remove a total of 4 US Influence from France, the United Kingdom or Israel. "
+    },
+    {
+      "name": "East European Unrest",
+      "id": 29,
+      "type": "Event",
+      "war": "TS_EARLY",
+      "ops": 3,
+      "side": "US",
+      "description": "In Early or Mid War: Remove 1 USSR Influence from three countries in Eastern Europe.\n"
+    },
+    {
+      "name": "Decolonization",
+      "id": 30,
+      "type": "Event",
+      "war": "TS_EARLY",
+      "ops": 2,
+      "side": "USSR",
+      "description": "Add one USSR Influence in each of any four African and/or SE Asian countries."
+    },
+    {
+      "name": "Red Scare/Purge",
+      "id": 31,
+      "type": "Event",
+      "war": "TS_EARLY",
+      "ops": 4,
+      "side": "NONE",
+      "description": "All further Operations cards played by your opponent this turn "
+    },
+    {
+      "name": "UN Intervention",
+      "id": 32,
+      "type": "Event",
+      "war": "TS_EARLY",
+      "ops": 1,
+      "side": "NONE",
+      "description": "Play this card simultaneously with a card containing your opponent's associated Event. ",
+      "can_headline": false
+    },
+    {
+      "name": "De-Stalinization",
+      "id": 33,
+      "type": "Event",
+      "war": "TS_EARLY",
+      "ops": 3,
+      "side": "USSR",
+      "description": "USSR may relocate up to 4 Influence points to non-US controlled countries. "
+    },
+    {
+      "name": "Nuclear Test Ban",
+      "id": 34,
+      "type": "Event",
+      "war": "TS_EARLY",
+      "ops": 4,
+      "side": "NONE",
+      "description": "Player earns VPs equal to the current DEFCON level minus 2, "
+    },
+    {
+      "name": "Formosan Resolution",
+      "id": 35,
+      "type": "Event",
+      "war": "TS_EARLY",
+      "ops": 2,
+      "side": "US",
+      "description": "Taiwan shall be treated as a Battleground country for scoring purposes, "
+    },
+    {
+      "name": "Brush War",
+      "id": 36,
+      "type": "Event",
+      "war": "TS_MID",
+      "ops": 3,
+      "side": "NONE",
+      "description": "Attack any country with a stability of 1 or 2. "
+    },
+    {
+      "name": "Central America Scoring",
+      "id": 37,
+      "type": "Scoring",
+      "war": "TS_MID",
+      "description": "Both sides score:\nPresence: 1\nDomination: 3\nControl: 5\n",
+      "scoring_region": "Central America"
+    },
+    {
+      "name": "Southeast Asia Scoring",
+      "id": 38,
+      "type": "Scoring",
+      "war": "TS_MID",
+      "description": "Both sides score:\n",
+      "scoring_region": "Southeast Asia"
+    },
+    {
+      "name": "Arms Race",
+      "id": 39,
+      "type": "Event",
+      "war": "TS_MID",
+      "ops": 3,
+      "side": "NONE",
+      "description": "Compare each player's status on the Military Operations Track. "
+    },
+    {
+      "name": "Cuban Missile Crisis",
+      "id": 40,
+      "type": "Event",
+      "war": "TS_MID",
+      "ops": 3,
+      "side": "NONE",
+      "description": "Set DEFCON to Level 2. "
+    },
+    {
+      "name": "Nuclear Subs",
+      "id": 41,
+      "type": "Event",
+      "war": "TS_MID",
+      "ops": 2,
+      "side": "US",
+      "description": "US Coup attempts in Battleground Countries do not affect the DEFCON track "
+    },
+    {
+      "name": "Quagmire",
+      "id": 42,
+      "type": "Event",
+      "war": "TS_MID",
+      "ops": 3,
+      "side": "USSR",
+      "description": "On next action round, US player must discard an Operations card worth 2 or more "
+    },
+    {
+      "name": "Salt Negotiations",
+      "id": 43,
+      "type": "Event",
+      "war": "TS_MID",
+      "ops": 3,
+      "side": "NONE",
+      "description": "Improve DEFCON two levels.\n"
+    },
+    {
+      "name": "Bear Trap",
+      "id": 44,
+      "type": "Event",
+      "war": "TS_MID",
+      "ops": 3,
+      "side": "US",
+      "description": "On next action round, USSR player must discard an Operations card worth 2 or more "
+    },
+    {
+      "name": "Summit",
+      "id": 45,
+      "type": "Event",
+      "war": "TS_MID",
+      "ops": 1,
+      "side": "NONE",
+      "description": "Both players roll a die.  Each adds 1 for each Region they Dominate or Control. ",
+      "defcon_change": [
+        -1,
+        -1
+      ]
+    },
+    {
+      "name": "How I Learned to Stop Worrying",
+      "id": 46,
+      "type": "Event",
+      "war": "TS_MID",
+      "ops": 2,
+      "side": "NONE",
+      "description": "Set the DEFCON at any level you want (1-5). "
+    },
+    {
+      "name": "Junta",
+      "id": 47,
+      "type": "Event",
+      "war": "TS_MID",
+      "ops": 2,
+      "side": "NONE",
+      "description": "Place 2 Influence in any one Central or South American country.\n"
+    },
+    {
+      "name": "Kitchen Debates",
+      "id": 48,
+      "type": "Event",
+      "war": "TS_MID",
+      "ops": 1,
+      "side": "US",
+      "description": "If the US controls more Battleground countries than the USSR, "
+    },
+    {
+      "name": "Missile Envy",
+      "id": 49,
+      "type": "Event",
+      "war": "TS_MID",
+      "ops": 2,
+      "side": "NONE",
+      "description": "Exchange this card for your opponent's highest valued Operations card in his hand. ",
+      "defcon_change": [
+        -1,
+        -1
+      ]
+    },
+    {
+      "name": "We Will Bury You",
+      "id": 50,
+      "type": "Event",
+      "war": "TS_MID",
+      "ops": 4,
+      "side": "USSR",
+      "description": "Unless UN Invervention is played as an Event on the US player's next round, ",
+      "defcon_change": [
+        -1,
+        -1
+      ]
+    },
+    {
+      "name": "Brezhnev Doctrine",
+      "id": 51,
+      "type": "Event",
+      "war": "TS_MID",
+      "ops": 3,
+      "side": "USSR",
+      "description": "All further Operations cards played by the USSR this turn "
+    },
+    {
+      "name": "Portuguese Empire Crumbles",
+      "id": 52,
+      "type": "Event",
+      "war": "TS_MID",
+      "ops": 2,
+      "side": "USSR",
+      "description": "Add 2 USSR Influence in both SE African States and Angola."
+    },
+    {
+      "name": "South African Unrest",
+      "id": 53,
+      "type": "Event",
+      "war": "TS_MID",
+      "ops": 2,
+      "side": "USSR",
+      "description": "USSR either adds 2 Influence in South Africa "
+    },
+    {
+      "name": "Allende",
+      "id": 54,
+      "type": "Event",
+      "war": "TS_MID",
+      "ops": 1,
+      "side": "USSR",
+      "description": "USSR receives 2 Influence in Chile."
+    },
+    {
+      "name": "Willy Brandt",
+      "id": 55,
+      "type": "Event",
+      "war": "TS_MID",
+      "ops": 2,
+      "side": "USSR",
+      "description": "USSR receives gains 1 VP.\n"
+    },
+    {
+      "name": "Muslim Revolution",
+      "id": 56,
+      "type": "Event",
+      "war": "TS_MID",
+      "ops": 4,
+      "side": "USSR",
+      "description": "Remove all US Influence in two of the following countries: "
+    },
+    {
+      "name": "ABM Treaty",
+      "id": 57,
+      "type": "Event",
+      "war": "TS_MID",
+      "ops": 4,
+      "side": "NONE",
+      "description": "Improve DEFCON one level.\n"
+    },
+    {
+      "name": "Cultural Revolution",
+      "id": 58,
+      "type": "Event",
+      "war": "TS_MID",
+      "ops": 3,
+      "side": "USSR",
+      "description": "If the US has \\'The China Card\\', claim it face up and available for play. "
+    },
+    {
+      "name": "Flower Power",
+      "id": 59,
+      "type": "Event",
+      "war": "TS_MID",
+      "ops": 4,
+      "side": "USSR",
+      "description": "USSR gains 2 VP for every subsequently US played \\'war card\\' "
+    },
+    {
+      "name": "U2 Incident",
+      "id": 60,
+      "type": "Event",
+      "war": "TS_MID",
+      "ops": 3,
+      "side": "USSR",
+      "description": "USSR gains 1VP.\n"
+    },
+    {
+      "name": "OPEC",
+      "id": 61,
+      "type": "Event",
+      "war": "TS_MID",
+      "ops": 3,
+      "side": "USSR",
+      "description": "USSR gains 1VP for each of the following countries he controls:\n"
+    },
+    {
+      "name": "Lone Gunman",
+      "id": 62,
+      "type": "Event",
+      "war": "TS_MID",
+      "ops": 1,
+      "side": "USSR",
+      "description": "US player reveals his hand. ",
+      "defcon_change": [
+        0,
+        -1
+      ]
+    },
+    {
+      "name": "Colonial Rear Guards",
+      "id": 63,
+      "type": "Event",
+      "war": "TS_MID",
+      "ops": 2,
+      "side": "US",
+      "description": "Add 1 US Influence in each of four different African and/or Southeast Asian countries."
+    },
+    {
+      "name": "Panama Canal Returned",
+      "id": 64,
+      "type": "Event",
+      "war": "TS_MID",
+      "ops": 1,
+      "side": "US",
+      "description": "Add 1 US Influence in Panama, Costa Rica, and Venezuela."
+    },
+    {
+      "name": "Camp David Accords",
+      "id": 65,
+      "type": "Event",
+      "war": "TS_MID",
+      "ops": 2,
+      "side": "US",
+      "description": "US gains 1 VP.\n"
+    },
+    {
+      "name": "Puppet Governments",
+      "id": 66,
+      "type": "Event",
+      "war": "TS_MID",
+      "ops": 2,
+      "side": "US",
+      "description": "US may add 1 Influence in three countries that currently contain no Influence from either power."
+    },
+    {
+      "name": "Grain Sales to Soviets",
+      "id": 67,
+      "type": "Event",
+      "war": "TS_MID",
+      "ops": 2,
+      "side": "US",
+      "description": "Randomly choose one card from USSR hand. ",
+      "defcon_change": [
+        -1,
+        0
+      ]
+    },
+    {
+      "name": "John Paul II Elected Pope",
+      "id": 68,
+      "type": "Event",
+      "war": "TS_MID",
+      "ops": 2,
+      "side": "US",
+      "description": "Remove 2 USSR Influence in Poland and then add 1 US Influence in Poland.\n"
+    },
+    {
+      "name": "Latin American Death Squads",
+      "id": 69,
+      "type": "Event",
+      "war": "TS_MID",
+      "ops": 2,
+      "side": "NONE",
+      "description": "All of the player's Coup attempts in Central and South America are +1 "
+    },
+    {
+      "name": "OAS Founded",
+      "id": 70,
+      "type": "Event",
+      "war": "TS_MID",
+      "ops": 1,
+      "side": "US",
+      "description": "Add 2 US Influence in Central America and/or South America."
+    },
+    {
+      "name": "Nixon Plays The China Card",
+      "id": 71,
+      "type": "Event",
+      "war": "TS_MID",
+      "ops": 2,
+      "side": "US",
+      "description": "If US has \\'The China Card\\', gain 2 VP. "
+    },
+    {
+      "name": "Sadat Expels Soviets",
+      "id": 72,
+      "type": "Event",
+      "war": "TS_MID",
+      "ops": 1,
+      "side": "US",
+      "description": "Remove all USSR Influence in Egypt and add one US Influence."
+    },
+    {
+      "name": "Shuttle Diplomacy",
+      "id": 73,
+      "type": "Event",
+      "war": "TS_MID",
+      "ops": 3,
+      "side": "US",
+      "description": "Play in front of US player. "
+    },
+    {
+      "name": "The Voice Of America",
+      "id": 74,
+      "type": "Event",
+      "war": "TS_MID",
+      "ops": 2,
+      "side": "US",
+      "description": "Remove 4 USSR Influence from non-European countries. "
+    },
+    {
+      "name": "Liberation Theology",
+      "id": 75,
+      "type": "Event",
+      "war": "TS_MID",
+      "ops": 2,
+      "side": "USSR",
+      "description": "Add 3 USSR Influence in Central America, no more than 2 per country."
+    },
+    {
+      "name": "Ussuri River Skirmish",
+      "id": 76,
+      "type": "Event",
+      "war": "TS_MID",
+      "ops": 3,
+      "side": "US",
+      "description": "If the USSR has \\'The China Card\\', claim it face up and available for play. "
+    },
+    {
+      "name": "Ask Not What Your Country Can Do For You...",
+      "id": 77,
+      "type": "Event",
+      "war": "TS_MID",
+      "ops": 3,
+      "side": "US",
+      "description": "US player may discard up to entire hand (including Scoring cards) "
+    },
+    {
+      "name": "Alliance for Progress",
+      "id": 78,
+      "type": "Event",
+      "war": "TS_MID",
+      "ops": 3,
+      "side": "US",
+      "description": "US gains 1 VP for each US controlled Battleground country in Central America and South America."
+    },
+    {
+      "name": "Africa Scoring",
+      "id": 79,
+      "type": "Scoring",
+      "war": "TS_MID",
+      "description": "Both sides score:\nPresence: 1\nDomination: 4\nControl: 6\n",
+      "scoring_region": "Africa"
+    },
+    {
+      "name": "One Small Step...",
+      "id": 80,
+      "type": "Event",
+      "war": "TS_MID",
+      "ops": 2,
+      "side": "NONE",
+      "description": "If you are behind on the Space Race Track, play this card to move your marker "
+    },
+    {
+      "name": "South America Scoring",
+      "id": 81,
+      "type": "Scoring",
+      "war": "TS_MID",
+      "description": "Both sides score:\nPresence: 2\nDomination: 5\nControl: 6\n",
+      "scoring_region": "South America"
+    },
+    {
+      "name": "Iranian Hostage Crisis",
+      "id": 82,
+      "type": "Event",
+      "war": "TS_LATE",
+      "ops": 3,
+      "side": "USSR",
+      "description": "Remove all US Influence in Iran. Add 2 USSR Influence in Iran.\n"
+    },
+    {
+      "name": "The Iron Lady",
+      "id": 83,
+      "type": "Event",
+      "war": "TS_LATE",
+      "ops": 3,
+      "side": "US",
+      "description": "US gains 1 VP.\n"
+    },
+    {
+      "name": "Reagan Bombs Libya",
+      "id": 84,
+      "type": "Event",
+      "war": "TS_LATE",
+      "ops": 2,
+      "side": "US",
+      "description": "US gains 1 VP for every 2 USSR Influence in Libya."
+    },
+    {
+      "name": "Star Wars",
+      "id": 85,
+      "type": "Event",
+      "war": "TS_LATE",
+      "ops": 2,
+      "side": "US",
+      "description": "If the US is ahead on the Space Race Track, ",
+      "defcon_change": [
+        -1,
+        0
+      ]
+    },
+    {
+      "name": "North Sea Oil",
+      "id": 86,
+      "type": "Event",
+      "war": "TS_LATE",
+      "ops": 3,
+      "side": "US",
+      "description": "OPEC event is no longer playable.\n"
+    },
+    {
+      "name": "The Reformer",
+      "id": 87,
+      "type": "Event",
+      "war": "TS_LATE",
+      "ops": 3,
+      "side": "USSR",
+      "description": "Add 4 Influence in Europe (no more than 2 per country). "
+    },
+    {
+      "name": "Marine Barracks Bombing",
+      "id": 88,
+      "type": "Event",
+      "war": "TS_LATE",
+      "ops": 2,
+      "side": "USSR",
+      "description": "Remove all US Influence in Lebanon plus remove 2 additional US Influence "
+    },
+    {
+      "name": "Soviets Shoot Down KAL-007",
+      "id": 89,
+      "type": "Event",
+      "war": "TS_LATE",
+      "ops": 4,
+      "side": "US",
+      "description": "Degrade DEFCON one level. US gains 2 VP.\n",
+      "defcon_change": [
+        -1,
+        -1
+      ]
+    },
+    {
+      "name": "Glasnost",
+      "id": 90,
+      "type": "Event",
+      "war": "TS_LATE",
+      "ops": 4,
+      "side": "USSR",
+      "description": "USSR gains 2 VP.\n"
+    },
+    {
+      "name": "Ortega Elected in Nicaragua",
+      "id": 91,
+      "type": "Event",
+      "war": "TS_LATE",
+      "ops": 2,
+      "side": "USSR",
+      "description": "Remove all US Influence from Nicaragua. ",
+      "defcon_change": [
+        0,
+        -1
+      ]
+    },
+    {
+      "name": "Terrorism",
+      "id": 92,
+      "type": "Event",
+      "war": "TS_LATE",
+      "ops": 2,
+      "side": "NONE",
+      "description": "Opponent must randomly discard one card. "
+    },
+    {
+      "name": "Iran-Contra Scandal",
+      "id": 93,
+      "type": "Event",
+      "war": "TS_LATE",
+      "ops": 2,
+      "side": "USSR",
+      "description": "All US Realignment rolls have a -1 die roll modifier for the remainder of the turn."
+    },
+    {
+      "name": "Chernobyl",
+      "id": 94,
+      "type": "Event",
+      "war": "TS_LATE",
+      "ops": 3,
+      "side": "US",
+      "description": "The US player may designate one Region. "
+    },
+    {
+      "name": "Latin American Debt Crisis",
+      "id": 95,
+      "type": "Event",
+      "war": "TS_LATE",
+      "ops": 2,
+      "side": "USSR",
+      "description": "Unless the US Player immediately discards a \\'3\\' or greater Operations card, "
+    },
+    {
+      "name": "Tear Down This Wall",
+      "id": 96,
+      "type": "Event",
+      "war": "TS_LATE",
+      "ops": 3,
+      "side": "US",
+      "description": "Cancels/prevent Willy Brandt.\n",
+      "defcon_change": [
+        -1,
+        0
+      ]
+    },
+    {
+      "name": "An Evil Empire",
+      "id": 97,
+      "type": "Event",
+      "war": "TS_LATE",
+      "ops": 3,
+      "side": "US",
+      "description": "Cancels/Prevents Flower Power.\n"
+    },
+    {
+      "name": "Aldrich Ames Remix",
+      "id": 98,
+      "type": "Event",
+      "war": "TS_LATE",
+      "ops": 3,
+      "side": "USSR",
+      "description": "US player exposes his hand to USSR player for remainder of turn. "
+    },
+    {
+      "name": "Pershing II Deployed",
+      "id": 99,
+      "type": "Event",
+      "war": "TS_LATE",
+      "ops": 3,
+      "side": "USSR",
+      "description": "USSR gains 1 VP.\n"
+    },
+    {
+      "name": "Wargames",
+      "id": 100,
+      "type": "Event",
+      "war": "TS_LATE",
+      "ops": 4,
+      "side": "NONE",
+      "description": "If DEFCON Status 2, you may immediately end the game (without Final Scoring Phase) "
+    },
+    {
+      "name": "Solidarity",
+      "id": 101,
+      "type": "Event",
+      "war": "TS_LATE",
+      "ops": 2,
+      "side": "US",
+      "description": "Playable as an event only if John Paul II Elected Pope is in effect.\n"
+    },
+    {
+      "name": "Iran-Iraq War",
+      "id": 102,
+      "type": "Event",
+      "war": "TS_LATE",
+      "ops": 2,
+      "side": "NONE",
+      "description": "Iran or Iraq invades the other (player's choice). "
+    },
+    {
+      "name": "Defectors",
+      "id": 103,
+      "type": "Event",
+      "war": "TS_EARLY",
+      "ops": 2,
+      "side": "US",
+      "description": "Play in Headline Phase to cancel USSR Headline event, including Scoring Card. "
+    },
+    {
+      "name": "The Cambridge Five",
+      "id": 104,
+      "type": "Event",
+      "war": "TS_EARLY",
+      "ops": 2,
+      "side": "USSR",
+      "description": "The US player exposes all scoring cards in their hand. "
+    },
+    {
+      "name": "Special Relationship",
+      "id": 105,
+      "type": "Event",
+      "war": "TS_EARLY",
+      "ops": 2,
+      "side": "US",
+      "description": "If UK is US controlled but NATO is not in effect, US adds 1 Influence to any country adjacent to the UK.\n"
+    },
+    {
+      "name": "NORAD",
+      "id": 106,
+      "type": "Event",
+      "war": "TS_EARLY",
+      "ops": 3,
+      "side": "US",
+      "description": "If the US controls Canada, the US may add 1 Influence to any country "
+    },
+    {
+      "name": "Che",
+      "id": 107,
+      "type": "Event",
+      "war": "TS_MID",
+      "ops": 3,
+      "side": "USSR",
+      "description": "USSR may immediately make a Coup attempt using this card's Operations value "
+    },
+    {
+      "name": "Our Man In Tehran",
+      "id": 108,
+      "type": "Event",
+      "war": "TS_MID",
+      "ops": 2,
+      "side": "US",
+      "description": "If the US controls at least one Middle East country, "
+    },
+    {
+      "name": "Yuri and Samantha",
+      "id": 109,
+      "type": "Event",
+      "war": "TS_LATE",
+      "ops": 2,
+      "side": "USSR",
+      "description": "USSR receives 1 VP for each US coup attempt made for the remainder of the current turn."
+    },
+    {
+      "name": "AWACS Sale to Saudis",
+      "id": 110,
+      "type": "Event",
+      "war": "TS_LATE",
+      "ops": 3,
+      "side": "US",
+      "description": "US receives 2 Influence in Saudi Arabia. "
+    },
+    {
+      "name": "Non-Aligned Movement",
+      "id": 121,
+      "type": "Event",
+      "war": "TS_MID",
+      "ops": 1,
+      "side": "NONE",
+      "description": "Select India or a country in Africa, Southeast Asia, the Middle East, or South America "
+    },
+    {
+      "name": "Mobutu Sese Seko",
+      "id": 122,
+      "type": "Event",
+      "war": "TS_MID",
+      "ops": 2,
+      "side": "US",
+      "description": "Zaire's stability number permanently becomes 3. "
+    },
+    {
+      "name": "Berlin Wall",
+      "id": 123,
+      "type": "Event",
+      "war": "TS_MID",
+      "ops": 2,
+      "side": "USSR",
+      "description": "Add 2 Influence in East Germany and, "
+    },
+    {
+      "name": "Stanislav Petrov",
+      "id": 124,
+      "type": "Event",
+      "war": "TS_LATE",
+      "ops": 3,
+      "side": "NONE",
+      "description": "Play only if DEFCON is 2.\n"
+    },
+    {
+      "name": "Kremlin Flu",
+      "id": 125,
+      "type": "Event",
+      "war": "TS_EARLY",
+      "ops": 2,
+      "side": "US",
+      "description": "US takes Operations as if this card were played as Operations. ",
+      "defcon_change": [
+        -1,
+        0
+      ]
+    },
+    {
+      "name": "First Lightning",
+      "id": 126,
+      "type": "Event",
+      "war": "TS_EARLY",
+      "ops": 2,
+      "side": "USSR",
+      "description": "Play at the same time you play a card with ",
+      "can_headline": false
+    },
+    {
+      "name": "Who Lost China",
+      "id": 127,
+      "type": "Event",
+      "war": "TS_EARLY",
+      "ops": 1,
+      "side": "USSR",
+      "description": "If the USSR holds the China Card, "
+    },
+    {
+      "name": "Don't Wait for the Translation",
+      "id": 128,
+      "type": "Event",
+      "war": "TS_MID",
+      "ops": 3,
+      "side": "US",
+      "description": "If the US is behind in Military Operations, the US scores 2 VP."
+    },
+    {
+      "name": "Andropov",
+      "id": 129,
+      "type": "Statecraft",
+      "side": "USSR",
+      "description": "Subtract 1 from the die roll total for the current Crisis."
+    },
+    {
+      "name": "Khrushchev",
+      "id": 130,
+      "type": "Statecraft",
+      "side": "USSR",
+      "description": "Subtract 1 from the die roll total for the current Crisis."
+    },
+    {
+      "name": "Molotov",
+      "id": 131,
+      "type": "Statecraft",
+      "side": "USSR",
+      "description": "Subtract 2 from the die roll total for the current Crisis."
+    },
+    {
+      "name": "Beria",
+      "id": 132,
+      "type": "Statecraft",
+      "side": "USSR",
+      "description": "Cancel effect of US card for the current Crisis."
+    },
+    {
+      "name": "Dummy Card - USSR",
+      "id": 133,
+      "type": "Statecraft",
+      "side": "USSR",
+      "description": "No effect."
+    },
+    {
+      "name": "Kennan",
+      "id": 134,
+      "type": "Statecraft",
+      "side": "US",
+      "description": "Add 1 to the die roll total for the current Crisis."
+    },
+    {
+      "name": "Acheson",
+      "id": 135,
+      "type": "Statecraft",
+      "side": "US",
+      "description": "Add 1 to the die roll total for the current Crisis."
+    },
+    {
+      "name": "Marshall",
+      "id": 136,
+      "type": "Statecraft",
+      "side": "US",
+      "description": "Add 2 to the die roll total for the current Crisis."
+    },
+    {
+      "name": "Dulles",
+      "id": 137,
+      "type": "Statecraft",
+      "side": "US",
+      "description": "Cancel effect of USSR card for the current Crisis."
+    },
+    {
+      "name": "Dummy Card - USA",
+      "id": 138,
+      "type": "Statecraft",
+      "side": "US",
+      "description": "No effect."
+    },
+    {
+      "name": "Europe Scoring - Allied Berlin",
+      "id": 139,
+      "type": "Scoring",
+      "war": "TS_EARLY",
+      "description": "Both sides score:\nPresence: 3\nDomination: 6\nControl: 6\n",
+      "scoring_region": "Europe - Allied Berlin"
+    },
+    {
+      "name": "Nationalist China",
+      "id": 140,
+      "type": "Event",
+      "war": "TS_EARLY",
+      "ops": 2,
+      "side": "US",
+      "description": "US places 3 Influence in Asia, "
+    },
+    {
+      "name": "VE Day",
+      "id": 141,
+      "type": "Crisis",
+      "side": "USSR",
+      "description": "1:   Soviets advance past Elbe. "
+    },
+    {
+      "name": "Yalta and Potsdam",
+      "id": 142,
+      "type": "Crisis",
+      "side": "US",
+      "description": "1:   FDR attends Potsdam in poor health; misreads Stalin's intentions. "
+    },
+    {
+      "name": "1945 UK Election",
+      "id": 143,
+      "type": "Crisis",
+      "side": "US",
+      "description": "1:   Labour wins in a huge landslide; Tories fail to reach 100 seats in the Commons. "
+    },
+    {
+      "name": "Israel",
+      "id": 144,
+      "type": "Crisis",
+      "side": "USSR",
+      "description": "1:   Ben-Gurion coalition shaky. "
+    },
+    {
+      "name": "VJ Day",
+      "id": 145,
+      "type": "Crisis",
+      "side": "USSR",
+      "description": "1:   Soviets invade Manchuria and Korea in early 1945. "
+    },
+    {
+      "name": "Chinese Civil War",
+      "id": 146,
+      "type": "Crisis",
+      "side": "US",
+      "description": "1:   Sino-Soviet relations remain cordial, even if strained on occasion. "
+    },
+    {
+      "name": "1 Op AI Proxy",
+      "id": 201,
+      "type": "Event",
+      "war": "TS_EARLY",
+      "ops": 1,
+      "side": "NONE",
+      "description": "1 Op Proxy.  For AI Use Only."
+    },
+    {
+      "name": "2 Op AI Proxy",
+      "id": 202,
+      "type": "Event",
+      "war": "TS_EARLY",
+      "ops": 2,
+      "side": "NONE",
+      "description": "2 Op Proxy.  For AI Use Only."
+    },
+    {
+      "name": "3 Op AI Proxy",
+      "id": 203,
+      "type": "Event",
+      "war": "TS_EARLY",
+      "ops": 3,
+      "side": "NONE",
+      "description": "3 Op Proxy.  For AI Use Only."
+    },
+    {
+      "name": "4 Op AI Proxy",
+      "id": 204,
+      "type": "Event",
+      "war": "TS_EARLY",
+      "ops": 4,
+      "side": "NONE",
+      "description": "4 Op Proxy.  For AI Use Only."
+    }
+  ],
+  "countries": [
+    {
+      "name": "USSR",
+      "index": 1,
+      "is_superpower": true,
+      "adjacent": [
+        "Finland",
+        "Poland",
+        "Romania",
+        "Afghanistan",
+        "North Korea",
+        "Chinese Civil War"
+      ]
+    },
+    {
+      "name": "USA",
+      "index": 2,
+      "is_superpower": true,
+      "adjacent": [
+        "Japan",
+        "Mexico",
+        "Cuba",
+        "Canada"
+      ]
+    },
+    {
+      "name": "Canada",
+      "index": 3,
+      "region": "Western Europe",
+      "stability": 4,
+      "adjacent": [
+        "USA",
+        "UK"
+      ]
+    },
+    {
+      "name": "UK",
+      "index": 4,
+      "region": "Western Europe",
+      "stability": 5,
+      "adjacent": [
+        "Canada",
+        "Norway",
+        "Benelux",
+        "France"
+      ]
+    },
+    {
+      "name": "Norway",
+      "index": 5,
+      "region": "Western Europe",
+      "stability": 4,
+      "adjacent": [
+        "UK",
+        "Sweden"
+      ]
+    },
+    {
+      "name": "Sweden",
+      "index": 6,
+      "region": "Western Europe",
+      "stability": 4,
+      "adjacent": [
+        "Norway",
+        "Finland",
+        "Denmark"
+      ]
+    },
+    {
+      "name": "Finland",
+      "index": 7,
+      "region": "Europe",
+      "stability": 4,
+      "adjacent": [
+        "Sweden",
+        "USSR"
+      ]
+    },
+    {
+      "name": "Denmark",
+      "index": 8,
+      "region": "Western Europe",
+      "stability": 3,
+      "adjacent": [
+        "Sweden",
+        "West Germany"
+      ]
+    },
+    {
+      "name": "Benelux",
+      "index": 9,
+      "region": "Western Europe",
+      "stability": 3,
+      "adjacent": [
+        "UK",
+        "West Germany"
+      ]
+    },
+    {
+      "name": "France",
+      "index": 10,
+      "region": "Western Europe",
+      "stability": 3,
+      "is_battleground": true,
+      "adjacent": [
+        "UK",
+        "West Germany",
+        "Spain/Portugal",
+        "Italy",
+        "Algeria"
+      ]
+    },
+    {
+      "name": "Spain/Portugal",
+      "index": 11,
+      "region": "Western Europe",
+      "stability": 2,
+      "adjacent": [
+        "France",
+        "Italy",
+        "Morocco"
+      ]
+    },
+    {
+      "name": "Italy",
+      "index": 12,
+      "region": "Western Europe",
+      "stability": 2,
+      "is_battleground": true,
+      "adjacent": [
+        "France",
+        "Spain/Portugal",
+        "Austria",
+        "Yugoslavia",
+        "Greece"
+      ]
+    },
+    {
+      "name": "Greece",
+      "index": 13,
+      "region": "Western Europe",
+      "stability": 2,
+      "adjacent": [
+        "Italy",
+        "Yugoslavia",
+        "Bulgaria",
+        "Turkey"
+      ]
+    },
+    {
+      "name": "Austria",
+      "index": 14,
+      "region": "Europe",
+      "stability": 4,
+      "adjacent": [
+        "West Germany",
+        "East Germany",
+        "Hungary",
+        "Italy"
+      ]
+    },
+    {
+      "name": "West Germany",
+      "index": 15,
+      "region": "Western Europe",
+      "stability": 4,
+      "is_battleground": true,
+      "adjacent": [
+        "France",
+        "Benelux",
+        "Denmark",
+        "East Germany",
+        "Austria"
+      ]
+    },
+    {
+      "name": "East Germany",
+      "index": 16,
+      "region": "Eastern Europe",
+      "stability": 3,
+      "is_battleground": true,
+      "adjacent": [
+        "West Germany",
+        "Austria",
+        "Czechoslovakia",
+        "Poland"
+      ]
+    },
+    {
+      "name": "Poland",
+      "index": 17,
+      "region": "Eastern Europe",
+      "stability": 3,
+      "is_battleground": true,
+      "adjacent": [
+        "East Germany",
+        "Czechoslovakia",
+        "USSR"
+      ]
+    },
+    {
+      "name": "Czechoslovakia",
+      "index": 18,
+      "region": "Eastern Europe",
+      "stability": 3,
+      "adjacent": [
+        "East Germany",
+        "Poland",
+        "Hungary"
+      ]
+    },
+    {
+      "name": "Hungary",
+      "index": 19,
+      "region": "Eastern Europe",
+      "stability": 3,
+      "adjacent": [
+        "Austria",
+        "Czechoslovakia",
+        "Romania",
+        "Yugoslavia"
+      ]
+    },
+    {
+      "name": "Yugoslavia",
+      "index": 20,
+      "region": "Eastern Europe",
+      "stability": 3,
+      "adjacent": [
+        "Italy",
+        "Hungary",
+        "Greece",
+        "Romania"
+      ]
+    },
+    {
+      "name": "Romania",
+      "index": 21,
+      "region": "Eastern Europe",
+      "stability": 3,
+      "adjacent": [
+        "Hungary",
+        "Yugoslavia",
+        "Turkey",
+        "USSR"
+      ]
+    },
+    {
+      "name": "Bulgaria",
+      "index": 22,
+      "region": "Eastern Europe",
+      "stability": 3,
+      "adjacent": [
+        "Greece",
+        "Turkey"
+      ]
+    },
+    {
+      "name": "Turkey",
+      "index": 23,
+      "region": "Western Europe",
+      "stability": 2,
+      "adjacent": [
+        "Greece",
+        "Bulgaria",
+        "Romania",
+        "Syria"
+      ]
+    },
+    {
+      "name": "Libya",
+      "index": 24,
+      "region": "Middle East",
+      "stability": 2,
+      "is_battleground": true,
+      "adjacent": [
+        "Tunisia",
+        "Egypt"
+      ]
+    },
+    {
+      "name": "Egypt",
+      "index": 25,
+      "region": "Middle East",
+      "stability": 2,
+      "is_battleground": true,
+      "adjacent": [
+        "Libya",
+        "Israel",
+        "Sudan"
+      ]
+    },
+    {
+      "name": "Israel",
+      "index": 26,
+      "region": "Middle East",
+      "stability": 4,
+      "is_battleground": true,
+      "adjacent": [
+        "Lebanon",
+        "Syria",
+        "Jordan",
+        "Egypt"
+      ]
+    },
+    {
+      "name": "Lebanon",
+      "index": 27,
+      "region": "Middle East",
+      "stability": 1,
+      "adjacent": [
+        "Israel",
+        "Syria",
+        "Jordan"
+      ]
+    },
+    {
+      "name": "Syria",
+      "index": 28,
+      "region": "Middle East",
+      "stability": 2,
+      "adjacent": [
+        "Israel",
+        "Lebanon",
+        "Turkey"
+      ]
+    },
+    {
+      "name": "Iraq",
+      "index": 29,
+      "region": "Middle East",
+      "stability": 3,
+      "is_battleground": true,
+      "adjacent": [
+        "Jordan",
+        "Saudi Arabia",
+        "Gulf States",
+        "Iran"
+      ]
+    },
+    {
+      "name": "Iran",
+      "index": 30,
+      "region": "Middle East",
+      "stability": 2,
+      "is_battleground": true,
+      "adjacent": [
+        "Iraq",
+        "Afghanistan",
+        "Pakistan"
+      ]
+    },
+    {
+      "name": "Jordan",
+      "index": 31,
+      "region": "Middle East",
+      "stability": 2,
+      "adjacent": [
+        "Iraq",
+        "Israel",
+        "Lebanon",
+        "Saudi Arabia"
+      ]
+    },
+    {
+      "name": "Gulf States",
+      "index": 32,
+      "region": "Middle East",
+      "stability": 3,
+      "adjacent": [
+        "Iraq",
+        "Saudi Arabia"
+      ]
+    },
+    {
+      "name": "Saudi Arabia",
+      "index": 33,
+      "region": "Middle East",
+      "stability": 3,
+      "is_battleground": true,
+      "adjacent": [
+        "Iraq",
+        "Jordan",
+        "Gulf States"
+      ]
+    },
+    {
+      "name": "Afghanistan",
+      "index": 34,
+      "region": "Asia",
+      "stability": 2,
+      "adjacent": [
+        "USSR",
+        "Iran",
+        "Pakistan"
+      ]
+    },
+    {
+      "name": "Pakistan",
+      "index": 35,
+      "region": "Asia",
+      "stability": 2,
+      "is_battleground": true,
+      "adjacent": [
+        "Afghanistan",
+        "Iran",
+        "India"
+      ]
+    },
+    {
+      "name": "India",
+      "index": 36,
+      "region": "Asia",
+      "stability": 3,
+      "is_battleground": true,
+      "adjacent": [
+        "Pakistan",
+        "Burma"
+      ]
+    },
+    {
+      "name": "Burma",
+      "index": 37,
+      "region": "Southeast Asia",
+      "stability": 2,
+      "adjacent": [
+        "India",
+        "Laos/Cambodia"
+      ]
+    },
+    {
+      "name": "Laos/Cambodia",
+      "index": 38,
+      "region": "Southeast Asia",
+      "stability": 1,
+      "adjacent": [
+        "Burma",
+        "Thailand",
+        "Vietnam"
+      ]
+    },
+    {
+      "name": "Thailand",
+      "index": 39,
+      "region": "Southeast Asia",
+      "stability": 2,
+      "is_battleground": true,
+      "adjacent": [
+        "Laos/Cambodia",
+        "Vietnam",
+        "Malaysia"
+      ]
+    },
+    {
+      "name": "Vietnam",
+      "index": 40,
+      "region": "Southeast Asia",
+      "stability": 1,
+      "adjacent": [
+        "Laos/Cambodia",
+        "Thailand"
+      ]
+    },
+    {
+      "name": "Malaysia",
+      "index": 41,
+      "region": "Southeast Asia",
+      "stability": 2,
+      "adjacent": [
+        "Thailand",
+        "Indonesia",
+        "Australia"
+      ]
+    },
+    {
+      "name": "Australia",
+      "index": 42,
+      "region": "Asia",
+      "stability": 4,
+      "adjacent": [
+        "Malaysia"
+      ]
+    },
+    {
+      "name": "Indonesia",
+      "index": 43,
+      "region": "Southeast Asia",
+      "stability": 1,
+      "adjacent": [
+        "Malaysia",
+        "Philippines"
+      ]
+    },
+    {
+      "name": "Philippines",
+      "index": 44,
+      "region": "Southeast Asia",
+      "stability": 2,
+      "adjacent": [
+        "Indonesia",
+        "Japan"
+      ]
+    },
+    {
+      "name": "Japan",
+      "index": 45,
+      "region": "Asia",
+      "stability": 4,
+      "is_battleground": true,
+      "adjacent": [
+        "Philippines",
+        "Taiwan",
+        "South Korea",
+        "USA"
+      ]
+    },
+    {
+      "name": "Taiwan",
+      "index": 46,
+      "region": "Asia",
+      "stability": 3,
+      "adjacent": [
+        "Japan",
+        "South Korea"
+      ]
+    },
+    {
+      "name": "South Korea",
+      "index": 47,
+      "region": "Asia",
+      "stability": 3,
+      "is_battleground": true,
+      "adjacent": [
+        "Japan",
+        "Taiwan",
+        "North Korea"
+      ]
+    },
+    {
+      "name": "North Korea",
+      "index": 48,
+      "region": "Asia",
+      "stability": 3,
+      "is_battleground": true,
+      "adjacent": [
+        "South Korea",
+        "USSR"
+      ]
+    },
+    {
+      "name": "Algeria",
+      "index": 49,
+      "region": "Africa",
+      "stability": 2,
+      "is_battleground": true,
+      "adjacent": [
+        "Morocco",
+        "Saharan States",
+        "Tunisia",
+        "France"
+      ]
+    },
+    {
+      "name": "Morocco",
+      "index": 50,
+      "region": "Africa",
+      "stability": 3,
+      "adjacent": [
+        "Algeria",
+        "West African States",
+        "Spain/Portugal"
+      ]
+    },
+    {
+      "name": "Tunisia",
+      "index": 51,
+      "region": "Africa",
+      "stability": 2,
+      "adjacent": [
+        "Algeria",
+        "Libya"
+      ]
+    },
+    {
+      "name": "West African States",
+      "index": 52,
+      "region": "Africa",
+      "stability": 2,
+      "adjacent": [
+        "Morocco",
+        "Ivory Coast"
+      ]
+    },
+    {
+      "name": "Ivory Coast",
+      "index": 53,
+      "region": "Africa",
+      "stability": 2,
+      "adjacent": [
+        "West African States",
+        "Nigeria"
+      ]
+    },
+    {
+      "name": "Saharan States",
+      "index": 54,
+      "region": "Africa",
+      "stability": 1,
+      "adjacent": [
+        "Algeria",
+        "Nigeria"
+      ]
+    },
+    {
+      "name": "Nigeria",
+      "index": 55,
+      "region": "Africa",
+      "stability": 1,
+      "is_battleground": true,
+      "adjacent": [
+        "Ivory Coast",
+        "Saharan States",
+        "Cameroon"
+      ]
+    },
+    {
+      "name": "Cameroon",
+      "index": 56,
+      "region": "Africa",
+      "stability": 1,
+      "adjacent": [
+        "Nigeria",
+        "Zaire"
+      ]
+    },
+    {
+      "name": "Zaire",
+      "index": 57,
+      "region": "Africa",
+      "stability": 1,
+      "is_battleground": true,
+      "adjacent": [
+        "Cameroon",
+        "Angola",
+        "Zimbabwe"
+      ]
+    },
+    {
+      "name": "Angola",
+      "index": 58,
+      "region": "Africa",
+      "stability": 1,
+      "is_battleground": true,
+      "adjacent": [
+        "Zaire",
+        "Botswana",
+        "South Africa"
+      ]
+    },
+    {
+      "name": "South Africa",
+      "index": 59,
+      "region": "Africa",
+      "stability": 3,
+      "is_battleground": true,
+      "adjacent": [
+        "Angola",
+        "Botswana"
+      ]
+    },
+    {
+      "name": "Botswana",
+      "index": 60,
+      "region": "Africa",
+      "stability": 2,
+      "adjacent": [
+        "Angola",
+        "South Africa",
+        "Zimbabwe"
+      ]
+    },
+    {
+      "name": "Zimbabwe",
+      "index": 61,
+      "region": "Africa",
+      "stability": 1,
+      "adjacent": [
+        "Zaire",
+        "Botswana",
+        "SE African States"
+      ]
+    },
+    {
+      "name": "SE African States",
+      "index": 62,
+      "region": "Africa",
+      "stability": 1,
+      "adjacent": [
+        "Zimbabwe",
+        "Kenya"
+      ]
+    },
+    {
+      "name": "Kenya",
+      "index": 63,
+      "region": "Africa",
+      "stability": 2,
+      "adjacent": [
+        "SE African States",
+        "Somalia"
+      ]
+    },
+    {
+      "name": "Somalia",
+      "index": 64,
+      "region": "Africa",
+      "stability": 2,
+      "adjacent": [
+        "Kenya",
+        "Ethiopia"
+      ]
+    },
+    {
+      "name": "Ethiopia",
+      "index": 65,
+      "region": "Africa",
+      "stability": 1,
+      "adjacent": [
+        "Somalia",
+        "Sudan"
+      ]
+    },
+    {
+      "name": "Sudan",
+      "index": 66,
+      "region": "Africa",
+      "stability": 1,
+      "adjacent": [
+        "Ethiopia",
+        "Egypt"
+      ]
+    },
+    {
+      "name": "Mexico",
+      "index": 67,
+      "region": "Central America",
+      "stability": 2,
+      "is_battleground": true,
+      "adjacent": [
+        "Guatemala",
+        "USA"
+      ]
+    },
+    {
+      "name": "Guatemala",
+      "index": 68,
+      "region": "Central America",
+      "stability": 1,
+      "adjacent": [
+        "Mexico",
+        "El Salvador",
+        "Honduras"
+      ]
+    },
+    {
+      "name": "El Salvador",
+      "index": 69,
+      "region": "Central America",
+      "stability": 1,
+      "adjacent": [
+        "Guatemala",
+        "Honduras"
+      ]
+    },
+    {
+      "name": "Honduras",
+      "index": 70,
+      "region": "Central America",
+      "stability": 2,
+      "adjacent": [
+        "Guatemala",
+        "El Salvador",
+        "Costa Rica",
+        "Nicaragua"
+      ]
+    },
+    {
+      "name": "Costa Rica",
+      "index": 71,
+      "region": "Central America",
+      "stability": 3,
+      "adjacent": [
+        "Honduras",
+        "Nicaragua",
+        "Panama"
+      ]
+    },
+    {
+      "name": "Panama",
+      "index": 72,
+      "region": "Central America",
+      "stability": 2,
+      "is_battleground": true,
+      "adjacent": [
+        "Costa Rica",
+        "Colombia"
+      ]
+    },
+    {
+      "name": "Nicaragua",
+      "index": 73,
+      "region": "Central America",
+      "stability": 1,
+      "adjacent": [
+        "Costa Rica",
+        "Honduras",
+        "Cuba"
+      ]
+    },
+    {
+      "name": "Cuba",
+      "index": 74,
+      "region": "Central America",
+      "stability": 3,
+      "is_battleground": true,
+      "adjacent": [
+        "Nicaragua",
+        "Haiti",
+        "USA"
+      ]
+    },
+    {
+      "name": "Haiti",
+      "index": 75,
+      "region": "Central America",
+      "stability": 1,
+      "adjacent": [
+        "Cuba",
+        "Dominican Republic"
+      ]
+    },
+    {
+      "name": "Dominican Republic",
+      "index": 76,
+      "region": "Central America",
+      "stability": 1,
+      "adjacent": [
+        "Haiti"
+      ]
+    },
+    {
+      "name": "Colombia",
+      "index": 77,
+      "region": "South America",
+      "stability": 1,
+      "adjacent": [
+        "Panama",
+        "Ecuador",
+        "Venezuela"
+      ]
+    },
+    {
+      "name": "Ecuador",
+      "index": 78,
+      "region": "South America",
+      "stability": 2,
+      "adjacent": [
+        "Colombia",
+        "Peru"
+      ]
+    },
+    {
+      "name": "Peru",
+      "index": 79,
+      "region": "South America",
+      "stability": 2,
+      "adjacent": [
+        "Ecuador",
+        "Bolivia",
+        "Chile"
+      ]
+    },
+    {
+      "name": "Chile",
+      "index": 80,
+      "region": "South America",
+      "stability": 3,
+      "is_battleground": true,
+      "adjacent": [
+        "Peru",
+        "Argentina"
+      ]
+    },
+    {
+      "name": "Argentina",
+      "index": 81,
+      "region": "South America",
+      "stability": 2,
+      "is_battleground": true,
+      "adjacent": [
+        "Chile",
+        "Uruguay",
+        "Paraguay"
+      ]
+    },
+    {
+      "name": "Uruguay",
+      "index": 82,
+      "region": "South America",
+      "stability": 2,
+      "adjacent": [
+        "Argentina",
+        "Paraguay",
+        "Brazil"
+      ]
+    },
+    {
+      "name": "Paraguay",
+      "index": 83,
+      "region": "South America",
+      "stability": 2,
+      "adjacent": [
+        "Argentina",
+        "Uruguay",
+        "Bolivia"
+      ]
+    },
+    {
+      "name": "Bolivia",
+      "index": 84,
+      "region": "South America",
+      "stability": 2,
+      "adjacent": [
+        "Peru",
+        "Paraguay"
+      ]
+    },
+    {
+      "name": "Brazil",
+      "index": 85,
+      "region": "South America",
+      "stability": 2,
+      "is_battleground": true,
+      "adjacent": [
+        "Uruguay",
+        "Venezuela"
+      ]
+    },
+    {
+      "name": "Venezuela",
+      "index": 86,
+      "region": "South America",
+      "stability": 2,
+      "is_battleground": true,
+      "adjacent": [
+        "Colombia",
+        "Brazil"
+      ]
+    },
+    {
+      "name": "Chinese Civil War",
+      "index": 87,
+      "region": "Asia",
+      "stability": 3,
+      "adjacent": [
+        "USSR"
+      ]
+    }
+  ],
+  "indexes": {
+    "cards_by_type": {
+      "Scoring": [
+        1,
+        2,
+        3,
+        37,
+        38,
+        79,
+        81,
+        139
+      ],
+      "Event": [
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44,
+        45,
+        46,
+        47,
+        48,
+        49,
+        50,
+        51,
+        52,
+        53,
+        54,
+        55,
+        56,
+        57,
+        58,
+        59,
+        60,
+        61,
+        62,
+        63,
+        64,
+        65,
+        66,
+        67,
+        68,
+        69,
+        70,
+        71,
+        72,
+        73,
+        74,
+        75,
+        76,
+        77,
+        78,
+        80,
+        82,
+        83,
+        84,
+        85,
+        86,
+        87,
+        88,
+        89,
+        90,
+        91,
+        92,
+        93,
+        94,
+        95,
+        96,
+        97,
+        98,
+        99,
+        100,
+        101,
+        102,
+        103,
+        104,
+        105,
+        106,
+        107,
+        108,
+        109,
+        110,
+        121,
+        122,
+        123,
+        124,
+        125,
+        126,
+        127,
+        128,
+        140,
+        201,
+        202,
+        203,
+        204
+      ],
+      "Statecraft": [
+        129,
+        130,
+        131,
+        132,
+        133,
+        134,
+        135,
+        136,
+        137,
+        138
+      ],
+      "Crisis": [
+        141,
+        142,
+        143,
+        144,
+        145,
+        146
+      ]
+    },
+    "cards_by_ops": {
+      "0": [
+        1,
+        2,
+        3,
+        37,
+        38,
+        79,
+        81,
+        129,
+        130,
+        131,
+        132,
+        133,
+        134,
+        135,
+        136,
+        137,
+        138,
+        139,
+        141,
+        142,
+        143,
+        144,
+        145,
+        146
+      ],
+      "1": [
+        10,
+        12,
+        15,
+        18,
+        19,
+        26,
+        32,
+        45,
+        48,
+        54,
+        62,
+        64,
+        70,
+        72,
+        121,
+        127,
+        201
+      ],
+      "2": [
+        8,
+        9,
+        11,
+        13,
+        20,
+        22,
+        24,
+        30,
+        35,
+        41,
+        46,
+        47,
+        49,
+        52,
+        53,
+        55,
+        63,
+        65,
+        66,
+        67,
+        68,
+        69,
+        71,
+        74,
+        75,
+        80,
+        84,
+        85,
+        88,
+        91,
+        92,
+        93,
+        95,
+        101,
+        102,
+        103,
+        104,
+        105,
+        108,
+        109,
+        122,
+        123,
+        125,
+        126,
+        140,
+        202
+      ],
+      "3": [
+        4,
+        5,
+        7,
+        14,
+        16,
+        17,
+        25,
+        28,
+        29,
+        33,
+        36,
+        39,
+        40,
+        42,
+        43,
+        44,
+        51,
+        58,
+        60,
+        61,
+        73,
+        76,
+        77,
+        78,
+        82,
+        83,
+        86,
+        87,
+        94,
+        96,
+        97,
+        98,
+        99,
+        106,
+        107,
+        110,
+        124,
+        128,
+        203
+      ],
+      "4": [
+        6,
+        21,
+        23,
+        27,
+        31,
+        34,
+        50,
+        56,
+        57,
+        59,
+        89,
+        90,
+        100,
+        204
+      ]
+    },
+    "countries_by_region": {
+      "Other": [
+        "USA",
+        "USSR"
+      ],
+      "Western Europe": [
+        "Benelux",
+        "Canada",
+        "Denmark",
+        "France",
+        "Greece",
+        "Italy",
+        "Norway",
+        "Spain/Portugal",
+        "Sweden",
+        "Turkey",
+        "UK",
+        "West Germany"
+      ],
+      "Europe": [
+        "Austria",
+        "Finland"
+      ],
+      "Eastern Europe": [
+        "Bulgaria",
+        "Czechoslovakia",
+        "East Germany",
+        "Hungary",
+        "Poland",
+        "Romania",
+        "Yugoslavia"
+      ],
+      "Middle East": [
+        "Egypt",
+        "Gulf States",
+        "Iran",
+        "Iraq",
+        "Israel",
+        "Jordan",
+        "Lebanon",
+        "Libya",
+        "Saudi Arabia",
+        "Syria"
+      ],
+      "Asia": [
+        "Afghanistan",
+        "Australia",
+        "Chinese Civil War",
+        "India",
+        "Japan",
+        "North Korea",
+        "Pakistan",
+        "South Korea",
+        "Taiwan"
+      ],
+      "Southeast Asia": [
+        "Burma",
+        "Indonesia",
+        "Laos/Cambodia",
+        "Malaysia",
+        "Philippines",
+        "Thailand",
+        "Vietnam"
+      ],
+      "Africa": [
+        "Algeria",
+        "Angola",
+        "Botswana",
+        "Cameroon",
+        "Ethiopia",
+        "Ivory Coast",
+        "Kenya",
+        "Morocco",
+        "Nigeria",
+        "SE African States",
+        "Saharan States",
+        "Somalia",
+        "South Africa",
+        "Sudan",
+        "Tunisia",
+        "West African States",
+        "Zaire",
+        "Zimbabwe"
+      ],
+      "Central America": [
+        "Costa Rica",
+        "Cuba",
+        "Dominican Republic",
+        "El Salvador",
+        "Guatemala",
+        "Haiti",
+        "Honduras",
+        "Mexico",
+        "Nicaragua",
+        "Panama"
+      ],
+      "South America": [
+        "Argentina",
+        "Bolivia",
+        "Brazil",
+        "Chile",
+        "Colombia",
+        "Ecuador",
+        "Paraguay",
+        "Peru",
+        "Uruguay",
+        "Venezuela"
+      ]
+    }
+  }
+}
