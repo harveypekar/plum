@@ -69,6 +69,7 @@ import re
 import sqlite3
 import subprocess
 import sys
+import time
 import urllib.request
 import uuid
 from dataclasses import dataclass
@@ -578,22 +579,42 @@ async def main():
         screen = ts_ui.render(game.state, last_move=last_move, model=nickname)
         await server.send(client_id, StyledText().add(screen))
         await server.stream_start(client_id)
+        think_clr = ts_ui.THINK_US if side_name == "US" else ts_ui.THINK_USSR
         use_think = settings.get("think", False)
         was_thinking = False
         chunks = []
+        think_count = 0
+        t_start = time.monotonic()
+        t_resp_start = None
         async for text, is_thinking in ollama.generate_stream(prompt, system=system, think=use_think):
             if is_thinking:
+                think_count += 1
                 if not was_thinking:
-                    await server.stream_chunk(client_id, StyledText().add("[think] ", fg=Color.MAGENTA))
+                    await server.stream_chunk(client_id, StyledText().add(f"{think_clr}[think] {ts_ui.RESET}"))
                     was_thinking = True
-                await server.stream_chunk(client_id, StyledText().add(text, fg=Color.MAGENTA))
+                await server.stream_chunk(client_id, StyledText().add(f"{think_clr}{text}{ts_ui.RESET}"))
             else:
                 if was_thinking:
                     await server.stream_chunk(client_id, StyledText().add(f"\n{side_name}> ", fg=side_color))
                     was_thinking = False
+                if t_resp_start is None:
+                    t_resp_start = time.monotonic()
                 chunks.append(text)
                 await server.stream_chunk(client_id, StyledText().add(text))
+        t_end = time.monotonic()
         await server.stream_end(client_id)
+
+        # Performance metrics
+        total_s = t_end - t_start
+        resp_count = len(chunks)
+        resp_s = t_end - t_resp_start if t_resp_start else 0
+        tps = resp_count / resp_s if resp_s > 0.001 else 0
+        perf = f"{resp_count} tok \u00b7 {tps:.1f} t/s \u00b7 {total_s:.1f}s"
+        if think_count:
+            perf += f" ({think_count} think tok)"
+        await server.send(client_id, StyledText().add(f"{ts_ui.PERF_CLR}[perf] {perf}{ts_ui.RESET}"))
+        log.log(f"perf: {perf}", category="ollama")
+
         response = "".join(chunks)
         log.log(f"{side_name} response: {response}", category="ollama")
         return response

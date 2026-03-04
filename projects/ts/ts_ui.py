@@ -22,6 +22,10 @@ def _fg(r, g, b):
     return f"{ESC}[38;2;{r};{g};{b}m"
 
 
+def _bg(r, g, b):
+    return f"{ESC}[48;2;{r};{g};{b}m"
+
+
 # -- Color palette (24-bit RGB) -----------------------------------------------
 
 US_CLR    = _fg(100, 149, 237)   # cornflower blue
@@ -36,7 +40,9 @@ GOLD      = _fg(255, 215, 0)     # BG star
 DIM_CLR   = _fg(80, 80, 80)      # box drawing, stability
 HDR_CLR   = _fg(200, 200, 200)   # status bar text
 MOVE_CLR  = _fg(180, 180, 100)   # last move
-THINK_CLR = _fg(180, 100, 220)   # thinking (magenta)
+THINK_US   = _fg(0, 0, 0) + _bg(50, 70, 130)    # black on mid-blue
+THINK_USSR = _fg(0, 0, 0) + _bg(130, 40, 40)     # black on mid-red
+PERF_CLR   = _fg(100, 100, 100)                   # metrics (dim gray)
 
 # -- Data mappings -------------------------------------------------------------
 
