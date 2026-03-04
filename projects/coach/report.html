@@ -1,0 +1,1154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Running Coach Report - 21 Feb 2026</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+    font-family: 'Lucida Console', 'Consolas', monospace;
+    background: #000000; color: #00FF00; line-height: 1.6;
+    max-width: 900px; margin: 0 auto; padding: 24px;
+}
+h1 { font-size: 28px; margin-bottom: 8px; color: #00FF41; }
+h2 { font-size: 22px; margin: 24px 0 12px; color: #00FF41; border-bottom: 2px solid #1a1a1a; padding-bottom: 6px; }
+h3 { font-size: 16px; margin: 18px 0 8px; color: #00FFFF; }
+.subtitle { color: #888; font-size: 14px; margin-bottom: 24px; }
+.section { background: #0a0a0a; border-radius: 8px; padding: 20px 24px; margin-bottom: 20px; border: 1px solid #1a1a1a; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; margin: 12px 0; }
+.stat-card { background: #111; border-radius: 6px; padding: 12px; text-align: center; }
+.stat-value { font-size: 18px; font-weight: 600; color: #e0e0e0; }
+.stat-label { font-size: 12px; color: #888; margin-top: 2px; }
+.insight { background: #111; border-left: 3px solid #00FFFF; padding: 8px 12px; margin: 8px 0; border-radius: 0 4px 4px 0; font-size: 14px; }
+.insight.good { border-left-color: #00FF41; }
+.insight.warning { border-left-color: #FF00FF; }
+.chart-note { font-size: 12px; color: #888; margin: 4px 0 12px; }
+.zone-summary { margin: 8px 0; }
+.zone-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 12px; margin: 2px; }
+table.splits { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 14px; }
+table.splits th { background: #151515; padding: 6px 10px; text-align: left; font-weight: 600; color: #00FF41; }
+table.splits td { padding: 5px 10px; border-bottom: 1px solid #1a1a1a; }
+table.splits tr:hover { background: #111; }
+svg { display: block; margin: 8px 0; max-width: 100%; }
+.coach-conversation { margin: 16px 0; }
+.coach-conversation h3 { font-size: 17px; color: #00FFFF; margin: 20px 0 10px; border-bottom: 1px solid #1a1a1a; padding-bottom: 4px; }
+.coach-line { display: flex; gap: 12px; padding: 10px 14px; margin: 6px 0; border-left: 3px solid; border-radius: 0 6px 6px 0; background: #0a0a0a; }
+.coach-name { font-weight: 600; font-size: 13px; white-space: nowrap; min-width: 180px; }
+.coach-text { font-size: 14px; line-height: 1.5; }
+.has-tooltip { position: relative; border-bottom: 1px dotted #888; cursor: help; }
+.tooltip-popup {
+    display: none; position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%);
+    background: #1a1a1a; color: #00FF00; padding: 8px 12px; border-radius: 6px; font-size: 12px;
+    line-height: 1.4; width: 280px; z-index: 100; border: 1px solid #333;
+    box-shadow: 0 0 12px rgba(0,255,65,0.15);
+    pointer-events: auto;
+}
+.tooltip-popup::after {
+    content: ''; position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
+    border: 6px solid transparent; border-top-color: #1a1a1a;
+}
+.has-tooltip:hover .tooltip-popup { display: block; }
+.tooltip-link { color: #00FFFF; margin-left: 6px; text-decoration: none; font-size: 11px; }
+.tooltip-link:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<h1>Running Coach Report &mdash; Backyard Ultra Prep</h1>
+<p class="subtitle">135 runs analyzed &middot; 2025-04-01 to 2026-02-21 &middot; Race: 04 Jul 2026 (132 days) &middot; Generated 22 Feb 2026 15:06</p>
+<div class="section"><h2>Coaching Panel</h2><div class="coach-conversation"><h3>Last Week</h3><div class="coach-line" style="border-left-color:#00FFFF"><div class="coach-name" style="color:#00FFFF">Marathon Coach</div><div class="coach-text">Seventy-four kilometres in seven days with a total <span class="has-tooltip">training load<span class="tooltip-popup">A single-number measure of how hard a session was, combining duration and intensity (HRSS or TRIMP-based).</span></span> of 369 — that's a substantial week. The <span class="has-tooltip">TSB<span class="tooltip-popup">Training Stress Balance (CTL minus ATL). Positive = fresh, negative = fatigued. Race-ready zone: +5 to +15.</span></span> is at -10.2 and the AC ratio is sitting at 1.19, which tells me accumulated fatigue is real. What concerns me most is the load ramp at 50.6% and the fact that it's been four weeks since a recovery week. The 3-on-1 structure exists precisely to prevent this kind of compounding — that recovery week is overdue.</div></div><div class="coach-line" style="border-left-color:#FFD600"><div class="coach-name" style="color:#FFD600">Sports Physio</div><div class="coach-text">The ramp rate is a red flag, but zoom in on February 17th: 4.89 km at 7:11 pace and heart rate hit 145. That's a striking mismatch — HR that elevated on a short, slow effort just two days after Sunday's run signals incomplete recovery. Then they turned around the very next day and ran 21 km at 5:52 with HR at 147. The body delivered, but it was working harder than those paces should demand.</div></div><div class="coach-line" style="border-left-color:#00FF41"><div class="coach-name" style="color:#00FF41">Ultrarunning Coach</div><div class="coach-text">Fair points, but let me highlight what's working. Saturday's 24.53 km — 204 minutes, 682 metres of climbing, HR averaging 124 — is an excellent effort. Holding aerobic control for 3 hours 24 minutes on that kind of terrain is exa<span class="has-tooltip">ctl<span class="tooltip-popup">Chronic Training Load — your fitness. 42-day exponentially weighted average of daily training load.</span></span>y the stimulus this athlete needs for a July backyard ultra. The cadence dropping to 166.5 spm on that run makes complete sense given 682 metres of elevation; they were almost certainly power-hiking the steeper pitches, which is correct race technique, not a form issue.</div></div><div class="coach-line" style="border-left-color:#FF00FF"><div class="coach-name" style="color:#FF00FF">Backyard Ultra World Champion</div><div class="coach-text">That Saturday run is the standout piece of the whole week. HR at 124 for over three hours on hilly terrain shows real aerobic efficiency. But the four consecutive days leading into it — Tuesday through Saturday with no rest — that's the pattern I'd fix. In backyard ultra you accumulate fatigue across yards, not across days, but the recovery habits carry over. I want this athlete arriving at each long run with at least 48 hours of genuine rest, not running into it on tired legs.</div></div><div class="coach-line" style="border-left-color:#00FFFF"><div class="coach-name" style="color:#00FFFF">Marathon Coach</div><div class="coach-text">With 18 weeks to race day, <span class="has-tooltip">CTL<span class="tooltip-popup">Chronic Training Load — your fitness. 42-day exponentially weighted average of daily training load.</span></span> at 53.6 is workable but needs to climb to the 65-70 range by late May peak. That trajectory only holds if the periodisation is respected. This coming week must be a proper cut-back — I'm talking 35 to 38 km maximum, long run capped at 14-16 km, and let that <span class="has-tooltip">TSB<span class="tooltip-popup">Training Stress Balance (CTL minus ATL). Positive = fresh, negative = fatigued. Race-ready zone: +5 to +15.</span></span> recover back toward zero before the next build block starts.</div></div><div class="coach-line" style="border-left-color:#FFD600"><div class="coach-name" style="color:#FFD600">Sports Physio</div><div class="coach-text">That recovery week also serves as a diagnostic window. Four weeks of build, including a week this heavy, tends to mask small soft-tissue issues. When the load drops, things like Achilles tightness or hip flexor fatigue tend to surface. Better to catch and address those now than push into week five and have a minor irritation become a forced rest.</div></div></div><div class="coach-conversation"><h3>Last Month</h3><div class="coach-line" style="border-left-color:#00FFFF"><div class="coach-name" style="color:#00FFFF">Marathon Coach</div><div class="coach-text">Zooming out to the full 30 days, the volume pattern tells a clear story: W05 peaked at 94.63 km with a load of 582, W06 came in at 75.97 km with load 304, and this current W07 is 66.76 km at load 332. That looks like a natural descent, but weeks_since_recovery is 4 and the load ramp is 50.6% — there is no deliberate cut-back in there. The <span class="has-tooltip">3:1 cycle<span class="tooltip-popup">Three weeks of progressive training load followed by one recovery week at ~50% volume. Allows adaptation without overtraining.</span></span> hasn't happened; the body is doing the tapering on its own terms, not on schedule.</div></div><div class="coach-line" style="border-left-color:#00FF41"><div class="coach-name" style="color:#00FF41">Ultrarunning Coach</div><div class="coach-text">We also need to contextualise January 25th — 51 km in 5 hours 37 minutes, 790 metres of climbing, 141 HR average. That's a race or an A-effort by any measure. Then there's a 9-day gap before the next run on February 3rd. So the actual sequence over 30 days is: race — forced rest — build — build — build. Three build weeks with race fatigue carried into the first one, not three clean build weeks off a recovered base.</div></div><div class="coach-line" style="border-left-color:#FFD600"><div class="coach-name" style="color:#FFD600">Sports Physio</div><div class="coach-text">That's an important distinction. Nine days of complete rest after a 51 km effort isn't equivalent to a structured recovery week — tissue repair happens, but you also lose neuromuscular sharpness and come back stiff. Then the athlete went straight into 94.63 km in W05, which explains why <span class="has-tooltip">ATL<span class="tooltip-popup">Acute Training Load — your fatigue. 7-day exponentially weighted average of daily training load.</span></span> jumped to 63.9 while <span class="has-tooltip">CTL<span class="tooltip-popup">Chronic Training Load — your fitness. 42-day exponentially weighted average of daily training load.</span></span> only sits at 53.6. That 10-point gap is the physiological signature of someone who spiked load faster than their long-term fitness could absorb.</div></div><div class="coach-line" style="border-left-color:#FF00FF"><div class="coach-name" style="color:#FF00FF">Backyard Ultra World Champion</div><div class="coach-text">The W05 34.88 km long run — 280 minutes, 624 metres of climbing — is actually a decent stimulus on its own. But stacking it into a 94 km week right off a race and rest pattern is where the maths breaks down. For a backyard ultra, you need to practice accumulating fatigue intelligently, not accidentally. W06 and W07 drifting down to 76 and 67 km looks like the body voting for recovery rather than the athlete choosing it.</div></div><div class="coach-line" style="border-left-color:#00FFFF"><div class="coach-name" style="color:#00FFFF">Marathon Coach</div><div class="coach-text">The load sequence — 582, 304, 332 — is erratic rather than structured. A proper three-week build would show progressive loading, say 55, 65, 75 km, then a deliberate cut to 33-37 km. What we actually have is descent from over-reaching. The upcoming week has to be a planned recovery, not just another uncontrolled drift downward. Cap it at 35 km, keep the long run under 14 km, and let that <span class="has-tooltip">TSB<span class="tooltip-popup">Training Stress Balance (CTL minus ATL). Positive = fresh, negative = fatigued. Race-ready zone: +5 to +15.</span></span> recover back toward zero before the next build block.</div></div><div class="coach-line" style="border-left-color:#FFD600"><div class="coach-name" style="color:#FFD600">Sports Physio</div><div class="coach-text">And with consistency at 67%, the 30-day picture isn't just about volume — it's about pattern. The 9-day gap, the W05 spike, the gradual drift down all point to training that's reactive rather than planned. Getting deliberate with the 3:1 structure over the next 16 weeks is the single highest-leverage change this athlete can make. The fitness is there — <span class="has-tooltip">CTL<span class="tooltip-popup">Chronic Training Load — your fitness. 42-day exponentially weighted average of daily training load.</span></span> at 53.6 with that January effort as proof — but it needs a proper architecture to build on safely toward July.</div></div></div><div class="coach-conversation"><h3>Big Picture</h3><div class="coach-line" style="border-left-color:#00FF41"><div class="coach-name" style="color:#00FF41">Ultrarunning Coach</div><div class="coach-text">Zooming all the way out: <span class="has-tooltip">CTL<span class="tooltip-popup">Chronic Training Load — your fitness. 42-day exponentially weighted average of daily training load.</span></span> at 53.6, a pace trend of -15.8% improvement over the full training history, and three confirmed efforts over 4.5 hours on the legs — 5.6 hours for the 51 km January race, 4.7 hours for the 35 km long run, 4.6 hours for the 42 km. The aerobic foundation is real and the time-on-feet bank is being built. With 18 weeks to July 4th and a 2-week taper, that's exactly 16 training weeks — four clean <span class="has-tooltip">3:1 cycle<span class="tooltip-popup">Three weeks of progressive training load followed by one recovery week at ~50% volume. Allows adaptation without overtraining.</span></span>s if the structure is respected from this point forward. Conditionally, this athlete is on track.</div></div><div class="coach-line" style="border-left-color:#00FFFF"><div class="coach-name" style="color:#00FFFF">Marathon Coach</div><div class="coach-text">The condition is everything, though. <span class="has-tooltip">CTL<span class="tooltip-popup">Chronic Training Load — your fitness. 42-day exponentially weighted average of daily training load.</span></span> needs to reach 68-72 entering the taper — that's 15-18 points of growth from 53.6. Four disciplined cycles, each adding 3-4 CTL points through progressive build weeks, gets them there mathematically. But the AC ratio sitting at 1.19 with a 50.6% load ramp tells me the last cycle wasn't progressive — it was chaotic. If this week isn't a genuine recovery week at 35-38 km, the first build of that plan starts with compromised adaptation and the numbers never stack up the way they need to.</div></div><div class="coach-line" style="border-left-color:#FFD600"><div class="coach-name" style="color:#FFD600">Sports Physio</div><div class="coach-text">The risk I keep coming back to is consistency at 67%. That means roughly one in three planned sessions isn't happening, and over 16 weeks that's a compounding deficit. We've seen the pattern: a race effort in January, nine days of forced rest, then three weeks of uncontrolled loading that drift rather than build. The pace trend of -15.8% is encouraging — the aerobic system is genuinely improving — but if the structural gaps continue, the athlete could arrive at peak training in April and May without the chronic base to absorb the hardest blocks. That's where injuries happen.</div></div><div class="coach-line" style="border-left-color:#FF00FF"><div class="coach-name" style="color:#FF00FF">Backyard Ultra World Champion</div><div class="coach-text">The time-on-feet profile is what I care about most for this specific event, and I'll be honest — it's the strongest part of this athlete's preparation right now. Three efforts over 4.5 hours is more than many backyard ultra competitors have done at this point in their build. But the January 51 km was race intensity at 141 HR and 6:35 pace. What I want to see through April and May is the same duration — five to six hours — at genuinely easy pace, 120-130 HR, with deliberate fueling practice every 45 minutes from the first hour. That specific adaptation doesn't register in <span class="has-tooltip">CTL<span class="tooltip-popup">Chronic Training Load — your fitness. 42-day exponentially weighted average of daily training load.</span></span> numbers but it's the difference between surviving the mid-race yards and moving well through them.</div></div><div class="coach-line" style="border-left-color:#00FFFF"><div class="coach-name" style="color:#00FFFF">Marathon Coach</div><div class="coach-text">To put the remaining schedule in concrete terms: recovery week now, then three build cycles targeting roughly 55-65-75, then 60-70-80, then 65-75-85 km — each followed by a deliberate cut to 35-40 km, not the drift we've seen the past month. That trajectory lands <span class="has-tooltip">CTL<span class="tooltip-popup">Chronic Training Load — your fitness. 42-day exponentially weighted average of daily training load.</span></span> in the 68-72 range at taper entry. The biggest single risk to that plan isn't fitness — it's skipping one of the four recovery weeks and turning the subsequent build block into survival mode rather than adaptation.</div></div><div class="coach-line" style="border-left-color:#FFD600"><div class="coach-name" style="color:#FFD600">Sports Physio</div><div class="coach-text">And I'd tie the pace verdict dire<span class="has-tooltip">ctl<span class="tooltip-popup">Chronic Training Load — your fitness. 42-day exponentially weighted average of daily training load.</span></span>y to that risk. The -6.4% pace improvement over the last four weeks is genuine progress, but the progress change sitting at only -3.5% tells me the curve is flattening — which is exactly what you'd expect from an athlete carrying four weeks of accumulated fatigue. Give this body one proper recovery week and that pace trend likely accelerates again in the next build. Withhold it and the plateau becomes a ceiling. The fitness is there; the architecture just needs to start working with it.</div></div></div></div><div class="section"><h2>Last Run Deep-Dive</h2><div class="card-grid"><div class="stat-card"><div class="stat-value">Sat 21 Feb 2026, 13:42</div><div class="stat-label">Date</div></div><div class="stat-card"><div class="stat-value">24.5 km</div><div class="stat-label">Distance</div></div><div class="stat-card"><div class="stat-value">3:24:07</div><div class="stat-label">Duration</div></div><div class="stat-card"><div class="stat-value">8:19 /km</div><div class="stat-label">Pace</div></div><div class="stat-card"><div class="stat-value">124 bpm</div><div class="stat-label">Avg HR</div></div><div class="stat-card"><div class="stat-value">144 bpm</div><div class="stat-label">Max HR</div></div><div class="stat-card"><div class="stat-value">682 m</div><div class="stat-label">Elevation</div></div><div class="stat-card"><div class="stat-value">109</div><div class="stat-label">Training Load</div></div><div class="stat-card"><div class="stat-value">167 spm</div><div class="stat-label">Cadence</div></div><div class="stat-card"><div class="stat-value">0.72 m</div><div class="stat-label">Stride</div></div></div><p class="insight">Compared to 15 runs at similar distance (19.6-29.4 km): pace was <b>4.4% slower</b> (8:19 vs avg 7:58), avg HR 124 vs 137 bpm.</p><h3>HR Zone Distribution</h3><svg width="700" height="260" xmlns="http://www.w3.org/2000/svg" style="font-family:sans-serif">
+<rect width="700" height="260" fill="#0a0a0a" rx="6"/>
+
+
+<text x="47" y="224.0" text-anchor="end" font-size="11" fill="#888">0.0</text>
+<line x1="55" y1="220.0" x2="680" y2="220.0" stroke="#333"/>
+<text x="47" y="174.0" text-anchor="end" font-size="11" fill="#888">53.2</text>
+<line x1="55" y1="170.0" x2="680" y2="170.0" stroke="#333"/>
+<text x="47" y="124.0" text-anchor="end" font-size="11" fill="#888">106.3</text>
+<line x1="55" y1="120.0" x2="680" y2="120.0" stroke="#333"/>
+<text x="47" y="74.0" text-anchor="end" font-size="11" fill="#888">159.5</text>
+<line x1="55" y1="70.0" x2="680" y2="70.0" stroke="#333"/>
+<text x="47" y="24.0" text-anchor="end" font-size="11" fill="#888">212.7</text>
+<line x1="55" y1="20.0" x2="680" y2="20.0" stroke="#333"/>
+<rect x="148.8" y="32.2" width="437.5" height="187.8" fill="#4CAF50" opacity="0.85"/>
+<rect x="148.8" y="29.5" width="437.5" height="2.6" fill="#8BC34A" opacity="0.85"/>
+<text x="367.5" y="236.0" text-anchor="middle" font-size="10" fill="#888">This Run</text>
+<rect x="50" y="8" width="10" height="10" fill="#4CAF50" rx="2"/>
+<text x="64" y="16" font-size="10" fill="#aaa">Z1</text>
+<rect x="140" y="8" width="10" height="10" fill="#8BC34A" rx="2"/>
+<text x="154" y="16" font-size="10" fill="#aaa">Z2</text>
+<rect x="230" y="8" width="10" height="10" fill="#FFC107" rx="2"/>
+<text x="244" y="16" font-size="10" fill="#aaa">Z3</text>
+<rect x="320" y="8" width="10" height="10" fill="#FF9800" rx="2"/>
+<text x="334" y="16" font-size="10" fill="#aaa">Z4</text>
+<rect x="410" y="8" width="10" height="10" fill="#FF5722" rx="2"/>
+<text x="424" y="16" font-size="10" fill="#aaa">Z5</text>
+<rect x="500" y="8" width="10" height="10" fill="#E91E63" rx="2"/>
+<text x="514" y="16" font-size="10" fill="#aaa">Z6</text>
+<rect x="590" y="8" width="10" height="10" fill="#9C27B0" rx="2"/>
+<text x="604" y="16" font-size="10" fill="#aaa">Z7</text>
+</svg><div class="zone-summary"><span class="zone-badge" style="background:#4CAF50;color:white">Z1: 200min (99%)</span> <span class="zone-badge" style="background:#8BC34A;color:white">Z2: 3min (1%)</span> <span class="zone-badge" style="background:#FFC107;color:white">Z3: 0min (0%)</span> <span class="zone-badge" style="background:#FF9800;color:white">Z4: 0min (0%)</span> <span class="zone-badge" style="background:#FF5722;color:white">Z5: 0min (0%)</span> <span class="zone-badge" style="background:#E91E63;color:white">Z6: 0min (0%)</span> <span class="zone-badge" style="background:#9C27B0;color:white">Z7: 0min (0%)</span> </div><p class="insight">Easy (Z1-2): 100% | Tempo (Z3): 0% | Hard (Z4+): 0%</p><h3>Pace Over Distance</h3><svg width="700" height="260" xmlns="http://www.w3.org/2000/svg" style="font-family:sans-serif">
+<rect width="700" height="260" fill="#0a0a0a" rx="6"/>
+
+
+<text x="47" y="214.9090909090909" text-anchor="end" font-size="11" fill="#888">5:49</text>
+<line x1="55" y1="210.9" x2="680" y2="210.9" stroke="#333"/>
+<text x="47" y="154.9090909090909" text-anchor="end" font-size="11" fill="#888">12:28</text>
+<line x1="55" y1="150.9" x2="680" y2="150.9" stroke="#333"/>
+<text x="47" y="93.0909090909091" text-anchor="end" font-size="11" fill="#888">19:20</text>
+<line x1="55" y1="89.1" x2="680" y2="89.1" stroke="#333"/>
+<text x="47" y="33.09090909090909" text-anchor="end" font-size="11" fill="#888">25:59</text>
+<line x1="55" y1="29.1" x2="680" y2="29.1" stroke="#333"/>
+<text x="80.5" y="238" text-anchor="middle" font-size="11" fill="#888">1km</text>
+<line x1="80.5" y1="220" x2="80.5" y2="224" stroke="#444"/>
+<text x="106.0" y="238" text-anchor="middle" font-size="11" fill="#888">2km</text>
+<line x1="106.0" y1="220" x2="106.0" y2="224" stroke="#444"/>
+<text x="131.6" y="238" text-anchor="middle" font-size="11" fill="#888">3km</text>
+<line x1="131.6" y1="220" x2="131.6" y2="224" stroke="#444"/>
+<text x="157.1" y="238" text-anchor="middle" font-size="11" fill="#888">4km</text>
+<line x1="157.1" y1="220" x2="157.1" y2="224" stroke="#444"/>
+<text x="182.6" y="238" text-anchor="middle" font-size="11" fill="#888">5km</text>
+<line x1="182.6" y1="220" x2="182.6" y2="224" stroke="#444"/>
+<text x="208.2" y="238" text-anchor="middle" font-size="11" fill="#888">6km</text>
+<line x1="208.2" y1="220" x2="208.2" y2="224" stroke="#444"/>
+<text x="233.7" y="238" text-anchor="middle" font-size="11" fill="#888">7km</text>
+<line x1="233.7" y1="220" x2="233.7" y2="224" stroke="#444"/>
+<text x="259.2" y="238" text-anchor="middle" font-size="11" fill="#888">8km</text>
+<line x1="259.2" y1="220" x2="259.2" y2="224" stroke="#444"/>
+<text x="284.7" y="238" text-anchor="middle" font-size="11" fill="#888">9km</text>
+<line x1="284.7" y1="220" x2="284.7" y2="224" stroke="#444"/>
+<text x="310.3" y="238" text-anchor="middle" font-size="11" fill="#888">10km</text>
+<line x1="310.3" y1="220" x2="310.3" y2="224" stroke="#444"/>
+<text x="335.8" y="238" text-anchor="middle" font-size="11" fill="#888">11km</text>
+<line x1="335.8" y1="220" x2="335.8" y2="224" stroke="#444"/>
+<text x="361.3" y="238" text-anchor="middle" font-size="11" fill="#888">12km</text>
+<line x1="361.3" y1="220" x2="361.3" y2="224" stroke="#444"/>
+<text x="386.9" y="238" text-anchor="middle" font-size="11" fill="#888">13km</text>
+<line x1="386.9" y1="220" x2="386.9" y2="224" stroke="#444"/>
+<text x="412.4" y="238" text-anchor="middle" font-size="11" fill="#888">14km</text>
+<line x1="412.4" y1="220" x2="412.4" y2="224" stroke="#444"/>
+<text x="437.9" y="238" text-anchor="middle" font-size="11" fill="#888">15km</text>
+<line x1="437.9" y1="220" x2="437.9" y2="224" stroke="#444"/>
+<text x="463.5" y="238" text-anchor="middle" font-size="11" fill="#888">16km</text>
+<line x1="463.5" y1="220" x2="463.5" y2="224" stroke="#444"/>
+<text x="489.0" y="238" text-anchor="middle" font-size="11" fill="#888">17km</text>
+<line x1="489.0" y1="220" x2="489.0" y2="224" stroke="#444"/>
+<text x="514.5" y="238" text-anchor="middle" font-size="11" fill="#888">18km</text>
+<line x1="514.5" y1="220" x2="514.5" y2="224" stroke="#444"/>
+<text x="540.1" y="238" text-anchor="middle" font-size="11" fill="#888">19km</text>
+<line x1="540.1" y1="220" x2="540.1" y2="224" stroke="#444"/>
+<text x="565.6" y="238" text-anchor="middle" font-size="11" fill="#888">20km</text>
+<line x1="565.6" y1="220" x2="565.6" y2="224" stroke="#444"/>
+<text x="591.1" y="238" text-anchor="middle" font-size="11" fill="#888">21km</text>
+<line x1="591.1" y1="220" x2="591.1" y2="224" stroke="#444"/>
+<text x="616.6" y="238" text-anchor="middle" font-size="11" fill="#888">22km</text>
+<line x1="616.6" y1="220" x2="616.6" y2="224" stroke="#444"/>
+<text x="642.2" y="238" text-anchor="middle" font-size="11" fill="#888">23km</text>
+<line x1="642.2" y1="220" x2="642.2" y2="224" stroke="#444"/>
+<text x="667.7" y="238" text-anchor="middle" font-size="11" fill="#888">24km</text>
+<line x1="667.7" y1="220" x2="667.7" y2="224" stroke="#444"/>
+<polyline points="55.0,141.4 56.9,184.1 59.2,194.7 61.4,191.8 63.5,189.4 66.0,191.3 68.4,195.0 70.9,198.4 73.4,199.1 75.3,197.4 77.2,191.3 78.8,172.6 80.3,155.1 82.0,154.0 84.4,184.7 87.1,207.0 89.7,204.2 91.7,197.6 94.4,194.2 96.9,203.7 99.1,196.6 101.5,192.2 103.1,186.5 104.3,172.5 105.7,171.3 107.5,164.2 109.2,187.8 111.7,192.5 113.9,194.5 116.6,194.7 119.2,200.8 121.0,189.9 122.4,171.4 123.9,134.0 126.2,179.0 128.8,198.6 131.7,205.7 134.2,203.9 136.8,201.3 139.5,202.4 141.4,196.1 144.4,202.8 146.4,199.8 148.6,189.2 150.9,190.9 151.9,160.3 152.8,85.2 154.4,136.5 156.4,174.3 158.7,195.6 161.2,195.9 163.9,198.2 167.1,205.0 169.9,210.9 172.5,205.8 175.1,202.1 176.8,193.1 178.0,137.9 179.2,135.4 180.4,135.4 181.8,144.4 184.3,183.6 187.1,207.9 189.8,205.7 192.0,199.7 194.1,195.5 196.0,185.3 198.6,191.9 201.2,199.6 203.6,198.9 205.3,180.2 207.5,173.8 208.6,189.7 208.8,129.8 209.4,39.4 212.4,197.1 215.0,207.1 217.2,200.1 219.6,192.6 222.1,193.9 224.2,192.9 226.1,190.2 228.8,201.4 231.6,204.3 233.6,197.0 236.3,190.7 238.7,201.2 240.9,195.4 243.2,195.2 245.6,195.1 248.0,194.7 250.8,196.8 252.9,199.7 255.7,199.0 258.8,204.0 261.6,208.2 264.4,208.4 266.9,204.9 269.5,198.3 271.9,199.2 274.4,198.2 277.1,199.2 279.6,201.3 281.4,193.7 282.7,164.6 285.8,195.8 287.5,201.6 289.0,189.1 290.1,177.9 290.4,167.0 291.3,134.6 292.2,102.9 293.6,139.2 296.2,186.8 298.8,199.9 300.0,183.0 300.9,126.8 303.1,170.1 305.9,202.3 308.8,206.7 311.5,206.3 313.4,196.9 314.0,155.4 314.6,137.0 315.9,169.7 317.0,165.0 318.1,144.8 318.7,131.7 319.4,29.1 320.7,114.9 322.7,183.3 324.8,188.5 326.3,181.3 327.5,147.5 329.5,178.5 330.3,163.8 331.7,141.9 333.3,151.8 335.8,181.7 338.3,197.9 340.7,199.2 343.2,197.6 345.6,199.8 347.8,197.0 350.5,196.1 353.1,200.4 355.0,200.3 355.7,182.4 356.9,181.8 359.2,194.6 361.6,194.5 363.8,198.0 365.8,188.9 367.1,158.3 368.5,143.4 369.7,138.5 371.2,144.9 372.6,152.9 374.0,146.7 375.0,139.2 376.4,135.1 378.7,178.8 381.0,192.7 382.5,183.5 383.5,146.5 384.9,156.2 387.0,184.0 389.1,187.7 391.4,190.5 392.8,179.4 394.0,149.9 395.5,151.8 397.0,157.4 398.2,136.7 399.0,105.4 400.1,111.8 401.6,132.9 403.1,150.9 404.5,150.7 406.0,156.8 407.5,153.5 410.2,192.8 412.7,204.7 415.1,200.5 417.3,193.9 419.8,191.9 420.6,187.7 421.6,155.3 424.7,201.9 426.5,201.0 427.5,140.6 429.1,131.3 431.8,192.1 434.2,203.4 435.9,189.2 438.1,194.6 440.1,208.0 442.8,202.4 444.8,195.8 447.1,191.3 449.3,192.1 451.7,199.6 453.7,188.7 456.3,198.8 458.2,192.6 460.1,184.0 462.6,190.7 465.1,198.3 467.4,198.6 469.7,194.8 471.3,183.7 472.8,160.9 473.7,140.6 474.6,90.0 475.9,130.7 477.5,155.3 479.7,182.3 482.0,195.6 484.5,195.9 486.6,191.3 489.4,199.9 491.9,203.2 494.2,195.7 496.8,197.2 499.3,199.8 502.0,200.8 504.6,202.1 507.2,201.1 509.5,199.6 512.0,196.9 514.3,195.2 515.7,177.2 517.1,144.7 518.5,147.2 520.2,150.7 523.0,195.5 525.4,202.5 528.0,199.3 530.1,196.4 530.9,163.1 532.8,172.3 535.6,201.6 537.8,200.5 539.7,193.2 542.1,190.7 544.7,197.1 546.6,192.2 548.1,163.5 549.8,163.8 551.8,167.7 554.5,195.8 557.2,203.4 559.9,204.2 562.6,201.0 565.4,202.2 567.7,201.0 570.5,199.3 573.1,203.0 574.1,170.1 575.9,155.8 578.8,199.0 581.1,202.1 583.1,195.5 584.8,174.9 587.2,190.3 589.5,192.1 591.8,192.3 594.0,191.7 595.9,187.5 598.5,188.6 601.2,201.3 602.4,191.6 604.3,186.0 605.7,170.5 606.6,141.5 608.1,136.6 609.6,147.2 611.4,163.6 614.0,197.0 616.3,196.7 618.8,195.4 621.5,197.5 624.4,203.8 627.1,207.2 629.7,204.6 631.8,191.7 634.6,197.3 637.3,203.4 640.2,204.6 643.1,205.3 645.9,207.2 648.7,206.4 651.5,204.3 654.1,204.2 657.0,205.4 659.7,205.6 662.2,203.9 663.6,180.5 665.1,152.9 666.6,152.2 669.1,180.9 672.1,203.7 674.6,204.4 677.3,202.1 680.0,204.2" fill="none" stroke="#2196F3" stroke-width="2" opacity="1"/>
+</svg><p class="chart-note">60-second rolling average. Lower = faster.</p><h3>Elevation Profile</h3><svg width="700" height="260" xmlns="http://www.w3.org/2000/svg" style="font-family:sans-serif">
+<rect width="700" height="260" fill="#0a0a0a" rx="6"/>
+
+
+<text x="47" y="224.0" text-anchor="end" font-size="11" fill="#888">10.0</text>
+<line x1="55" y1="220.0" x2="680" y2="220.0" stroke="#333"/>
+<text x="47" y="174.0" text-anchor="end" font-size="11" fill="#888">29.9</text>
+<line x1="55" y1="170.0" x2="680" y2="170.0" stroke="#333"/>
+<text x="47" y="124.0" text-anchor="end" font-size="11" fill="#888">49.8</text>
+<line x1="55" y1="120.0" x2="680" y2="120.0" stroke="#333"/>
+<text x="47" y="73.99999999999997" text-anchor="end" font-size="11" fill="#888">69.7</text>
+<line x1="55" y1="70.0" x2="680" y2="70.0" stroke="#333"/>
+<text x="47" y="24.0" text-anchor="end" font-size="11" fill="#888">89.6</text>
+<line x1="55" y1="20.0" x2="680" y2="20.0" stroke="#333"/>
+<text x="80.4" y="238" text-anchor="middle" font-size="11" fill="#888">1km</text>
+<line x1="80.4" y1="220" x2="80.4" y2="224" stroke="#444"/>
+<text x="105.9" y="238" text-anchor="middle" font-size="11" fill="#888">2km</text>
+<line x1="105.9" y1="220" x2="105.9" y2="224" stroke="#444"/>
+<text x="131.5" y="238" text-anchor="middle" font-size="11" fill="#888">3km</text>
+<line x1="131.5" y1="220" x2="131.5" y2="224" stroke="#444"/>
+<text x="157.0" y="238" text-anchor="middle" font-size="11" fill="#888">4km</text>
+<line x1="157.0" y1="220" x2="157.0" y2="224" stroke="#444"/>
+<text x="182.5" y="238" text-anchor="middle" font-size="11" fill="#888">5km</text>
+<line x1="182.5" y1="220" x2="182.5" y2="224" stroke="#444"/>
+<text x="208.0" y="238" text-anchor="middle" font-size="11" fill="#888">6km</text>
+<line x1="208.0" y1="220" x2="208.0" y2="224" stroke="#444"/>
+<text x="233.6" y="238" text-anchor="middle" font-size="11" fill="#888">7km</text>
+<line x1="233.6" y1="220" x2="233.6" y2="224" stroke="#444"/>
+<text x="259.1" y="238" text-anchor="middle" font-size="11" fill="#888">8km</text>
+<line x1="259.1" y1="220" x2="259.1" y2="224" stroke="#444"/>
+<text x="284.6" y="238" text-anchor="middle" font-size="11" fill="#888">9km</text>
+<line x1="284.6" y1="220" x2="284.6" y2="224" stroke="#444"/>
+<text x="310.1" y="238" text-anchor="middle" font-size="11" fill="#888">10km</text>
+<line x1="310.1" y1="220" x2="310.1" y2="224" stroke="#444"/>
+<text x="335.7" y="238" text-anchor="middle" font-size="11" fill="#888">11km</text>
+<line x1="335.7" y1="220" x2="335.7" y2="224" stroke="#444"/>
+<text x="361.2" y="238" text-anchor="middle" font-size="11" fill="#888">12km</text>
+<line x1="361.2" y1="220" x2="361.2" y2="224" stroke="#444"/>
+<text x="386.7" y="238" text-anchor="middle" font-size="11" fill="#888">13km</text>
+<line x1="386.7" y1="220" x2="386.7" y2="224" stroke="#444"/>
+<text x="412.2" y="238" text-anchor="middle" font-size="11" fill="#888">14km</text>
+<line x1="412.2" y1="220" x2="412.2" y2="224" stroke="#444"/>
+<text x="437.8" y="238" text-anchor="middle" font-size="11" fill="#888">15km</text>
+<line x1="437.8" y1="220" x2="437.8" y2="224" stroke="#444"/>
+<text x="463.3" y="238" text-anchor="middle" font-size="11" fill="#888">16km</text>
+<line x1="463.3" y1="220" x2="463.3" y2="224" stroke="#444"/>
+<text x="488.8" y="238" text-anchor="middle" font-size="11" fill="#888">17km</text>
+<line x1="488.8" y1="220" x2="488.8" y2="224" stroke="#444"/>
+<text x="514.4" y="238" text-anchor="middle" font-size="11" fill="#888">18km</text>
+<line x1="514.4" y1="220" x2="514.4" y2="224" stroke="#444"/>
+<text x="539.9" y="238" text-anchor="middle" font-size="11" fill="#888">19km</text>
+<line x1="539.9" y1="220" x2="539.9" y2="224" stroke="#444"/>
+<text x="565.4" y="238" text-anchor="middle" font-size="11" fill="#888">20km</text>
+<line x1="565.4" y1="220" x2="565.4" y2="224" stroke="#444"/>
+<text x="590.9" y="238" text-anchor="middle" font-size="11" fill="#888">21km</text>
+<line x1="590.9" y1="220" x2="590.9" y2="224" stroke="#444"/>
+<text x="616.5" y="238" text-anchor="middle" font-size="11" fill="#888">22km</text>
+<line x1="616.5" y1="220" x2="616.5" y2="224" stroke="#444"/>
+<text x="642.0" y="238" text-anchor="middle" font-size="11" fill="#888">23km</text>
+<line x1="642.0" y1="220" x2="642.0" y2="224" stroke="#444"/>
+<text x="667.5" y="238" text-anchor="middle" font-size="11" fill="#888">24km</text>
+<line x1="667.5" y1="220" x2="667.5" y2="224" stroke="#444"/>
+<polygon points="55.0,220.0 55.0,171.7 57.1,210.9 59.4,203.9 61.5,185.3 63.7,189.3 66.1,179.3 68.6,164.7 71.0,163.7 73.6,181.3 75.5,166.7 77.3,137.6 78.9,120.0 80.4,94.4 82.0,85.3 84.5,70.8 87.2,81.3 89.9,70.3 91.8,68.8 94.6,79.3 97.0,86.3 99.2,88.4 101.6,98.4 103.1,103.9 104.4,108.4 105.8,111.0 107.6,109.5 109.4,77.8 111.9,84.3 114.1,84.3 116.7,91.4 119.2,116.5 121.2,101.4 122.4,83.8 123.9,78.3 126.3,91.9 129.1,79.8 131.7,90.9 134.4,86.3 136.9,101.4 139.6,113.0 141.7,103.4 144.5,127.5 146.5,146.1 148.7,129.0 150.9,137.1 151.8,103.9 152.9,77.8 154.3,68.3 156.5,40.6 158.9,38.1 161.4,29.1 164.0,56.7 167.3,90.4 170.0,102.9 172.6,111.5 175.2,124.0 176.9,107.4 178.0,101.4 179.2,91.4 180.4,64.8 181.8,53.7 184.5,67.8 187.3,72.8 189.8,65.8 192.1,73.8 194.1,114.0 196.1,125.5 198.8,122.0 201.3,109.5 203.6,116.0 205.3,75.3 207.6,70.3 208.5,75.3 208.7,81.8 209.6,77.3 212.5,83.8 215.1,84.8 217.4,71.3 219.6,54.2 222.2,36.1 224.2,52.7 226.2,79.3 229.0,79.8 231.8,76.8 233.7,78.8 236.4,82.8 238.8,93.4 241.1,88.4 243.3,97.9 245.7,86.3 248.1,91.9 250.9,91.4 253.1,93.9 255.9,91.9 259.0,115.5 261.8,134.1 264.6,154.7 267.1,153.1 269.6,153.7 272.1,167.2 274.5,162.2 277.2,174.2 279.7,179.3 281.5,166.7 282.9,151.1 285.9,160.2 287.5,147.1 288.9,138.6 290.0,125.0 290.4,95.9 291.2,116.0 292.1,90.9 293.7,79.8 296.3,76.8 298.8,86.3 299.9,58.7 300.9,68.8 303.2,58.2 306.1,48.2 308.9,54.7 311.7,72.3 313.4,77.8 313.9,69.3 314.5,65.8 315.8,88.9 316.9,91.4 318.0,68.8 318.6,59.7 319.3,53.7 320.8,103.4 322.8,115.5 324.8,135.1 326.2,131.0 327.5,135.1 329.4,130.0 330.3,115.5 331.7,88.4 333.4,61.7 335.8,57.7 338.4,74.3 340.7,85.3 343.3,44.2 345.6,66.3 347.9,65.3 350.5,54.2 353.1,56.7 354.9,67.3 355.6,68.8 357.0,83.8 359.2,117.0 361.6,120.0 363.8,154.2 365.7,147.1 367.0,141.6 368.5,127.0 369.7,112.5 371.2,99.9 372.6,95.9 373.9,74.3 374.9,57.2 376.4,58.2 378.7,71.8 381.0,79.3 382.4,94.4 383.4,104.9 384.9,117.5 386.9,123.5 389.1,121.0 391.4,134.1 392.7,123.5 393.9,127.0 395.5,115.0 397.0,116.5 398.0,116.0 399.0,103.9 400.1,91.9 401.5,69.3 403.0,49.2 404.4,57.2 405.9,54.2 407.5,57.2 410.2,58.2 412.7,67.3 415.1,50.2 417.3,50.2 419.8,68.3 420.4,58.7 421.7,60.7 424.8,82.3 426.4,94.4 427.4,101.4 429.1,78.3 431.8,67.3 434.2,61.2 435.8,61.2 438.1,67.3 440.1,73.3 442.8,71.3 444.8,70.8 447.1,72.3 449.3,60.7 451.6,60.7 453.7,74.3 456.3,87.9 458.2,81.8 460.1,109.5 462.7,124.0 465.1,133.6 467.4,152.1 469.7,148.1 471.3,134.1 472.7,116.5 473.6,93.9 474.4,82.3 475.8,82.8 477.5,67.3 479.7,39.6 482.0,42.7 484.4,46.7 486.7,38.6 489.4,36.1 492.0,52.7 494.2,84.8 496.8,110.5 499.4,120.5 502.0,105.4 504.6,95.4 507.1,89.4 509.6,97.4 512.0,85.8 514.3,88.9 515.6,89.9 517.1,101.9 518.4,93.9 520.2,91.9 523.0,86.3 525.4,75.3 528.0,71.8 530.0,90.9 530.8,108.4 532.8,110.5 535.6,130.5 537.8,133.6 539.6,130.5 542.1,129.5 544.7,117.0 546.5,104.4 548.1,83.3 549.8,70.8 551.8,62.2 554.6,80.8 557.3,84.8 559.9,83.3 562.6,75.3 565.4,99.9 567.8,106.4 570.5,119.5 573.0,131.6 574.0,137.1 575.9,140.6 578.8,150.6 581.1,139.6 583.0,134.6 584.8,136.1 587.2,128.0 589.5,122.5 591.8,117.5 593.9,113.0 595.9,112.0 598.5,117.0 601.1,143.1 602.3,118.5 604.2,91.9 605.6,96.9 606.5,83.8 608.0,81.8 609.4,88.9 611.5,91.4 613.9,77.8 616.3,80.8 618.8,93.9 621.5,85.8 624.4,96.9 627.1,110.5 629.7,113.5 631.8,117.5 634.6,125.0 637.3,134.6 640.2,135.6 643.1,143.6 645.9,159.7 648.7,168.7 651.4,183.3 654.1,184.8 657.0,184.8 659.7,191.3 662.1,194.3 663.5,208.4 665.0,200.4 666.5,187.3 669.1,163.2 672.1,177.8 674.6,181.8 677.2,188.3 680.0,208.9 680.0,220.0" fill="#A1887F" opacity="0.25"/>
+<polyline points="55.0,171.7 57.1,210.9 59.4,203.9 61.5,185.3 63.7,189.3 66.1,179.3 68.6,164.7 71.0,163.7 73.6,181.3 75.5,166.7 77.3,137.6 78.9,120.0 80.4,94.4 82.0,85.3 84.5,70.8 87.2,81.3 89.9,70.3 91.8,68.8 94.6,79.3 97.0,86.3 99.2,88.4 101.6,98.4 103.1,103.9 104.4,108.4 105.8,111.0 107.6,109.5 109.4,77.8 111.9,84.3 114.1,84.3 116.7,91.4 119.2,116.5 121.2,101.4 122.4,83.8 123.9,78.3 126.3,91.9 129.1,79.8 131.7,90.9 134.4,86.3 136.9,101.4 139.6,113.0 141.7,103.4 144.5,127.5 146.5,146.1 148.7,129.0 150.9,137.1 151.8,103.9 152.9,77.8 154.3,68.3 156.5,40.6 158.9,38.1 161.4,29.1 164.0,56.7 167.3,90.4 170.0,102.9 172.6,111.5 175.2,124.0 176.9,107.4 178.0,101.4 179.2,91.4 180.4,64.8 181.8,53.7 184.5,67.8 187.3,72.8 189.8,65.8 192.1,73.8 194.1,114.0 196.1,125.5 198.8,122.0 201.3,109.5 203.6,116.0 205.3,75.3 207.6,70.3 208.5,75.3 208.7,81.8 209.6,77.3 212.5,83.8 215.1,84.8 217.4,71.3 219.6,54.2 222.2,36.1 224.2,52.7 226.2,79.3 229.0,79.8 231.8,76.8 233.7,78.8 236.4,82.8 238.8,93.4 241.1,88.4 243.3,97.9 245.7,86.3 248.1,91.9 250.9,91.4 253.1,93.9 255.9,91.9 259.0,115.5 261.8,134.1 264.6,154.7 267.1,153.1 269.6,153.7 272.1,167.2 274.5,162.2 277.2,174.2 279.7,179.3 281.5,166.7 282.9,151.1 285.9,160.2 287.5,147.1 288.9,138.6 290.0,125.0 290.4,95.9 291.2,116.0 292.1,90.9 293.7,79.8 296.3,76.8 298.8,86.3 299.9,58.7 300.9,68.8 303.2,58.2 306.1,48.2 308.9,54.7 311.7,72.3 313.4,77.8 313.9,69.3 314.5,65.8 315.8,88.9 316.9,91.4 318.0,68.8 318.6,59.7 319.3,53.7 320.8,103.4 322.8,115.5 324.8,135.1 326.2,131.0 327.5,135.1 329.4,130.0 330.3,115.5 331.7,88.4 333.4,61.7 335.8,57.7 338.4,74.3 340.7,85.3 343.3,44.2 345.6,66.3 347.9,65.3 350.5,54.2 353.1,56.7 354.9,67.3 355.6,68.8 357.0,83.8 359.2,117.0 361.6,120.0 363.8,154.2 365.7,147.1 367.0,141.6 368.5,127.0 369.7,112.5 371.2,99.9 372.6,95.9 373.9,74.3 374.9,57.2 376.4,58.2 378.7,71.8 381.0,79.3 382.4,94.4 383.4,104.9 384.9,117.5 386.9,123.5 389.1,121.0 391.4,134.1 392.7,123.5 393.9,127.0 395.5,115.0 397.0,116.5 398.0,116.0 399.0,103.9 400.1,91.9 401.5,69.3 403.0,49.2 404.4,57.2 405.9,54.2 407.5,57.2 410.2,58.2 412.7,67.3 415.1,50.2 417.3,50.2 419.8,68.3 420.4,58.7 421.7,60.7 424.8,82.3 426.4,94.4 427.4,101.4 429.1,78.3 431.8,67.3 434.2,61.2 435.8,61.2 438.1,67.3 440.1,73.3 442.8,71.3 444.8,70.8 447.1,72.3 449.3,60.7 451.6,60.7 453.7,74.3 456.3,87.9 458.2,81.8 460.1,109.5 462.7,124.0 465.1,133.6 467.4,152.1 469.7,148.1 471.3,134.1 472.7,116.5 473.6,93.9 474.4,82.3 475.8,82.8 477.5,67.3 479.7,39.6 482.0,42.7 484.4,46.7 486.7,38.6 489.4,36.1 492.0,52.7 494.2,84.8 496.8,110.5 499.4,120.5 502.0,105.4 504.6,95.4 507.1,89.4 509.6,97.4 512.0,85.8 514.3,88.9 515.6,89.9 517.1,101.9 518.4,93.9 520.2,91.9 523.0,86.3 525.4,75.3 528.0,71.8 530.0,90.9 530.8,108.4 532.8,110.5 535.6,130.5 537.8,133.6 539.6,130.5 542.1,129.5 544.7,117.0 546.5,104.4 548.1,83.3 549.8,70.8 551.8,62.2 554.6,80.8 557.3,84.8 559.9,83.3 562.6,75.3 565.4,99.9 567.8,106.4 570.5,119.5 573.0,131.6 574.0,137.1 575.9,140.6 578.8,150.6 581.1,139.6 583.0,134.6 584.8,136.1 587.2,128.0 589.5,122.5 591.8,117.5 593.9,113.0 595.9,112.0 598.5,117.0 601.1,143.1 602.3,118.5 604.2,91.9 605.6,96.9 606.5,83.8 608.0,81.8 609.4,88.9 611.5,91.4 613.9,77.8 616.3,80.8 618.8,93.9 621.5,85.8 624.4,96.9 627.1,110.5 629.7,113.5 631.8,117.5 634.6,125.0 637.3,134.6 640.2,135.6 643.1,143.6 645.9,159.7 648.7,168.7 651.4,183.3 654.1,184.8 657.0,184.8 659.7,191.3 662.1,194.3 663.5,208.4 665.0,200.4 666.5,187.3 669.1,163.2 672.1,177.8 674.6,181.8 677.2,188.3 680.0,208.9" fill="none" stroke="#795548" stroke-width="1.5"/>
+</svg><h3>HR Drift</h3><p class="insight good">First half avg: 127 bpm | Second half avg: 123 bpm | Drift: <b>-3.0%</b></p><h3>Per-km Splits</h3><table class="splits"><tr><th>km</th><th>Pace</th><th>Avg HR</th><th>Elev +/-</th><th>Cadence</th></tr><tr><td>1</td><td>8:42</td><td>118</td><td>+84/-54</td><td>168</td></tr><tr><td>2</td><td>8:31</td><td>136</td><td>+34/-41</td><td>170</td></tr><tr><td>3</td><td>8:08</td><td>135</td><td>+50/-42</td><td>169</td></tr><tr><td>4</td><td>8:39</td><td>128</td><td>+69/-47</td><td>162</td></tr><tr><td>5</td><td>8:30</td><td>127</td><td>+47/-55</td><td>159</td></tr><tr><td>6</td><td>7:33</td><td>129</td><td>+49/-55</td><td>173</td></tr><tr><td>7</td><td>8:56</td><td>125</td><td>+44/-46</td><td>176</td></tr><tr><td>8</td><td>7:04</td><td>122</td><td>+25/-40</td><td>184</td></tr><tr><td>9</td><td>7:21</td><td>124</td><td>+34/-49</td><td>181</td></tr><tr><td>10</td><td>10:26</td><td>128</td><td>+86/-50</td><td>158</td></tr><tr><td>11</td><td>12:56</td><td>119</td><td>+97/-93</td><td>148</td></tr><tr><td>12</td><td>8:20</td><td>125</td><td>+39/-65</td><td>184</td></tr><tr><td>13</td><td>11:11</td><td>120</td><td>+54/-56</td><td>146</td></tr><tr><td>14</td><td>11:09</td><td>117</td><td>+61/-39</td><td>133</td></tr><tr><td>15</td><td>9:08</td><td>125</td><td>+52/-52</td><td>170</td></tr><tr><td>16</td><td>7:57</td><td>126</td><td>+30/-53</td><td>182</td></tr><tr><td>17</td><td>9:28</td><td>129</td><td>+69/-34</td><td>158</td></tr><tr><td>18</td><td>7:11</td><td>129</td><td>+28/-50</td><td>183</td></tr><tr><td>19</td><td>9:08</td><td>117</td><td>+43/-60</td><td>162</td></tr><tr><td>20</td><td>7:37</td><td>129</td><td>+48/-36</td><td>167</td></tr><tr><td>21</td><td>8:08</td><td>124</td><td>+30/-38</td><td>173</td></tr><tr><td>22</td><td>9:24</td><td>123</td><td>+59/-45</td><td>159</td></tr><tr><td>23</td><td>6:41</td><td>124</td><td>+22/-45</td><td>182</td></tr><tr><td>24</td><td>7:31</td><td>117</td><td>+37/-48</td><td>168</td></tr></table></div><div class="section"><h2>Training Load &amp; Fitness</h2><h3>Fitness (CTL) / Fatigue (ATL) / Form (TSB)</h3><svg width="700" height="260" xmlns="http://www.w3.org/2000/svg" style="font-family:sans-serif">
+<rect width="700" height="260" fill="#0a0a0a" rx="6"/>
+
+
+<text x="47" y="224.0" text-anchor="end" font-size="11" fill="#888">-36.0</text>
+<line x1="55" y1="220.0" x2="680" y2="220.0" stroke="#333"/>
+<text x="47" y="174.0" text-anchor="end" font-size="11" fill="#888">-4.9</text>
+<line x1="55" y1="170.0" x2="680" y2="170.0" stroke="#333"/>
+<text x="47" y="124.0" text-anchor="end" font-size="11" fill="#888">26.2</text>
+<line x1="55" y1="120.0" x2="680" y2="120.0" stroke="#333"/>
+<text x="47" y="74.0" text-anchor="end" font-size="11" fill="#888">57.2</text>
+<line x1="55" y1="70.0" x2="680" y2="70.0" stroke="#333"/>
+<text x="47" y="24.0" text-anchor="end" font-size="11" fill="#888">88.3</text>
+<line x1="55" y1="20.0" x2="680" y2="20.0" stroke="#333"/>
+<text x="55.0" y="238" text-anchor="middle" font-size="11" fill="#888">Apr 25</text>
+<line x1="55.0" y1="220" x2="55.0" y2="224" stroke="#444"/>
+<text x="163.0" y="238" text-anchor="middle" font-size="11" fill="#888">May 25</text>
+<line x1="163.0" y1="220" x2="163.0" y2="224" stroke="#444"/>
+<text x="274.9" y="238" text-anchor="middle" font-size="11" fill="#888">Jul 25</text>
+<line x1="274.9" y1="220" x2="274.9" y2="224" stroke="#444"/>
+<text x="398.4" y="238" text-anchor="middle" font-size="11" fill="#888">Sep 25</text>
+<line x1="398.4" y1="220" x2="398.4" y2="224" stroke="#444"/>
+<text x="477.5" y="238" text-anchor="middle" font-size="11" fill="#888">Nov 25</text>
+<line x1="477.5" y1="220" x2="477.5" y2="224" stroke="#444"/>
+<text x="591.3" y="238" text-anchor="middle" font-size="11" fill="#888">Jan 26</text>
+<line x1="591.3" y1="220" x2="591.3" y2="224" stroke="#444"/>
+<text x="680.0" y="238" text-anchor="middle" font-size="11" fill="#888">Feb 26</text>
+<line x1="680.0" y1="220" x2="680.0" y2="224" stroke="#444"/>
+<polyline points="55.0,160.2 58.9,158.7 64.6,157.8 72.4,151.5 78.1,151.7 82.0,151.3 85.9,150.0 95.5,145.7 99.4,141.3 105.2,140.9 118.7,140.2 126.4,134.3 132.2,131.7 136.0,130.5 136.0,130.5 139.9,128.3 141.8,127.2 145.7,127.5 149.5,128.1 153.4,128.1 159.2,125.8 159.2,125.8 163.0,124.1 166.9,121.2 172.7,120.1 182.3,117.1 186.2,115.3 190.0,114.1 193.9,109.4 203.5,110.1 209.3,109.0 213.2,108.5 219.0,107.7 220.9,107.9 226.7,109.5 230.5,109.7 234.4,111.3 236.3,105.3 249.8,107.4 253.7,107.0 257.5,106.9 263.3,105.6 267.2,104.8 271.0,104.6 274.9,97.4 298.1,107.5 301.9,105.8 307.7,105.1 311.6,104.4 321.2,105.8 325.1,105.9 328.9,106.2 330.8,97.6 342.4,100.3 348.2,100.8 352.1,102.1 355.9,99.8 361.7,98.9 365.6,98.8 367.5,96.1 375.2,98.1 382.9,94.3 384.9,93.7 388.7,90.7 390.6,91.0 394.5,91.6 398.4,87.4 402.2,88.5 406.1,88.1 409.9,84.6 411.9,84.1 419.6,85.4 423.4,86.1 429.2,84.7 435.0,88.2 436.9,80.7 442.7,84.0 446.6,84.8 450.4,86.5 454.3,89.0 454.3,89.0 456.2,89.5 462.0,90.8 464.0,90.8 467.8,94.1 467.8,94.1 469.7,91.9 477.5,91.2 477.5,91.2 483.2,93.3 491.0,94.6 496.7,94.7 500.6,96.0 500.6,96.0 506.4,97.8 514.1,98.4 525.7,100.3 531.5,100.9 535.3,97.8 539.2,97.2 545.0,94.4 552.7,96.7 558.5,92.3 562.3,94.2 570.0,98.3 573.9,99.6 577.8,98.9 581.6,99.9 585.5,98.9 589.3,97.4 591.3,97.6 593.2,97.6 595.1,97.2 599.0,88.4 604.8,90.5 610.6,89.0 612.5,87.2 618.3,90.3 627.9,84.3 647.2,89.4 649.1,84.0 649.1,84.0 649.1,84.0 654.9,77.9 658.8,78.3 662.6,75.8 666.5,75.0 666.5,77.1 668.4,77.7 672.3,79.1 674.2,76.2 676.1,77.3 680.0,77.9 680.0,75.8" fill="none" stroke="#4CAF50" stroke-width="2" opacity="1"/>
+<polyline points="55.0,151.0 58.9,145.2 64.6,144.5 72.4,114.4 78.1,127.9 82.0,131.7 85.9,129.4 95.5,117.6 99.4,100.6 105.2,112.4 118.7,124.6 126.4,102.3 132.2,98.9 136.0,100.0 136.0,100.0 139.9,95.9 141.8,93.8 145.7,103.5 149.5,112.3 153.4,115.8 159.2,106.9 159.2,106.9 163.0,101.8 166.9,90.2 172.7,93.4 182.3,89.5 186.2,85.7 190.0,86.1 193.9,66.0 203.5,88.8 209.3,88.7 213.2,90.2 219.0,90.0 220.9,94.6 226.7,106.4 230.5,107.7 234.4,116.7 236.3,82.3 249.8,104.5 253.7,102.9 257.5,102.7 263.3,95.4 267.2,92.7 271.0,94.0 274.9,58.4 298.1,121.3 301.9,107.7 307.7,101.7 311.6,98.2 321.2,106.6 325.1,107.4 328.9,108.6 330.8,59.8 342.4,89.9 348.2,94.4 352.1,102.9 355.9,88.9 361.7,86.1 365.6,88.4 367.5,74.7 375.2,92.4 382.9,72.6 384.9,72.3 388.7,60.0 390.6,65.9 394.5,74.8 398.4,54.9 402.2,68.1 406.1,70.7 409.9,54.8 411.9,56.3 419.6,73.6 423.4,79.7 429.2,75.0 435.0,95.8 436.9,52.3 442.7,78.3 446.6,83.3 450.4,92.3 454.3,103.9 454.3,103.9 456.2,105.0 462.0,105.6 464.0,105.6 467.8,116.7 467.8,116.7 469.7,101.1 477.5,88.5 477.5,88.5 483.2,98.3 491.0,97.8 496.7,96.3 500.6,102.3 500.6,102.3 506.4,108.3 514.1,102.0 525.7,104.6 531.5,104.0 535.3,85.4 539.2,84.2 545.0,73.0 552.7,91.9 558.5,64.8 562.3,82.0 570.0,106.3 573.9,110.3 577.8,104.0 581.6,107.8 585.5,99.2 589.3,90.4 591.3,93.4 593.2,93.4 595.1,92.6 599.0,43.7 604.8,69.8 610.6,66.0 612.5,61.5 618.3,85.3 627.9,48.7 647.2,87.4 649.1,56.7 649.1,56.7 649.1,56.7 654.9,29.1 658.8,42.7 662.6,36.6 666.5,37.4 666.5,54.0 668.4,60.5 672.3,71.8 674.2,56.6 676.1,65.1 680.0,70.5 680.0,59.3" fill="none" stroke="#FF5722" stroke-width="2" opacity="1"/>
+<polyline points="55.0,171.3 58.9,175.7 64.6,175.5 72.4,199.2 78.1,186.0 82.0,181.8 85.9,182.8 95.5,190.2 99.4,202.8 105.2,190.6 118.7,177.7 126.4,194.1 132.2,195.0 136.0,192.6 136.0,192.6 139.9,194.6 141.8,195.6 145.7,186.2 149.5,178.0 153.4,174.5 159.2,181.0 159.2,181.0 163.0,184.5 166.9,193.1 172.7,188.8 182.3,189.8 186.2,191.8 190.0,190.1 193.9,205.5 203.5,183.4 209.3,182.5 213.2,180.4 219.0,179.8 220.9,175.4 226.7,165.3 230.5,164.1 234.4,156.6 236.3,185.1 249.8,165.0 253.7,166.2 257.5,166.4 263.3,172.3 267.2,174.2 271.0,172.7 274.9,201.1 298.1,148.4 301.9,160.3 307.7,165.6 311.6,168.3 321.2,161.3 325.1,160.7 328.9,159.7 330.8,200.0 342.4,172.6 348.2,168.6 352.1,161.4 355.9,173.1 361.7,174.9 365.6,172.5 367.5,183.6 375.2,167.9 382.9,183.9 384.9,183.6 388.7,192.9 390.6,187.3 394.5,179.0 398.4,194.7 402.2,182.6 406.1,179.6 409.9,191.9 411.9,190.0 419.6,174.0 423.4,168.5 429.2,171.9 435.0,154.6 436.9,190.5 442.7,167.8 446.6,163.6 450.4,156.3 454.3,147.2 454.3,147.2 456.2,146.6 462.0,147.3 464.0,147.3 467.8,139.5 467.8,139.5 469.7,152.9 477.5,164.8 477.5,164.8 483.2,157.1 491.0,158.9 496.7,160.5 500.6,155.8 500.6,155.8 506.4,151.7 514.1,158.5 525.7,157.9 531.5,158.9 535.3,174.6 539.2,175.1 545.0,183.5 552.7,166.9 558.5,189.6 562.3,174.3 570.0,154.2 573.9,151.4 577.8,157.1 581.6,154.3 585.5,161.8 589.3,169.1 591.3,166.4 593.2,166.4 595.1,166.7 599.0,206.8 604.8,182.8 610.6,185.2 612.5,187.8 618.3,167.1 627.9,197.7 647.2,164.0 649.1,189.4 649.1,189.4 649.1,189.4 654.9,210.9 658.8,197.8 662.6,201.4 666.5,199.8 666.5,185.2 668.4,179.3 672.3,169.5 674.2,181.8 676.1,174.3 680.0,169.6 680.0,178.6" fill="none" stroke="#9C27B0" stroke-width="2" opacity="1"/>
+</svg><p class="chart-note"><span style="color:#4CAF50">&#9632; CTL (fitness)</span> &nbsp; <span style="color:#FF5722">&#9632; ATL (fatigue)</span> &nbsp; <span style="color:#9C27B0">&#9632; TSB (form)</span></p><p class="insight ">Current form: <b>Productive Overload</b> (TSB = -10.2). Building fitness. Monitor fatigue carefully.</p><p class="insight">CTL: 53.6 | ATL: 63.9</p><p class="insight good">Acute:Chronic ratio: <b>1.19</b> &mdash; In the sweet spot (0.8-1.3).</p><h3>Weekly Training Load (last 16 weeks)</h3><svg width="700" height="260" xmlns="http://www.w3.org/2000/svg" style="font-family:sans-serif">
+<rect width="700" height="260" fill="#0a0a0a" rx="6"/>
+
+
+<text x="47" y="224.0" text-anchor="end" font-size="11" fill="#888">0.0</text>
+<line x1="55" y1="220.0" x2="680" y2="220.0" stroke="#333"/>
+<text x="47" y="174.0" text-anchor="end" font-size="11" fill="#888">152.8</text>
+<line x1="55" y1="170.0" x2="680" y2="170.0" stroke="#333"/>
+<text x="47" y="124.0" text-anchor="end" font-size="11" fill="#888">305.6</text>
+<line x1="55" y1="120.0" x2="680" y2="120.0" stroke="#333"/>
+<text x="47" y="74.0" text-anchor="end" font-size="11" fill="#888">458.3</text>
+<line x1="55" y1="70.0" x2="680" y2="70.0" stroke="#333"/>
+<text x="47" y="24.0" text-anchor="end" font-size="11" fill="#888">611.1</text>
+<line x1="55" y1="20.0" x2="680" y2="20.0" stroke="#333"/>
+<rect x="60.9" y="125.4" width="27.3" height="94.6" fill="#2196F3" rx="2" opacity="0.85"/>
+<text x="74.5" y="236.0" text-anchor="middle" font-size="10" fill="#888">W44</text>
+<rect x="99.9" y="165.0" width="27.3" height="55.0" fill="#2196F3" rx="2" opacity="0.85"/>
+<text x="113.6" y="236.0" text-anchor="middle" font-size="10" fill="#888">W45</text>
+<rect x="139.0" y="178.4" width="27.3" height="41.6" fill="#2196F3" rx="2" opacity="0.85"/>
+<text x="152.7" y="236.0" text-anchor="middle" font-size="10" fill="#888">W46</text>
+<rect x="178.0" y="177.5" width="27.3" height="42.5" fill="#2196F3" rx="2" opacity="0.85"/>
+<text x="191.7" y="236.0" text-anchor="middle" font-size="10" fill="#888">W47</text>
+<rect x="217.1" y="183.0" width="27.3" height="37.0" fill="#2196F3" rx="2" opacity="0.85"/>
+<text x="230.8" y="236.0" text-anchor="middle" font-size="10" fill="#888">W48</text>
+<rect x="256.2" y="134.3" width="27.3" height="85.7" fill="#2196F3" rx="2" opacity="0.85"/>
+<text x="269.8" y="236.0" text-anchor="middle" font-size="10" fill="#888">W49</text>
+<rect x="295.2" y="132.0" width="27.3" height="88.0" fill="#2196F3" rx="2" opacity="0.85"/>
+<text x="308.9" y="236.0" text-anchor="middle" font-size="10" fill="#888">W50</text>
+<rect x="334.3" y="194.8" width="27.3" height="25.2" fill="#2196F3" rx="2" opacity="0.85"/>
+<text x="348.0" y="236.0" text-anchor="middle" font-size="10" fill="#888">W51</text>
+<rect x="373.4" y="200.0" width="27.3" height="20.0" fill="#2196F3" rx="2" opacity="0.85"/>
+<text x="387.0" y="236.0" text-anchor="middle" font-size="10" fill="#888">W52</text>
+<rect x="412.4" y="155.2" width="27.3" height="64.8" fill="#2196F3" rx="2" opacity="0.85"/>
+<text x="426.1" y="236.0" text-anchor="middle" font-size="10" fill="#888">W00</text>
+<rect x="451.5" y="112.7" width="27.3" height="107.3" fill="#2196F3" rx="2" opacity="0.85"/>
+<text x="465.2" y="236.0" text-anchor="middle" font-size="10" fill="#888">W01</text>
+<rect x="490.5" y="177.1" width="27.3" height="42.9" fill="#2196F3" rx="2" opacity="0.85"/>
+<text x="504.2" y="236.0" text-anchor="middle" font-size="10" fill="#888">W02</text>
+<rect x="529.6" y="105.1" width="27.3" height="114.9" fill="#2196F3" rx="2" opacity="0.85"/>
+<text x="543.3" y="236.0" text-anchor="middle" font-size="10" fill="#888">W03</text>
+<rect x="568.7" y="29.5" width="27.3" height="190.5" fill="#2196F3" rx="2" opacity="0.85"/>
+<text x="582.3" y="236.0" text-anchor="middle" font-size="10" fill="#888">W05</text>
+<rect x="607.7" y="120.5" width="27.3" height="99.5" fill="#2196F3" rx="2" opacity="0.85"/>
+<text x="621.4" y="236.0" text-anchor="middle" font-size="10" fill="#888">W06</text>
+<rect x="646.8" y="111.3" width="27.3" height="108.7" fill="#2196F3" rx="2" opacity="0.85"/>
+<text x="660.5" y="236.0" text-anchor="middle" font-size="10" fill="#888">W07</text>
+</svg></div><div class="section"><h2>Pace Trends &amp; Progress</h2><h3>Pace Over Time</h3><svg width="700" height="260" xmlns="http://www.w3.org/2000/svg" style="font-family:sans-serif">
+<rect width="700" height="260" fill="#0a0a0a" rx="6"/>
+
+
+<text x="47" y="214.9090909090909" text-anchor="end" font-size="11" fill="#888">3:49</text>
+<line x1="55" y1="210.9" x2="680" y2="210.9" stroke="#333"/>
+<text x="47" y="154.3030303030303" text-anchor="end" font-size="11" fill="#888">6:04</text>
+<line x1="55" y1="150.3" x2="680" y2="150.3" stroke="#333"/>
+<text x="47" y="93.69696969696972" text-anchor="end" font-size="11" fill="#888">8:18</text>
+<line x1="55" y1="89.7" x2="680" y2="89.7" stroke="#333"/>
+<text x="47" y="33.09090909090909" text-anchor="end" font-size="11" fill="#888">10:33</text>
+<line x1="55" y1="29.1" x2="680" y2="29.1" stroke="#333"/>
+<text x="55.0" y="238" text-anchor="middle" font-size="11" fill="#888">Apr 25</text>
+<line x1="55.0" y1="220" x2="55.0" y2="224" stroke="#444"/>
+<text x="160.8" y="238" text-anchor="middle" font-size="11" fill="#888">May 25</text>
+<line x1="160.8" y1="220" x2="160.8" y2="224" stroke="#444"/>
+<text x="272.3" y="238" text-anchor="middle" font-size="11" fill="#888">Jul 25</text>
+<line x1="272.3" y1="220" x2="272.3" y2="224" stroke="#444"/>
+<text x="395.4" y="238" text-anchor="middle" font-size="11" fill="#888">Sep 25</text>
+<line x1="395.4" y1="220" x2="395.4" y2="224" stroke="#444"/>
+<text x="478.1" y="238" text-anchor="middle" font-size="11" fill="#888">Nov 25</text>
+<line x1="478.1" y1="220" x2="478.1" y2="224" stroke="#444"/>
+<text x="589.6" y="238" text-anchor="middle" font-size="11" fill="#888">Jan 26</text>
+<line x1="589.6" y1="220" x2="589.6" y2="224" stroke="#444"/>
+<text x="676.2" y="238" text-anchor="middle" font-size="11" fill="#888">Feb 26</text>
+<line x1="676.2" y1="220" x2="676.2" y2="224" stroke="#444"/>
+<circle cx="55.0" cy="106.1" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="56.9" cy="93.6" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="60.8" cy="90.2" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="66.5" cy="99.3" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="74.2" cy="130.4" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="80.0" cy="95.5" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="83.8" cy="90.5" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="87.7" cy="95.3" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="97.3" cy="91.6" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="101.2" cy="80.1" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="106.9" cy="116.9" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="120.4" cy="98.7" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="128.1" cy="75.9" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="133.8" cy="117.8" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="137.7" cy="110.9" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="137.7" cy="133.4" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="141.5" cy="96.5" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="143.5" cy="42.3" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="147.3" cy="125.5" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="151.2" cy="115.5" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="155.0" cy="127.0" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="160.8" cy="92.1" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="160.8" cy="90.7" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="164.6" cy="99.5" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="168.5" cy="105.1" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="174.2" cy="101.0" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="183.8" cy="72.5" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="187.7" cy="79.3" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="191.5" cy="92.5" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="195.4" cy="65.4" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="205.0" cy="94.6" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="210.8" cy="84.9" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="214.6" cy="85.1" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="220.4" cy="109.2" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="222.3" cy="77.0" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="228.1" cy="55.6" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="231.9" cy="118.7" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="235.8" cy="49.3" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="237.7" cy="84.6" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="251.2" cy="99.7" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="255.0" cy="108.9" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="258.8" cy="98.4" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="264.6" cy="61.3" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="268.5" cy="96.4" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="272.3" cy="109.7" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="276.2" cy="61.0" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="299.2" cy="67.8" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="303.1" cy="60.1" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="308.8" cy="56.9" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="312.7" cy="90.4" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="322.3" cy="131.8" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="326.2" cy="108.9" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="330.0" cy="93.4" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="331.9" cy="115.1" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="343.5" cy="67.2" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="349.2" cy="141.3" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="353.1" cy="94.4" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="356.9" cy="80.8" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="362.7" cy="111.4" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="366.5" cy="97.9" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="368.5" cy="82.3" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="376.2" cy="134.3" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="383.8" cy="126.8" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="385.8" cy="112.2" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="389.6" cy="60.9" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="391.5" cy="114.7" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="395.4" cy="108.6" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="399.2" cy="66.3" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="403.1" cy="29.1" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="406.9" cy="94.5" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="410.8" cy="136.2" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="412.7" cy="105.4" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="420.4" cy="94.9" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="424.2" cy="65.9" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="430.0" cy="127.3" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="435.8" cy="77.0" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="437.7" cy="123.3" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="443.5" cy="57.1" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="447.3" cy="121.0" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="451.2" cy="123.6" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="455.0" cy="116.3" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="455.0" cy="114.6" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="456.9" cy="119.6" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="462.7" cy="108.3" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="464.6" cy="92.6" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="468.5" cy="110.4" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="468.5" cy="96.0" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="470.4" cy="114.7" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="478.1" cy="72.6" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="478.1" cy="80.9" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="483.8" cy="128.3" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="491.5" cy="89.6" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="497.3" cy="128.7" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="501.2" cy="124.9" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="501.2" cy="112.6" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="506.9" cy="73.0" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="514.6" cy="139.9" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="526.2" cy="125.2" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="531.9" cy="124.0" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="535.8" cy="86.6" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="539.6" cy="152.9" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="545.4" cy="131.7" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="553.1" cy="146.7" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="558.8" cy="136.9" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="562.7" cy="42.5" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="570.4" cy="116.2" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="574.2" cy="101.9" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="578.1" cy="142.6" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="581.9" cy="129.2" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="585.8" cy="101.1" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="589.6" cy="148.4" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="591.5" cy="210.9" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="593.5" cy="147.9" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="595.4" cy="145.2" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="599.2" cy="137.4" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="605.0" cy="105.1" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="610.8" cy="126.3" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="612.7" cy="144.0" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="618.5" cy="139.3" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="628.1" cy="136.3" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="647.3" cy="83.2" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="649.2" cy="115.0" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="649.2" cy="109.6" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="649.2" cy="106.9" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="655.0" cy="97.3" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="658.8" cy="127.3" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="662.7" cy="106.8" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="666.5" cy="145.0" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="666.5" cy="99.3" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="668.5" cy="136.7" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="672.3" cy="119.9" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="674.2" cy="155.8" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="676.2" cy="131.0" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="680.0" cy="128.2" r="3.5" fill="#2196F3" opacity="0.6"/>
+<circle cx="680.0" cy="89.5" r="3.5" fill="#2196F3" opacity="0.6"/>
+<polyline points="55.0,85.7 680.0,122.0" fill="none" stroke="#FF5722" stroke-width="2" opacity="0.7" stroke-dasharray="6,3"/>
+</svg><p class="chart-note">Each dot = one run. Lower = faster. Dashed = trend line.</p><p class="insight">Overall pace trend: <b>15.8% faster</b> over the period (8:27 &rarr; 7:07).</p><h3>Pace at Comparable HR (Key Progress Indicator)</h3><table class="splits"><tr><th>HR Band</th><th>Prior 8wk Pace</th><th>Recent 8wk Pace</th><th>Change</th><th>Runs (P/R)</th></tr><tr><td>122-127 bpm</td><td>7:14</td><td>7:41</td><td style="color:#FF5722">6.4% slower</td><td>2/3</td></tr><tr><td>127-132 bpm</td><td>7:47</td><td>7:09</td><td style="color:#4CAF50">8.1% faster</td><td>5/9</td></tr><tr><td>132-137 bpm</td><td>7:03</td><td>6:27</td><td style="color:#4CAF50">8.4% faster</td><td>4/4</td></tr><tr><td>137-142 bpm</td><td>7:47</td><td>7:01</td><td style="color:#4CAF50">9.9% faster</td><td>4/5</td></tr><tr><td>142-147 bpm</td><td>6:55</td><td>7:05</td><td style="color:#FF5722">2.5% slower</td><td>2/5</td></tr></table><p class="insight good"><b>Progress Verdict: Progress</b> (avg 3.5% change). You are getting faster at the same heart rate. Aerobic fitness is improving.</p><h3>Monthly Summary</h3><table class="splits"><tr><th>Month</th><th>Runs</th><th>Distance</th><th>Avg Pace</th><th>Avg HR</th></tr><tr><td>Apr 2025</td><td>11</td><td>98.1 km</td><td>7:58</td><td>128 bpm</td></tr><tr><td>May 2025</td><td>14</td><td>135.8 km</td><td>7:51</td><td>132 bpm</td></tr><tr><td>Jun 2025</td><td>10</td><td>129.7 km</td><td>8:26</td><td>132 bpm</td></tr><tr><td>Jul 2025</td><td>11</td><td>120.8 km</td><td>8:27</td><td>130 bpm</td></tr><tr><td>Aug 2025</td><td>9</td><td>90.4 km</td><td>8:22</td><td>134 bpm</td></tr><tr><td>Sep 2025</td><td>14</td><td>164.5 km</td><td>8:02</td><td>134 bpm</td></tr><tr><td>Oct 2025</td><td>16</td><td>147.9 km</td><td>7:45</td><td>131 bpm</td></tr><tr><td>Nov 2025</td><td>12</td><td>141.1 km</td><td>7:42</td><td>135 bpm</td></tr><tr><td>Dec 2025</td><td>11</td><td>143.9 km</td><td>7:14</td><td>132 bpm</td></tr><tr><td>Jan 2026</td><td>12</td><td>203.6 km</td><td>6:28</td><td>134 bpm</td></tr><tr><td>Feb 2026</td><td>15</td><td>237.4 km</td><td>7:18</td><td>136 bpm</td></tr></table></div><div class="section"><h2>Weekly Volume &amp; Consistency</h2><h3>Weekly Distance (last 16 weeks)</h3><svg width="700" height="260" xmlns="http://www.w3.org/2000/svg" style="font-family:sans-serif">
+<rect width="700" height="260" fill="#0a0a0a" rx="6"/>
+
+
+<text x="47" y="224.0" text-anchor="end" font-size="11" fill="#888">0.0</text>
+<line x1="55" y1="220.0" x2="680" y2="220.0" stroke="#333"/>
+<text x="47" y="174.0" text-anchor="end" font-size="11" fill="#888">24.8</text>
+<line x1="55" y1="170.0" x2="680" y2="170.0" stroke="#333"/>
+<text x="47" y="124.0" text-anchor="end" font-size="11" fill="#888">49.7</text>
+<line x1="55" y1="120.0" x2="680" y2="120.0" stroke="#333"/>
+<text x="47" y="74.0" text-anchor="end" font-size="11" fill="#888">74.5</text>
+<line x1="55" y1="70.0" x2="680" y2="70.0" stroke="#333"/>
+<text x="47" y="24.0" text-anchor="end" font-size="11" fill="#888">99.4</text>
+<line x1="55" y1="20.0" x2="680" y2="20.0" stroke="#333"/>
+<rect x="60.9" y="87.6" width="27.3" height="132.4" fill="#4CAF50" rx="2" opacity="0.85"/>
+<text x="74.5" y="236.0" text-anchor="middle" font-size="10" fill="#888">W44</text>
+<rect x="99.9" y="165.4" width="27.3" height="54.6" fill="#4CAF50" rx="2" opacity="0.85"/>
+<text x="113.6" y="236.0" text-anchor="middle" font-size="10" fill="#888">W45</text>
+<rect x="139.0" y="166.2" width="27.3" height="53.8" fill="#4CAF50" rx="2" opacity="0.85"/>
+<text x="152.7" y="236.0" text-anchor="middle" font-size="10" fill="#888">W46</text>
+<rect x="178.0" y="176.9" width="27.3" height="43.1" fill="#4CAF50" rx="2" opacity="0.85"/>
+<text x="191.7" y="236.0" text-anchor="middle" font-size="10" fill="#888">W47</text>
+<rect x="217.1" y="178.6" width="27.3" height="41.4" fill="#4CAF50" rx="2" opacity="0.85"/>
+<text x="230.8" y="236.0" text-anchor="middle" font-size="10" fill="#888">W48</text>
+<rect x="256.2" y="121.4" width="27.3" height="98.6" fill="#4CAF50" rx="2" opacity="0.85"/>
+<text x="269.8" y="236.0" text-anchor="middle" font-size="10" fill="#888">W49</text>
+<rect x="295.2" y="144.1" width="27.3" height="75.9" fill="#4CAF50" rx="2" opacity="0.85"/>
+<text x="308.9" y="236.0" text-anchor="middle" font-size="10" fill="#888">W50</text>
+<rect x="334.3" y="176.8" width="27.3" height="43.2" fill="#4CAF50" rx="2" opacity="0.85"/>
+<text x="348.0" y="236.0" text-anchor="middle" font-size="10" fill="#888">W51</text>
+<rect x="373.4" y="189.4" width="27.3" height="30.6" fill="#4CAF50" rx="2" opacity="0.85"/>
+<text x="387.0" y="236.0" text-anchor="middle" font-size="10" fill="#888">W52</text>
+<rect x="412.4" y="127.2" width="27.3" height="92.8" fill="#4CAF50" rx="2" opacity="0.85"/>
+<text x="426.1" y="236.0" text-anchor="middle" font-size="10" fill="#888">W00</text>
+<rect x="451.5" y="76.9" width="27.3" height="143.1" fill="#4CAF50" rx="2" opacity="0.85"/>
+<text x="465.2" y="236.0" text-anchor="middle" font-size="10" fill="#888">W01</text>
+<rect x="490.5" y="164.7" width="27.3" height="55.3" fill="#4CAF50" rx="2" opacity="0.85"/>
+<text x="504.2" y="236.0" text-anchor="middle" font-size="10" fill="#888">W02</text>
+<rect x="529.6" y="101.3" width="27.3" height="118.7" fill="#4CAF50" rx="2" opacity="0.85"/>
+<text x="543.3" y="236.0" text-anchor="middle" font-size="10" fill="#888">W03</text>
+<rect x="568.7" y="29.5" width="27.3" height="190.5" fill="#4CAF50" rx="2" opacity="0.85"/>
+<text x="582.3" y="236.0" text-anchor="middle" font-size="10" fill="#888">W05</text>
+<rect x="607.7" y="67.1" width="27.3" height="152.9" fill="#4CAF50" rx="2" opacity="0.85"/>
+<text x="621.4" y="236.0" text-anchor="middle" font-size="10" fill="#888">W06</text>
+<rect x="646.8" y="85.6" width="27.3" height="134.4" fill="#4CAF50" rx="2" opacity="0.85"/>
+<text x="660.5" y="236.0" text-anchor="middle" font-size="10" fill="#888">W07</text>
+</svg><p class="chart-note">km per week</p><p class="insight warning">&#9888; Week W49: 49.0 km is 114% above 3-week rolling average (22.9 km). Watch for injury risk.</p><p class="insight warning">&#9888; Week W00: 46.1 km is 86% above 3-week rolling average (24.8 km). Watch for injury risk.</p><p class="insight warning">&#9888; Week W01: 71.1 km is 158% above 3-week rolling average (27.6 km). Watch for injury risk.</p><p class="insight warning">&#9888; Week W05: 94.6 km is 80% above 3-week rolling average (52.5 km). Watch for injury risk.</p><p class="insight">Consistency: <b>67%</b> of last 12 weeks had 3+ runs (8/12 weeks).</p><p class="insight">Longest gap: <b>12 days</b> (after 26 Jul 2025).</p></div><div class="section"><h2>Heart Rate Analysis</h2><h3>Average HR Per Run</h3><svg width="700" height="260" xmlns="http://www.w3.org/2000/svg" style="font-family:sans-serif">
+<rect width="700" height="260" fill="#0a0a0a" rx="6"/>
+
+
+<text x="47" y="224.0" text-anchor="end" font-size="11" fill="#888">94.2</text>
+<line x1="55" y1="220.0" x2="680" y2="220.0" stroke="#333"/>
+<text x="47" y="174.0" text-anchor="end" font-size="11" fill="#888">109.8</text>
+<line x1="55" y1="170.0" x2="680" y2="170.0" stroke="#333"/>
+<text x="47" y="124.0" text-anchor="end" font-size="11" fill="#888">125.5</text>
+<line x1="55" y1="120.0" x2="680" y2="120.0" stroke="#333"/>
+<text x="47" y="73.99999999999994" text-anchor="end" font-size="11" fill="#888">141.2</text>
+<line x1="55" y1="70.0" x2="680" y2="70.0" stroke="#333"/>
+<text x="47" y="24.0" text-anchor="end" font-size="11" fill="#888">156.8</text>
+<line x1="55" y1="20.0" x2="680" y2="20.0" stroke="#333"/>
+<text x="55.0" y="238" text-anchor="middle" font-size="11" fill="#888">Apr 25</text>
+<line x1="55.0" y1="220" x2="55.0" y2="224" stroke="#444"/>
+<text x="160.8" y="238" text-anchor="middle" font-size="11" fill="#888">May 25</text>
+<line x1="160.8" y1="220" x2="160.8" y2="224" stroke="#444"/>
+<text x="272.3" y="238" text-anchor="middle" font-size="11" fill="#888">Jul 25</text>
+<line x1="272.3" y1="220" x2="272.3" y2="224" stroke="#444"/>
+<text x="395.4" y="238" text-anchor="middle" font-size="11" fill="#888">Sep 25</text>
+<line x1="395.4" y1="220" x2="395.4" y2="224" stroke="#444"/>
+<text x="478.1" y="238" text-anchor="middle" font-size="11" fill="#888">Nov 25</text>
+<line x1="478.1" y1="220" x2="478.1" y2="224" stroke="#444"/>
+<text x="593.5" y="238" text-anchor="middle" font-size="11" fill="#888">Jan 26</text>
+<line x1="593.5" y1="220" x2="593.5" y2="224" stroke="#444"/>
+<polyline points="55.0,108.8 56.9,118.4 60.8,120.5 66.5,119.2 74.2,99.3 80.0,99.3 83.8,104.8 87.7,103.3 97.3,124.0 101.2,121.6 106.9,108.8 120.4,107.2 128.1,100.1 133.8,93.7 137.7,99.3 137.7,97.7 141.5,108.8 143.5,125.6 147.3,120.0 151.2,127.2 155.0,119.2 160.8,97.7 160.8,86.5 164.6,80.1 168.5,73.7 174.2,74.5 183.8,85.7 187.7,76.9 191.5,87.3 195.4,89.7 205.0,93.7 210.8,98.5 214.6,97.7 220.4,105.6 222.3,107.2 228.1,104.8 231.9,108.0 235.8,121.6 237.7,100.1 251.2,112.0 255.0,107.2 258.8,91.3 264.6,112.0 268.5,108.0 272.3,112.0 276.2,110.4 299.2,112.8 303.1,113.6 308.8,94.5 312.7,92.9 322.3,73.0 326.2,73.7 330.0,97.7 331.9,81.7 343.5,102.5 349.2,84.9 353.1,80.1 356.9,95.3 362.7,90.5 366.5,112.0 368.5,112.8 376.2,108.8 383.8,90.5 385.8,78.5 389.6,74.5 391.5,82.5 395.4,98.5 399.2,103.3 403.1,92.9 406.9,91.3 410.8,76.1 412.7,82.5 420.4,97.7 424.2,104.1 430.0,106.4 435.8,103.3 437.7,81.7 443.5,84.9 447.3,104.1 451.2,102.5 455.0,120.8 455.0,111.2 456.9,112.8 462.7,110.4 464.6,108.8 468.5,105.6 468.5,98.5 470.4,88.9 478.1,82.5 483.8,80.1 491.5,73.7 497.3,83.3 501.2,95.3 501.2,104.8 506.9,112.0 514.6,103.3 526.2,91.3 531.9,83.3 535.8,84.1 539.6,81.7 545.4,85.7 553.1,90.5 558.8,73.7 562.7,113.6 570.4,116.8 574.2,117.6 578.1,133.6 581.9,108.0 585.8,112.0 589.6,108.0 593.5,103.3 595.4,102.5 599.2,84.9 605.0,88.9 610.8,92.1 612.7,86.5 618.5,92.9 628.1,83.3 647.3,73.7 649.2,80.1 649.2,87.3 649.2,98.5 655.0,100.9 658.8,88.1 662.7,81.7 666.5,69.8 668.5,73.7 672.3,73.7 674.2,65.8 676.2,77.7 680.0,85.7 680.0,102.5" fill="none" stroke="#E91E63" stroke-width="2" opacity="1"/>
+<polyline points="55.0,108.8 56.9,128.0 60.8,124.8 66.5,115.2 74.2,29.1 80.0,128.0 83.8,147.1 87.7,108.8 97.3,112.0 101.2,118.4 106.9,96.1 120.4,102.5 128.1,83.3 133.8,92.9 137.7,118.4 137.7,96.1 141.5,128.0 143.5,159.9 147.3,96.1 151.2,124.8 155.0,96.1 160.8,73.7 160.8,51.4 164.6,99.3 168.5,70.6 174.2,76.9 183.8,96.1 187.7,64.2 191.5,112.0 195.4,86.5 205.0,112.0 210.8,83.3 214.6,108.8 220.4,118.4 222.3,118.4 228.1,73.7 231.9,121.6 235.8,172.6 237.7,32.3 251.2,121.6 255.0,102.5 258.8,108.8 264.6,115.2 268.5,105.6 272.3,118.4 276.2,102.5 299.2,124.8 303.1,108.8 308.8,41.9 312.7,96.1 322.3,45.0 326.2,112.0 330.0,137.5 331.9,32.3 343.5,128.0 349.2,41.9 353.1,118.4 356.9,92.9 362.7,108.8 366.5,128.0 368.5,121.6 376.2,76.9 383.8,35.5 385.8,80.1 389.6,105.6 391.5,108.8 395.4,99.3 399.2,99.3 403.1,64.2 406.9,102.5 410.8,38.7 412.7,124.8 420.4,124.8 424.2,128.0 430.0,48.2 435.8,112.0 437.7,38.7 443.5,140.7 447.3,124.8 451.2,105.6 455.0,112.0 455.0,102.5 456.9,131.2 462.7,96.1 464.6,105.6 468.5,89.7 468.5,102.5 470.4,57.8 478.1,80.1 483.8,80.1 491.5,76.9 497.3,96.1 501.2,128.0 501.2,118.4 506.9,105.6 514.6,61.0 526.2,80.1 531.9,86.5 535.8,108.8 539.6,51.4 545.4,96.1 553.1,105.6 558.8,41.9 562.7,210.9 570.4,108.8 574.2,108.8 578.1,105.6 581.9,108.8 585.8,124.8 589.6,92.9 593.5,86.5 595.4,105.6 599.2,54.6 605.0,108.8 610.8,99.3 612.7,83.3 618.5,80.1 628.1,70.6 647.3,61.0 649.2,108.8 649.2,108.8 649.2,115.2 655.0,70.6 658.8,57.8 662.7,83.3 666.5,67.4 668.5,86.5 672.3,57.8 674.2,51.4 676.2,115.2 680.0,118.4 680.0,124.8" fill="none" stroke="#F8BBD0" stroke-width="2" opacity="1"/>
+</svg><p class="chart-note"><span style="color:#F8BBD0">&#9632; Individual runs</span> &nbsp; <span style="color:#E91E63">&#9632; 4-run rolling average</span></p><h3>HR Efficiency (speed per heartbeat)</h3><svg width="700" height="260" xmlns="http://www.w3.org/2000/svg" style="font-family:sans-serif">
+<rect width="700" height="260" fill="#0a0a0a" rx="6"/>
+
+
+<text x="47" y="224.0" text-anchor="end" font-size="11" fill="#888">10.6</text>
+<line x1="55" y1="220.0" x2="680" y2="220.0" stroke="#333"/>
+<text x="47" y="174.0" text-anchor="end" font-size="11" fill="#888">13.2</text>
+<line x1="55" y1="170.0" x2="680" y2="170.0" stroke="#333"/>
+<text x="47" y="123.99999999999997" text-anchor="end" font-size="11" fill="#888">15.9</text>
+<line x1="55" y1="120.0" x2="680" y2="120.0" stroke="#333"/>
+<text x="47" y="74.00000000000003" text-anchor="end" font-size="11" fill="#888">18.5</text>
+<line x1="55" y1="70.0" x2="680" y2="70.0" stroke="#333"/>
+<text x="47" y="24.0" text-anchor="end" font-size="11" fill="#888">21.1</text>
+<line x1="55" y1="20.0" x2="680" y2="20.0" stroke="#333"/>
+<text x="55.0" y="238" text-anchor="middle" font-size="11" fill="#888">Apr 25</text>
+<line x1="55.0" y1="220" x2="55.0" y2="224" stroke="#444"/>
+<text x="160.8" y="238" text-anchor="middle" font-size="11" fill="#888">May 25</text>
+<line x1="160.8" y1="220" x2="160.8" y2="224" stroke="#444"/>
+<text x="272.3" y="238" text-anchor="middle" font-size="11" fill="#888">Jul 25</text>
+<line x1="272.3" y1="220" x2="272.3" y2="224" stroke="#444"/>
+<text x="395.4" y="238" text-anchor="middle" font-size="11" fill="#888">Sep 25</text>
+<line x1="395.4" y1="220" x2="395.4" y2="224" stroke="#444"/>
+<text x="478.1" y="238" text-anchor="middle" font-size="11" fill="#888">Nov 25</text>
+<line x1="478.1" y1="220" x2="478.1" y2="224" stroke="#444"/>
+<text x="593.5" y="238" text-anchor="middle" font-size="11" fill="#888">Jan 26</text>
+<line x1="593.5" y1="220" x2="593.5" y2="224" stroke="#444"/>
+<circle cx="55.0" cy="102.8" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="56.9" cy="106.1" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="60.8" cy="113.4" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="66.5" cy="108.0" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="74.2" cy="119.2" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="80.0" cy="103.3" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="83.8" cy="94.6" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="87.7" cy="118.4" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="97.3" cy="121.0" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="101.2" cy="131.2" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="106.9" cy="95.4" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="120.4" cy="118.3" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="128.1" cy="159.0" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="133.8" cy="96.5" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="137.7" cy="87.5" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="137.7" cy="66.0" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="141.5" cy="101.9" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="143.5" cy="142.7" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="147.3" cy="80.8" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="151.2" cy="74.3" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="155.0" cy="78.1" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="160.8" cy="146.1" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="160.8" cy="160.7" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="164.6" cy="119.5" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="168.5" cy="131.1" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="174.2" cy="132.6" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="183.8" cy="154.9" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="187.7" cy="166.4" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="191.5" cy="119.9" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="195.4" cy="168.2" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="205.0" cy="117.0" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="210.8" cy="148.8" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="214.6" cy="131.8" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="220.4" cy="90.4" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="222.3" cy="134.9" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="228.1" cy="184.6" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="231.9" cy="71.6" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="235.8" cy="124.9" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="237.7" cy="177.4" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="251.2" cy="102.3" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="255.0" cy="103.4" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="258.8" cy="114.1" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="264.6" cy="154.7" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="268.5" cy="119.1" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="272.3" cy="89.6" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="276.2" cy="163.1" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="299.2" cy="141.2" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="303.1" cy="160.1" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="308.8" cy="199.2" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="312.7" cy="133.9" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="322.3" cy="106.7" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="326.2" cy="95.9" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="330.0" cy="98.5" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="331.9" cy="140.5" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="343.5" cy="139.5" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="349.2" cy="91.7" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="353.1" cy="112.5" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="356.9" cy="147.6" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="362.7" cy="94.5" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="366.5" cy="99.8" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="368.5" cy="126.1" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="376.2" cy="79.6" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="383.8" cy="121.1" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="385.8" cy="114.5" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="389.6" cy="161.2" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="391.5" cy="89.1" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="395.4" cy="106.2" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="399.2" cy="159.6" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="403.1" cy="210.9" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="406.9" cy="124.0" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="410.8" cy="103.3" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="412.7" cy="91.0" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="420.4" cy="106.8" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="424.2" cy="141.0" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="430.0" cy="112.2" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="435.8" cy="139.4" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="437.7" cy="124.6" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="443.5" cy="141.5" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="447.3" cy="64.7" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="451.2" cy="76.5" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="455.0" cy="83.9" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="455.0" cy="94.4" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="456.9" cy="61.3" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="462.7" cy="109.0" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="464.6" cy="124.3" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="468.5" cy="110.4" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="468.5" cy="122.0" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="470.4" cy="125.7" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="478.1" cy="164.4" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="483.8" cy="88.0" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="491.5" cy="147.1" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="497.3" cy="75.0" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="501.2" cy="54.4" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="501.2" cy="84.7" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="506.9" cy="148.3" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="514.6" cy="80.9" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="526.2" cy="93.5" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="531.9" cy="90.9" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="535.8" cy="129.9" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="539.6" cy="61.0" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="545.4" cy="69.3" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="553.1" cy="29.1" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="558.8" cy="99.9" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="562.7" cy="96.7" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="570.4" cy="86.6" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="574.2" cy="109.1" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="578.1" cy="38.4" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="581.9" cy="63.4" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="585.8" cy="97.6" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="589.6" cy="37.0" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="593.5" cy="43.7" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="595.4" cy="32.5" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="599.2" cy="90.3" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="605.0" cy="104.2" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="610.8" cy="76.8" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="612.7" cy="55.0" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="618.5" cy="67.3" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="628.1" cy="80.6" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="647.3" cy="163.9" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="649.2" cy="88.6" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="649.2" cy="97.3" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="649.2" cy="96.5" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="655.0" cy="141.4" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="658.8" cy="105.8" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="662.7" cy="120.3" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="666.5" cy="65.7" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="668.5" cy="67.5" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="672.3" cy="117.8" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="674.2" cy="54.5" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="676.2" cy="54.2" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="680.0" cy="56.8" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<circle cx="680.0" cy="114.3" r="3.5" fill="#9C27B0" opacity="0.6"/>
+<polyline points="55.0,131.6 680.0,88.0" fill="none" stroke="#FF5722" stroke-width="2" opacity="0.7" stroke-dasharray="6,3"/>
+</svg><p class="chart-note">Higher = more efficient. Dashed = trend.</p><p class="insight good">HR efficiency is trending upward &mdash; improving.</p><h3>Monthly HR Zone Distribution (%)</h3><svg width="700" height="260" xmlns="http://www.w3.org/2000/svg" style="font-family:sans-serif">
+<rect width="700" height="260" fill="#0a0a0a" rx="6"/>
+
+
+<text x="47" y="224.0" text-anchor="end" font-size="11" fill="#888">0.0</text>
+<line x1="55" y1="220.0" x2="680" y2="220.0" stroke="#333"/>
+<text x="47" y="174.0" text-anchor="end" font-size="11" fill="#888">26.3</text>
+<line x1="55" y1="170.0" x2="680" y2="170.0" stroke="#333"/>
+<text x="47" y="124.0" text-anchor="end" font-size="11" fill="#888">52.5</text>
+<line x1="55" y1="120.0" x2="680" y2="120.0" stroke="#333"/>
+<text x="47" y="74.0" text-anchor="end" font-size="11" fill="#888">78.8</text>
+<line x1="55" y1="70.0" x2="680" y2="70.0" stroke="#333"/>
+<text x="47" y="24.0" text-anchor="end" font-size="11" fill="#888">105.0</text>
+<line x1="55" y1="20.0" x2="680" y2="20.0" stroke="#333"/>
+<rect x="63.5" y="70.0" width="39.8" height="150.0" fill="#4CAF50" opacity="0.85"/>
+<rect x="63.5" y="59.7" width="39.8" height="10.3" fill="#8BC34A" opacity="0.85"/>
+<rect x="63.5" y="41.3" width="39.8" height="18.4" fill="#FFC107" opacity="0.85"/>
+<rect x="63.5" y="29.6" width="39.8" height="11.7" fill="#FF9800" opacity="0.85"/>
+<rect x="63.5" y="29.5" width="39.8" height="0.1" fill="#FF5722" opacity="0.85"/>
+<text x="83.4" y="236.0" text-anchor="middle" font-size="10" fill="#888">Apr</text>
+<rect x="120.3" y="74.4" width="39.8" height="145.6" fill="#4CAF50" opacity="0.85"/>
+<rect x="120.3" y="40.2" width="39.8" height="34.2" fill="#8BC34A" opacity="0.85"/>
+<rect x="120.3" y="32.9" width="39.8" height="7.3" fill="#FFC107" opacity="0.85"/>
+<rect x="120.3" y="29.5" width="39.8" height="3.4" fill="#FF9800" opacity="0.85"/>
+<text x="140.2" y="236.0" text-anchor="middle" font-size="10" fill="#888">May</text>
+<rect x="177.2" y="81.1" width="39.8" height="138.9" fill="#4CAF50" opacity="0.85"/>
+<rect x="177.2" y="42.3" width="39.8" height="38.8" fill="#8BC34A" opacity="0.85"/>
+<rect x="177.2" y="32.0" width="39.8" height="10.3" fill="#FFC107" opacity="0.85"/>
+<rect x="177.2" y="29.5" width="39.8" height="2.4" fill="#FF9800" opacity="0.85"/>
+<text x="197.0" y="236.0" text-anchor="middle" font-size="10" fill="#888">Jun</text>
+<rect x="234.0" y="71.7" width="39.8" height="148.3" fill="#4CAF50" opacity="0.85"/>
+<rect x="234.0" y="58.4" width="39.8" height="13.3" fill="#8BC34A" opacity="0.85"/>
+<rect x="234.0" y="39.5" width="39.8" height="18.8" fill="#FFC107" opacity="0.85"/>
+<rect x="234.0" y="30.0" width="39.8" height="9.6" fill="#FF9800" opacity="0.85"/>
+<rect x="234.0" y="29.6" width="39.8" height="0.4" fill="#FF5722" opacity="0.85"/>
+<rect x="234.0" y="29.5" width="39.8" height="0.1" fill="#E91E63" opacity="0.85"/>
+<text x="253.9" y="236.0" text-anchor="middle" font-size="10" fill="#888">Jul</text>
+<rect x="290.8" y="95.9" width="39.8" height="124.1" fill="#4CAF50" opacity="0.85"/>
+<rect x="290.8" y="83.7" width="39.8" height="12.2" fill="#8BC34A" opacity="0.85"/>
+<rect x="290.8" y="53.5" width="39.8" height="30.3" fill="#FFC107" opacity="0.85"/>
+<rect x="290.8" y="30.6" width="39.8" height="22.9" fill="#FF9800" opacity="0.85"/>
+<rect x="290.8" y="29.7" width="39.8" height="0.9" fill="#FF5722" opacity="0.85"/>
+<rect x="290.8" y="29.5" width="39.8" height="0.2" fill="#E91E63" opacity="0.85"/>
+<text x="310.7" y="236.0" text-anchor="middle" font-size="10" fill="#888">Aug</text>
+<rect x="347.6" y="69.1" width="39.8" height="150.9" fill="#4CAF50" opacity="0.85"/>
+<rect x="347.6" y="51.9" width="39.8" height="17.2" fill="#8BC34A" opacity="0.85"/>
+<rect x="347.6" y="34.3" width="39.8" height="17.6" fill="#FFC107" opacity="0.85"/>
+<rect x="347.6" y="29.5" width="39.8" height="4.8" fill="#FF9800" opacity="0.85"/>
+<rect x="347.6" y="29.5" width="39.8" height="0.0" fill="#FF5722" opacity="0.85"/>
+<text x="367.5" y="236.0" text-anchor="middle" font-size="10" fill="#888">Sep</text>
+<rect x="404.4" y="88.8" width="39.8" height="131.2" fill="#4CAF50" opacity="0.85"/>
+<rect x="404.4" y="74.9" width="39.8" height="13.9" fill="#8BC34A" opacity="0.85"/>
+<rect x="404.4" y="36.9" width="39.8" height="38.0" fill="#FFC107" opacity="0.85"/>
+<rect x="404.4" y="29.6" width="39.8" height="7.4" fill="#FF9800" opacity="0.85"/>
+<rect x="404.4" y="29.5" width="39.8" height="0.0" fill="#FF5722" opacity="0.85"/>
+<text x="424.3" y="236.0" text-anchor="middle" font-size="10" fill="#888">Oct</text>
+<rect x="461.2" y="107.1" width="39.8" height="112.9" fill="#4CAF50" opacity="0.85"/>
+<rect x="461.2" y="52.9" width="39.8" height="54.2" fill="#8BC34A" opacity="0.85"/>
+<rect x="461.2" y="35.4" width="39.8" height="17.6" fill="#FFC107" opacity="0.85"/>
+<rect x="461.2" y="29.5" width="39.8" height="5.8" fill="#FF9800" opacity="0.85"/>
+<text x="481.1" y="236.0" text-anchor="middle" font-size="10" fill="#888">Nov</text>
+<rect x="518.1" y="94.2" width="39.8" height="125.8" fill="#4CAF50" opacity="0.85"/>
+<rect x="518.1" y="68.8" width="39.8" height="25.4" fill="#8BC34A" opacity="0.85"/>
+<rect x="518.1" y="46.5" width="39.8" height="22.2" fill="#FFC107" opacity="0.85"/>
+<rect x="518.1" y="29.7" width="39.8" height="16.9" fill="#FF9800" opacity="0.85"/>
+<rect x="518.1" y="29.5" width="39.8" height="0.2" fill="#FF5722" opacity="0.85"/>
+<text x="538.0" y="236.0" text-anchor="middle" font-size="10" fill="#888">Dec</text>
+<rect x="574.9" y="118.2" width="39.8" height="101.8" fill="#4CAF50" opacity="0.85"/>
+<rect x="574.9" y="59.2" width="39.8" height="59.0" fill="#8BC34A" opacity="0.85"/>
+<rect x="574.9" y="32.8" width="39.8" height="26.4" fill="#FFC107" opacity="0.85"/>
+<rect x="574.9" y="29.5" width="39.8" height="3.3" fill="#FF9800" opacity="0.85"/>
+<text x="594.8" y="236.0" text-anchor="middle" font-size="10" fill="#888">Jan</text>
+<rect x="631.7" y="109.3" width="39.8" height="110.7" fill="#4CAF50" opacity="0.85"/>
+<rect x="631.7" y="54.1" width="39.8" height="55.2" fill="#8BC34A" opacity="0.85"/>
+<rect x="631.7" y="31.6" width="39.8" height="22.5" fill="#FFC107" opacity="0.85"/>
+<rect x="631.7" y="30.1" width="39.8" height="1.5" fill="#FF9800" opacity="0.85"/>
+<rect x="631.7" y="29.9" width="39.8" height="0.2" fill="#FF5722" opacity="0.85"/>
+<rect x="631.7" y="29.5" width="39.8" height="0.4" fill="#E91E63" opacity="0.85"/>
+<text x="651.6" y="236.0" text-anchor="middle" font-size="10" fill="#888">Feb</text>
+<rect x="50" y="8" width="10" height="10" fill="#4CAF50" rx="2"/>
+<text x="64" y="16" font-size="10" fill="#aaa">Z1</text>
+<rect x="140" y="8" width="10" height="10" fill="#8BC34A" rx="2"/>
+<text x="154" y="16" font-size="10" fill="#aaa">Z2</text>
+<rect x="230" y="8" width="10" height="10" fill="#FFC107" rx="2"/>
+<text x="244" y="16" font-size="10" fill="#aaa">Z3</text>
+<rect x="320" y="8" width="10" height="10" fill="#FF9800" rx="2"/>
+<text x="334" y="16" font-size="10" fill="#aaa">Z4</text>
+<rect x="410" y="8" width="10" height="10" fill="#FF5722" rx="2"/>
+<text x="424" y="16" font-size="10" fill="#aaa">Z5</text>
+<rect x="500" y="8" width="10" height="10" fill="#E91E63" rx="2"/>
+<text x="514" y="16" font-size="10" fill="#aaa">Z6</text>
+<rect x="590" y="8" width="10" height="10" fill="#9C27B0" rx="2"/>
+<text x="604" y="16" font-size="10" fill="#aaa">Z7</text>
+</svg><p class="chart-note">Shift toward more Z1-Z2 time indicates better polarization.</p></div><div class="section"><h2>Cadence &amp; Stride</h2><h3>Cadence Over Time</h3><svg width="700" height="260" xmlns="http://www.w3.org/2000/svg" style="font-family:sans-serif">
+<rect width="700" height="260" fill="#0a0a0a" rx="6"/>
+
+
+<text x="47" y="224.0" text-anchor="end" font-size="11" fill="#888">124.9</text>
+<line x1="55" y1="220.0" x2="680" y2="220.0" stroke="#333"/>
+<text x="47" y="173.99999999999994" text-anchor="end" font-size="11" fill="#888">142.5</text>
+<line x1="55" y1="170.0" x2="680" y2="170.0" stroke="#333"/>
+<text x="47" y="124.0" text-anchor="end" font-size="11" fill="#888">160.2</text>
+<line x1="55" y1="120.0" x2="680" y2="120.0" stroke="#333"/>
+<text x="47" y="74.00000000000006" text-anchor="end" font-size="11" fill="#888">177.8</text>
+<line x1="55" y1="70.0" x2="680" y2="70.0" stroke="#333"/>
+<text x="47" y="24.0" text-anchor="end" font-size="11" fill="#888">195.4</text>
+<line x1="55" y1="20.0" x2="680" y2="20.0" stroke="#333"/>
+<text x="55.0" y="238" text-anchor="middle" font-size="11" fill="#888">Apr 25</text>
+<line x1="55.0" y1="220" x2="55.0" y2="224" stroke="#444"/>
+<text x="160.8" y="238" text-anchor="middle" font-size="11" fill="#888">May 25</text>
+<line x1="160.8" y1="220" x2="160.8" y2="224" stroke="#444"/>
+<text x="268.5" y="238" text-anchor="middle" font-size="11" fill="#888">Jul 25</text>
+<line x1="268.5" y1="220" x2="268.5" y2="224" stroke="#444"/>
+<text x="389.6" y="238" text-anchor="middle" font-size="11" fill="#888">Sep 25</text>
+<line x1="389.6" y1="220" x2="389.6" y2="224" stroke="#444"/>
+<text x="468.5" y="238" text-anchor="middle" font-size="11" fill="#888">Nov 25</text>
+<line x1="468.5" y1="220" x2="468.5" y2="224" stroke="#444"/>
+<text x="581.9" y="238" text-anchor="middle" font-size="11" fill="#888">Jan 26</text>
+<line x1="581.9" y1="220" x2="581.9" y2="224" stroke="#444"/>
+<text x="672.3" y="238" text-anchor="middle" font-size="11" fill="#888">Feb 26</text>
+<line x1="672.3" y1="220" x2="672.3" y2="224" stroke="#444"/>
+<circle cx="55.0" cy="82.8" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="56.9" cy="80.5" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="60.8" cy="74.4" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="66.5" cy="84.0" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="74.2" cy="53.9" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="80.0" cy="77.0" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="83.8" cy="77.3" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="87.7" cy="86.6" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="97.3" cy="85.2" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="101.2" cy="112.8" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="106.9" cy="86.8" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="120.4" cy="88.9" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="128.1" cy="115.0" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="133.8" cy="69.9" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="137.7" cy="73.9" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="137.7" cy="62.6" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="141.5" cy="93.0" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="147.3" cy="74.6" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="151.2" cy="77.0" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="155.0" cy="68.4" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="160.8" cy="74.7" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="160.8" cy="68.4" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="164.6" cy="70.6" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="168.5" cy="81.1" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="174.2" cy="75.5" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="183.8" cy="103.7" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="187.7" cy="110.2" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="191.5" cy="84.1" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="195.4" cy="121.4" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="205.0" cy="86.2" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="210.8" cy="117.7" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="214.6" cy="99.6" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="220.4" cy="73.4" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="222.3" cy="95.2" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="228.1" cy="109.2" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="231.9" cy="66.9" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="235.8" cy="86.6" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="237.7" cy="131.8" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="251.2" cy="80.3" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="255.0" cy="64.3" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="258.8" cy="72.3" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="264.6" cy="157.9" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="268.5" cy="67.1" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="272.3" cy="57.4" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="276.2" cy="126.1" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="299.2" cy="77.1" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="303.1" cy="89.2" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="308.8" cy="131.0" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="312.7" cy="87.0" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="322.3" cy="62.2" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="326.2" cy="78.8" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="330.0" cy="75.2" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="331.9" cy="100.0" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="343.5" cy="82.1" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="349.2" cy="46.7" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="353.1" cy="81.5" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="356.9" cy="93.0" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="362.7" cy="65.9" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="366.5" cy="80.0" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="368.5" cy="95.6" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="376.2" cy="62.9" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="383.8" cy="82.4" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="385.8" cy="74.5" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="389.6" cy="109.7" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="391.5" cy="72.8" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="395.4" cy="76.6" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="399.2" cy="109.5" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="403.1" cy="116.1" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="406.9" cy="71.2" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="410.8" cy="78.0" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="412.7" cy="71.0" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="420.4" cy="75.0" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="424.2" cy="107.8" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="430.0" cy="64.0" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="435.8" cy="74.9" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="437.7" cy="66.4" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="443.5" cy="78.9" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="447.3" cy="71.6" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="451.2" cy="64.2" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="455.0" cy="61.0" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="455.0" cy="59.5" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="456.9" cy="68.2" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="462.7" cy="69.1" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="464.6" cy="66.8" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="468.5" cy="71.6" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="468.5" cy="77.5" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="470.4" cy="76.4" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="478.1" cy="98.9" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="491.5" cy="79.6" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="497.3" cy="59.7" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="501.2" cy="61.5" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="501.2" cy="67.2" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="506.9" cy="117.5" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="514.6" cy="45.1" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="526.2" cy="76.8" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="531.9" cy="80.5" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="535.8" cy="102.8" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="539.6" cy="50.9" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="545.4" cy="64.2" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="553.1" cy="62.1" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="558.8" cy="72.1" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="562.7" cy="210.9" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="570.4" cy="69.7" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="574.2" cy="83.4" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="578.1" cy="46.3" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="581.9" cy="53.6" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="585.8" cy="85.6" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="589.6" cy="45.6" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="593.5" cy="40.4" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="595.4" cy="41.4" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="599.2" cy="43.9" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="605.0" cy="71.7" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="610.8" cy="64.0" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="612.7" cy="48.5" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="618.5" cy="49.6" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="628.1" cy="68.5" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="647.3" cy="69.4" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="649.2" cy="74.5" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="649.2" cy="78.4" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="649.2" cy="91.8" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="655.0" cy="98.9" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="658.8" cy="76.5" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="662.7" cy="69.9" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="666.5" cy="42.7" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="666.5" cy="91.3" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="668.5" cy="49.5" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="672.3" cy="66.2" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="674.2" cy="29.1" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="676.2" cy="55.6" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="680.0" cy="59.3" r="3.5" fill="#FF9800" opacity="0.6"/>
+<circle cx="680.0" cy="101.9" r="3.5" fill="#FF9800" opacity="0.6"/>
+<polyline points="55.0,90.6 680.0,68.5" fill="none" stroke="#FF5722" stroke-width="2" opacity="0.7" stroke-dasharray="6,3"/>
+</svg><p class="chart-note">Steps per minute (both feet). Dashed = trend.</p><h3>Stride Length Over Time</h3><svg width="700" height="260" xmlns="http://www.w3.org/2000/svg" style="font-family:sans-serif">
+<rect width="700" height="260" fill="#0a0a0a" rx="6"/>
+
+
+<text x="47" y="224.0" text-anchor="end" font-size="11" fill="#888">0.6</text>
+<line x1="55" y1="220.0" x2="680" y2="220.0" stroke="#333"/>
+<text x="47" y="174.0" text-anchor="end" font-size="11" fill="#888">0.7</text>
+<line x1="55" y1="170.0" x2="680" y2="170.0" stroke="#333"/>
+<text x="47" y="123.99999999999997" text-anchor="end" font-size="11" fill="#888">0.7</text>
+<line x1="55" y1="120.0" x2="680" y2="120.0" stroke="#333"/>
+<text x="47" y="74.00000000000003" text-anchor="end" font-size="11" fill="#888">0.8</text>
+<line x1="55" y1="70.0" x2="680" y2="70.0" stroke="#333"/>
+<text x="47" y="24.0" text-anchor="end" font-size="11" fill="#888">0.9</text>
+<line x1="55" y1="20.0" x2="680" y2="20.0" stroke="#333"/>
+<text x="55.0" y="238" text-anchor="middle" font-size="11" fill="#888">Apr 25</text>
+<line x1="55.0" y1="220" x2="55.0" y2="224" stroke="#444"/>
+<text x="160.8" y="238" text-anchor="middle" font-size="11" fill="#888">May 25</text>
+<line x1="160.8" y1="220" x2="160.8" y2="224" stroke="#444"/>
+<text x="268.5" y="238" text-anchor="middle" font-size="11" fill="#888">Jul 25</text>
+<line x1="268.5" y1="220" x2="268.5" y2="224" stroke="#444"/>
+<text x="389.6" y="238" text-anchor="middle" font-size="11" fill="#888">Sep 25</text>
+<line x1="389.6" y1="220" x2="389.6" y2="224" stroke="#444"/>
+<text x="468.5" y="238" text-anchor="middle" font-size="11" fill="#888">Nov 25</text>
+<line x1="468.5" y1="220" x2="468.5" y2="224" stroke="#444"/>
+<text x="581.9" y="238" text-anchor="middle" font-size="11" fill="#888">Jan 26</text>
+<line x1="581.9" y1="220" x2="581.9" y2="224" stroke="#444"/>
+<text x="672.3" y="238" text-anchor="middle" font-size="11" fill="#888">Feb 26</text>
+<line x1="672.3" y1="220" x2="672.3" y2="224" stroke="#444"/>
+<circle cx="55.0" cy="118.8" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="56.9" cy="144.8" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="60.8" cy="155.6" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="66.5" cy="131.3" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="74.2" cy="89.6" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="80.0" cy="144.1" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="83.8" cy="152.9" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="87.7" cy="136.7" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="97.3" cy="144.5" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="101.2" cy="141.4" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="106.9" cy="91.9" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="120.4" cy="128.2" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="128.1" cy="146.6" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="133.8" cy="105.2" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="137.7" cy="116.5" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="137.7" cy="74.1" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="141.5" cy="129.0" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="147.3" cy="82.9" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="151.2" cy="103.9" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="155.0" cy="85.0" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="160.8" cy="152.1" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="160.8" cy="159.3" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="164.6" cy="141.9" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="168.5" cy="122.3" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="174.2" cy="135.1" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="183.8" cy="161.5" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="187.7" cy="145.0" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="191.5" cy="143.9" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="195.4" cy="157.9" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="205.0" cy="138.3" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="210.8" cy="128.5" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="214.6" cy="144.0" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="220.4" cy="120.6" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="222.3" cy="161.2" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="228.1" cy="182.3" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="231.9" cy="105.7" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="235.8" cy="207.2" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="237.7" cy="115.9" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="251.2" cy="133.5" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="255.0" cy="128.7" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="258.8" cy="142.6" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="264.6" cy="130.9" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="268.5" cy="150.2" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="272.3" cy="132.7" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="276.2" cy="160.6" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="299.2" cy="188.9" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="303.1" cy="191.1" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="308.8" cy="162.6" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="312.7" cy="145.3" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="322.3" cy="78.6" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="326.2" cy="116.5" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="330.0" cy="149.3" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="331.9" cy="83.6" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="343.5" cy="186.1" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="349.2" cy="67.4" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="353.1" cy="142.5" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="356.9" cy="156.8" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="362.7" cy="122.2" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="366.5" cy="137.2" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="368.5" cy="152.2" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="376.2" cy="71.6" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="383.8" cy="72.4" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="385.8" cy="113.2" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="389.6" cy="174.3" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="391.5" cy="109.3" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="395.4" cy="119.1" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="399.2" cy="166.4" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="403.1" cy="210.9" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="406.9" cy="150.5" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="410.8" cy="51.9" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="412.7" cy="130.1" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="420.4" cy="146.9" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="424.2" cy="168.4" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="430.0" cy="88.2" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="435.8" cy="176.8" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="437.7" cy="95.6" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="443.5" cy="202.4" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="447.3" cy="96.4" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="451.2" cy="96.9" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="455.0" cy="116.0" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="455.0" cy="120.9" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="456.9" cy="102.5" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="462.7" cy="126.0" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="464.6" cy="157.3" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="468.5" cy="119.5" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="468.5" cy="142.8" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="470.4" cy="106.4" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="478.1" cy="165.2" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="491.5" cy="152.6" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="497.3" cy="88.7" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="501.2" cy="96.2" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="501.2" cy="118.6" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="506.9" cy="149.1" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="514.6" cy="72.9" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="526.2" cy="81.6" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="531.9" cy="81.2" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="535.8" cy="138.8" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="539.6" cy="29.1" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="545.4" cy="77.0" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="553.1" cy="37.4" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="558.8" cy="55.9" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="562.7" cy="103.3" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="570.4" cy="108.8" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="574.2" cy="126.8" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="578.1" cy="64.2" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="581.9" cy="92.8" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="585.8" cy="126.4" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="589.6" cy="48.3" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="593.5" cy="54.5" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="595.4" cy="61.3" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="599.2" cy="80.6" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="605.0" cy="130.2" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="610.8" cy="90.6" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="612.7" cy="58.3" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="618.5" cy="70.4" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="628.1" cy="60.9" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="647.3" cy="171.1" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="649.2" cy="107.2" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="649.2" cy="115.3" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="649.2" cy="109.3" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="655.0" cy="122.2" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="658.8" cy="76.6" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="662.7" cy="128.4" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="666.5" cy="60.8" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="666.5" cy="124.9" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="668.5" cy="77.4" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="672.3" cy="103.7" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="674.2" cy="40.8" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="676.2" cy="86.6" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="680.0" cy="90.2" r="3.5" fill="#009688" opacity="0.6"/>
+<circle cx="680.0" cy="134.2" r="3.5" fill="#009688" opacity="0.6"/>
+<polyline points="55.0,146.5 680.0,96.0" fill="none" stroke="#FF5722" stroke-width="2" opacity="0.7" stroke-dasharray="6,3"/>
+</svg><p class="chart-note">Meters per stride. Dashed = trend.</p><p class="insight">Average: cadence 175 spm &times; stride 0.75 m = 2.17 m/s (actual avg speed: 2.18 m/s, pace 7:38 /km).</p><p class="insight">Trends: cadence trending up, stride length trending up.</p></div><div class="section"><h2>Training Plan &mdash; Backyard Ultra (04 Jul 2026)</h2><p class="insight"><b>132 days</b> (18 weeks) to race day.</p><h3>Current Training Baseline (last 4 weeks avg)</h3><div class="card-grid"><div class="stat-card"><div class="stat-value">74 km</div><div class="stat-label">Weekly Distance</div></div><div class="stat-card"><div class="stat-value">9.0 h</div><div class="stat-label">Weekly Time</div></div><div class="stat-card"><div class="stat-value">4.2</div><div class="stat-label">Runs / Week</div></div><div class="stat-card"><div class="stat-value">392</div><div class="stat-label">Weekly Load</div></div></div><h3>Week-by-Week Volume Plan</h3><svg width="700" height="260" xmlns="http://www.w3.org/2000/svg" style="font-family:sans-serif">
+<rect width="700" height="260" fill="#0a0a0a" rx="6"/>
+
+
+<text x="47" y="224.0" text-anchor="end" font-size="11" fill="#888">0.0</text>
+<line x1="55" y1="220.0" x2="680" y2="220.0" stroke="#333"/>
+<text x="47" y="174.0" text-anchor="end" font-size="11" fill="#888">25.3</text>
+<line x1="55" y1="170.0" x2="680" y2="170.0" stroke="#333"/>
+<text x="47" y="124.0" text-anchor="end" font-size="11" fill="#888">50.6</text>
+<line x1="55" y1="120.0" x2="680" y2="120.0" stroke="#333"/>
+<text x="47" y="74.0" text-anchor="end" font-size="11" fill="#888">75.8</text>
+<line x1="55" y1="70.0" x2="680" y2="70.0" stroke="#333"/>
+<text x="47" y="24.0" text-anchor="end" font-size="11" fill="#888">101.1</text>
+<line x1="55" y1="20.0" x2="680" y2="20.0" stroke="#333"/>
+<rect x="59.9" y="69.9" width="23.0" height="150.1" fill="#4CAF50" rx="2" opacity="0.85"/>
+<text x="71.4" y="236.0" text-anchor="middle" font-size="10" fill="#888">22/02</text>
+<rect x="92.8" y="66.3" width="23.0" height="153.7" fill="#4CAF50" rx="2" opacity="0.85"/>
+<text x="104.3" y="236.0" text-anchor="middle" font-size="10" fill="#888">01/03</text>
+<rect x="125.7" y="62.8" width="23.0" height="157.2" fill="#4CAF50" rx="2" opacity="0.85"/>
+<text x="137.2" y="236.0" text-anchor="middle" font-size="10" fill="#888">08/03</text>
+<rect x="158.6" y="141.4" width="23.0" height="78.6" fill="#2196F3" rx="2" opacity="0.85"/>
+<text x="170.1" y="236.0" text-anchor="middle" font-size="10" fill="#888">15/03</text>
+<rect x="191.5" y="55.6" width="23.0" height="164.4" fill="#4CAF50" rx="2" opacity="0.85"/>
+<text x="203.0" y="236.0" text-anchor="middle" font-size="10" fill="#888">22/03</text>
+<rect x="224.4" y="52.1" width="23.0" height="167.9" fill="#4CAF50" rx="2" opacity="0.85"/>
+<text x="235.9" y="236.0" text-anchor="middle" font-size="10" fill="#888">29/03</text>
+<rect x="257.3" y="48.5" width="23.0" height="171.5" fill="#4CAF50" rx="2" opacity="0.85"/>
+<text x="268.8" y="236.0" text-anchor="middle" font-size="10" fill="#888">05/04</text>
+<rect x="290.2" y="134.2" width="23.0" height="85.8" fill="#2196F3" rx="2" opacity="0.85"/>
+<text x="301.7" y="236.0" text-anchor="middle" font-size="10" fill="#888">12/04</text>
+<rect x="323.1" y="41.3" width="23.0" height="178.7" fill="#4CAF50" rx="2" opacity="0.85"/>
+<text x="334.6" y="236.0" text-anchor="middle" font-size="10" fill="#888">19/04</text>
+<rect x="356.0" y="37.8" width="23.0" height="182.2" fill="#4CAF50" rx="2" opacity="0.85"/>
+<text x="367.5" y="236.0" text-anchor="middle" font-size="10" fill="#888">26/04</text>
+<rect x="388.9" y="34.2" width="23.0" height="185.8" fill="#4CAF50" rx="2" opacity="0.85"/>
+<text x="400.4" y="236.0" text-anchor="middle" font-size="10" fill="#888">03/05</text>
+<rect x="421.8" y="127.1" width="23.0" height="92.9" fill="#2196F3" rx="2" opacity="0.85"/>
+<text x="433.3" y="236.0" text-anchor="middle" font-size="10" fill="#888">10/05</text>
+<rect x="454.7" y="29.5" width="23.0" height="190.5" fill="#4CAF50" rx="2" opacity="0.85"/>
+<text x="466.2" y="236.0" text-anchor="middle" font-size="10" fill="#888">17/05</text>
+<rect x="487.6" y="29.5" width="23.0" height="190.5" fill="#4CAF50" rx="2" opacity="0.85"/>
+<text x="499.1" y="236.0" text-anchor="middle" font-size="10" fill="#888">24/05</text>
+<rect x="520.5" y="29.5" width="23.0" height="190.5" fill="#4CAF50" rx="2" opacity="0.85"/>
+<text x="532.0" y="236.0" text-anchor="middle" font-size="10" fill="#888">31/05</text>
+<rect x="553.4" y="124.8" width="23.0" height="95.2" fill="#2196F3" rx="2" opacity="0.85"/>
+<text x="564.9" y="236.0" text-anchor="middle" font-size="10" fill="#888">07/06</text>
+<rect x="586.2" y="96.2" width="23.0" height="123.8" fill="#FFC107" rx="2" opacity="0.85"/>
+<text x="597.8" y="236.0" text-anchor="middle" font-size="10" fill="#888">14/06</text>
+<rect x="619.1" y="143.8" width="23.0" height="76.2" fill="#FFC107" rx="2" opacity="0.85"/>
+<text x="630.7" y="236.0" text-anchor="middle" font-size="10" fill="#888">21/06</text>
+<rect x="652.0" y="206.7" width="23.0" height="13.3" fill="#FF5722" rx="2" opacity="0.85"/>
+<text x="663.6" y="236.0" text-anchor="middle" font-size="10" fill="#888">28/06</text>
+</svg><p class="chart-note"><span style="color:#4CAF50">&#9632; Build</span> &nbsp; <span style="color:#2196F3">&#9632; Recovery (50%)</span> &nbsp; <span style="color:#FFC107">&#9632; Taper</span> &nbsp; <span style="color:#FF5722">&#9632; Race</span></p><table class="splits"><tr><th>Week of</th><th>Type</th><th>Target km</th><th>Target Time</th><th>Notes</th></tr><tr><td>22/02</td><td style="color:#4CAF50"><b>Build</b></td><td>76</td><td>9.2h</td><td>Build aerobic base. 80% easy, one long run.</td></tr><tr><td>01/03</td><td style="color:#4CAF50"><b>Build</b></td><td>78</td><td>9.4h</td><td>Build aerobic base. 80% easy, one long run.</td></tr><tr><td>08/03</td><td style="color:#4CAF50"><b>Build</b></td><td>80</td><td>9.7h</td><td>Build aerobic base. 80% easy, one long run.</td></tr><tr><td>15/03</td><td style="color:#2196F3"><b>Recovery</b></td><td>40</td><td>4.8h</td><td>Half volume. Easy runs only. Focus on sleep and nutrition.</td></tr><tr><td>22/03</td><td style="color:#4CAF50"><b>Build</b></td><td>83</td><td>10.1h</td><td>Increase long run. Add back-to-back weekend runs.</td></tr><tr><td>29/03</td><td style="color:#4CAF50"><b>Build</b></td><td>85</td><td>10.3h</td><td>Increase long run. Add back-to-back weekend runs.</td></tr><tr><td>05/04</td><td style="color:#4CAF50"><b>Build</b></td><td>87</td><td>10.5h</td><td>Increase long run. Add back-to-back weekend runs.</td></tr><tr><td>12/04</td><td style="color:#2196F3"><b>Recovery</b></td><td>43</td><td>5.3h</td><td>Half volume. Easy runs only. Focus on sleep and nutrition.</td></tr><tr><td>19/04</td><td style="color:#4CAF50"><b>Build</b></td><td>90</td><td>11.0h</td><td>Increase long run. Add back-to-back weekend runs.</td></tr><tr><td>26/04</td><td style="color:#4CAF50"><b>Build</b></td><td>92</td><td>11.2h</td><td>Increase long run. Add back-to-back weekend runs.</td></tr><tr><td>03/05</td><td style="color:#4CAF50"><b>Build</b></td><td>94</td><td>11.4h</td><td>Peak volume. Practice race-pace 6.7km repeats.</td></tr><tr><td>10/05</td><td style="color:#2196F3"><b>Recovery</b></td><td>47</td><td>5.7h</td><td>Half volume. Easy runs only. Focus on sleep and nutrition.</td></tr><tr><td>17/05</td><td style="color:#4CAF50"><b>Build</b></td><td>96</td><td>11.7h</td><td>Peak volume. Practice race-pace 6.7km repeats.</td></tr><tr><td>24/05</td><td style="color:#4CAF50"><b>Build</b></td><td>96</td><td>11.7h</td><td>Peak volume. Practice race-pace 6.7km repeats.</td></tr><tr><td>31/05</td><td style="color:#4CAF50"><b>Build</b></td><td>96</td><td>11.7h</td><td>Peak volume. Practice race-pace 6.7km repeats.</td></tr><tr><td>07/06</td><td style="color:#2196F3"><b>Recovery</b></td><td>48</td><td>5.9h</td><td>Half volume. Easy runs only. Focus on sleep and nutrition.</td></tr><tr><td>14/06</td><td style="color:#FFC107"><b>Taper</b></td><td>63</td><td>7.6h</td><td>Reduce to 65%. Keep one race-pace session.</td></tr><tr><td>21/06</td><td style="color:#FFC107"><b>Taper</b></td><td>39</td><td>4.7h</td><td>Reduce to 40%. Short easy runs. Rest legs.</td></tr><tr><td>28/06</td><td style="color:#FF5722"><b>Race</b></td><td>7</td><td>0.8h</td><td>Race day! Start conservative. Target ~50min per 6.7km yard.</td></tr></table><h3>Backyard Ultra Specifics</h3><div class="card-grid"><div class="stat-card"><div class="stat-value">8:56</div><div class="stat-label">Max Pace per Yard</div></div><div class="stat-card"><div class="stat-value">8:19</div><div class="stat-label">Last Run Avg Pace</div></div><div class="stat-card"><div class="stat-value">0.6 min</div><div class="stat-label">Margin per km</div></div><div class="stat-card"><div class="stat-value">4 min</div><div class="stat-label">Rest per Yard</div></div></div><p class="insight">At last-run pace (8:19/km), you have ~4 min rest per yard. Workable, but tighter than ideal for later yards.</p><h3>Longest Runs (Time on Feet)</h3><table class="splits"><tr><th>#</th><th>Duration</th><th>Distance</th><th>Date</th></tr><tr><td>1</td><td>5:36:33</td><td>51.1 km</td><td>25 Jan 2026</td></tr><tr><td>2</td><td>4:40:06</td><td>34.9 km</td><td>08 Feb 2026</td></tr><tr><td>3</td><td>4:36:50</td><td>42.3 km</td><td>10 Jan 2026</td></tr><tr><td>4</td><td>3:42:52</td><td>33.9 km</td><td>20 Dec 2025</td></tr><tr><td>5</td><td>3:32:02</td><td>30.0 km</td><td>18 Oct 2025</td></tr></table><p class="insight good">Longest run: 5.6h. Solid time-on-feet foundation for a backyard ultra.</p><h3>Recent 3:1 Cycle Adherence</h3><table class="splits"><tr><th>Week</th><th>Distance</th><th>vs Previous</th><th>Pattern</th></tr><tr><td>2025-W52</td><td>15 km</td><td>--</td><td>--</td></tr><tr><td>2026-W00</td><td>46 km</td><td style="color:#4CAF50">+203%</td><td style="color:#4CAF50">Build</td></tr><tr><td>2026-W01</td><td>71 km</td><td style="color:#4CAF50">+54%</td><td style="color:#4CAF50">Build</td></tr><tr><td>2026-W02</td><td>27 km</td><td style="color:#2196F3">-61%</td><td style="color:#2196F3">Recovery</td></tr><tr><td>2026-W03</td><td>59 km</td><td style="color:#4CAF50">+115%</td><td style="color:#4CAF50">Build</td></tr><tr><td>2026-W05</td><td>95 km</td><td style="color:#4CAF50">+60%</td><td style="color:#4CAF50">Build</td></tr><tr><td>2026-W06</td><td>76 km</td><td style="color:#FF9800">-20%</td><td style="color:#FF9800">Drop</td></tr><tr><td>2026-W07</td><td>67 km</td><td style="color:#FF9800">-12%</td><td style="color:#FF9800">Drop</td></tr></table></div>
+</body>
+</html>

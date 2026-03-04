@@ -1,0 +1,509 @@
+{
+  "total_runs": 135,
+  "date_range": {
+    "first": "2025-04-01T21:21:24",
+    "last": "2026-02-21T13:42:46"
+  },
+  "race": {
+    "name": "Backyard Ultra",
+    "date": "2026-07-04",
+    "weeks_out": 18,
+    "training_structure": "3 weeks build + 1 week recovery (50% volume)",
+    "taper": "2 weeks before race (progressive volume reduction)"
+  },
+  "last_run": {
+    "date": "2026-02-21T13:42:46",
+    "distance_km": 24.53,
+    "duration_min": 204.1,
+    "pace_minkm": "8:19",
+    "avg_hr": 124,
+    "max_hr": 144,
+    "elevation_m": 682.0,
+    "training_load": 109,
+    "cadence_spm": 166.5,
+    "stride": 0.7217686,
+    "hr_drift_pct": -3.0,
+    "hr_zones_pct": {
+      "Z1": 98.6,
+      "Z2": 1.4,
+      "Z3": 0.0,
+      "Z4": 0.0,
+      "Z5": 0.0,
+      "Z6": 0.0,
+      "Z7": 0.0
+    },
+    "easy_pct": 100.0
+  },
+  "fitness": {
+    "ctl": 53.6,
+    "atl": 63.9,
+    "tsb": -10.2,
+    "ac_ratio": 1.19
+  },
+  "pace_trend_pct": -15.8,
+  "progress_verdict": "Progress",
+  "progress_change_pct": -3.5,
+  "volume": {
+    "avg_weekly_km_last4": 74.1,
+    "avg_runs_per_week_last4": 4.2,
+    "consistency_pct": 67.0,
+    "weeks_since_recovery": 4,
+    "load_ramp_pct": 50.6
+  },
+  "pace_trend_last4w": -6.4,
+  "days_since_last_run": 0,
+  "longest_runs_hours": [
+    5.6,
+    4.7,
+    4.6
+  ],
+  "longest_runs_km": [
+    51.1,
+    34.9,
+    42.3
+  ],
+  "avg_cadence_spm": 174.6,
+  "avg_stride": 0.748,
+  "last_week": {
+    "count": 6,
+    "total_distance_km": 74.45,
+    "avg_pace_minkm": "6:56",
+    "avg_hr": 134.2,
+    "total_load": 369,
+    "total_elevation_m": 1409.0,
+    "runs": [
+      {
+        "date": "2026-02-15T13:43:59",
+        "distance_km": 7.7,
+        "duration_min": 50.6,
+        "pace_minkm": "6:34",
+        "avg_hr": 136,
+        "training_load": 37,
+        "elevation_m": 116.0,
+        "cadence_spm": 185.0
+      },
+      {
+        "date": "2026-02-17T20:56:51",
+        "distance_km": 4.89,
+        "duration_min": 35.2,
+        "pace_minkm": "7:11",
+        "avg_hr": 145,
+        "training_load": 35,
+        "elevation_m": 157.0,
+        "cadence_spm": 179.1
+      },
+      {
+        "date": "2026-02-18T15:40:00",
+        "distance_km": 21.14,
+        "duration_min": 124.1,
+        "pace_minkm": "5:52",
+        "avg_hr": 147,
+        "training_load": 127,
+        "elevation_m": 252.0,
+        "cadence_spm": 192.2
+      },
+      {
+        "date": "2026-02-19T15:30:52",
+        "distance_km": 6.8,
+        "duration_min": 46.2,
+        "pace_minkm": "6:47",
+        "avg_hr": 127,
+        "training_load": 26,
+        "elevation_m": 84.0,
+        "cadence_spm": 182.9
+      },
+      {
+        "date": "2026-02-20T22:22:31",
+        "distance_km": 9.39,
+        "duration_min": 64.7,
+        "pace_minkm": "6:53",
+        "avg_hr": 126,
+        "training_load": 35,
+        "elevation_m": 118.0,
+        "cadence_spm": 181.6
+      },
+      {
+        "date": "2026-02-21T13:42:46",
+        "distance_km": 24.53,
+        "duration_min": 204.1,
+        "pace_minkm": "8:19",
+        "avg_hr": 124,
+        "training_load": 109,
+        "elevation_m": 682.0,
+        "cadence_spm": 166.5
+      }
+    ]
+  },
+  "last_month": {
+    "count": 16,
+    "total_distance_km": 288.42,
+    "avg_pace_minkm": "7:16",
+    "avg_hr": 136.0,
+    "total_load": 1528,
+    "total_elevation_m": 4942.0,
+    "runs": [
+      {
+        "date": "2026-01-25T07:00:04",
+        "distance_km": 51.07,
+        "duration_min": 336.6,
+        "pace_minkm": "6:35",
+        "avg_hr": 141,
+        "training_load": 310,
+        "elevation_m": 790.0,
+        "cadence_spm": 178.3
+      },
+      {
+        "date": "2026-02-03T23:02:46",
+        "distance_km": 13.75,
+        "duration_min": 117.6,
+        "pace_minkm": "8:33",
+        "avg_hr": 144,
+        "training_load": 108,
+        "elevation_m": 404.0,
+        "cadence_spm": 178.0
+      },
+      {
+        "date": "2026-02-05T14:46:04",
+        "distance_km": 17.78,
+        "duration_min": 131.1,
+        "pace_minkm": "7:22",
+        "avg_hr": 129,
+        "training_load": 85,
+        "elevation_m": 140.0,
+        "cadence_spm": 176.2
+      },
+      {
+        "date": "2026-02-05T14:46:04",
+        "distance_km": 23.12,
+        "duration_min": 175.2,
+        "pace_minkm": "7:34",
+        "avg_hr": 129,
+        "training_load": 111,
+        "elevation_m": 202.0,
+        "cadence_spm": 174.8
+      },
+      {
+        "date": "2026-02-05T17:05:09",
+        "distance_km": 5.1,
+        "duration_min": 39.1,
+        "pace_minkm": "7:40",
+        "avg_hr": 127,
+        "training_load": 23,
+        "elevation_m": 62.0,
+        "cadence_spm": 170.1
+      },
+      {
+        "date": "2026-02-08T12:54:50",
+        "distance_km": 34.88,
+        "duration_min": 280.1,
+        "pace_minkm": "8:01",
+        "avg_hr": 141,
+        "training_load": 255,
+        "elevation_m": 624.0,
+        "cadence_spm": 167.6
+      },
+      {
+        "date": "2026-02-10T20:45:32",
+        "distance_km": 9.12,
+        "duration_min": 63.1,
+        "pace_minkm": "6:55",
+        "avg_hr": 145,
+        "training_load": 62,
+        "elevation_m": 236.0,
+        "cadence_spm": 175.5
+      },
+      {
+        "date": "2026-02-12T19:05:57",
+        "distance_km": 21.81,
+        "duration_min": 167.5,
+        "pace_minkm": "7:40",
+        "avg_hr": 137,
+        "training_load": 131,
+        "elevation_m": 527.0,
+        "cadence_spm": 177.8
+      },
+      {
+        "date": "2026-02-13T22:09:14",
+        "distance_km": 13.12,
+        "duration_min": 82.3,
+        "pace_minkm": "6:16",
+        "avg_hr": 142,
+        "training_load": 74,
+        "elevation_m": 152.0,
+        "cadence_spm": 187.4
+      },
+      {
+        "date": "2026-02-14T14:25:40",
+        "distance_km": 24.23,
+        "duration_min": 192.8,
+        "pace_minkm": "7:57",
+        "avg_hr": null,
+        "training_load": null,
+        "elevation_m": 396.0,
+        "cadence_spm": 170.3
+      },
+      {
+        "date": "2026-02-15T13:43:59",
+        "distance_km": 7.7,
+        "duration_min": 50.6,
+        "pace_minkm": "6:34",
+        "avg_hr": 136,
+        "training_load": 37,
+        "elevation_m": 116.0,
+        "cadence_spm": 185.0
+      },
+      {
+        "date": "2026-02-17T20:56:51",
+        "distance_km": 4.89,
+        "duration_min": 35.2,
+        "pace_minkm": "7:11",
+        "avg_hr": 145,
+        "training_load": 35,
+        "elevation_m": 157.0,
+        "cadence_spm": 179.1
+      },
+      {
+        "date": "2026-02-18T15:40:00",
+        "distance_km": 21.14,
+        "duration_min": 124.1,
+        "pace_minkm": "5:52",
+        "avg_hr": 147,
+        "training_load": 127,
+        "elevation_m": 252.0,
+        "cadence_spm": 192.2
+      },
+      {
+        "date": "2026-02-19T15:30:52",
+        "distance_km": 6.8,
+        "duration_min": 46.2,
+        "pace_minkm": "6:47",
+        "avg_hr": 127,
+        "training_load": 26,
+        "elevation_m": 84.0,
+        "cadence_spm": 182.9
+      },
+      {
+        "date": "2026-02-20T22:22:31",
+        "distance_km": 9.39,
+        "duration_min": 64.7,
+        "pace_minkm": "6:53",
+        "avg_hr": 126,
+        "training_load": 35,
+        "elevation_m": 118.0,
+        "cadence_spm": 181.6
+      },
+      {
+        "date": "2026-02-21T13:42:46",
+        "distance_km": 24.53,
+        "duration_min": 204.1,
+        "pace_minkm": "8:19",
+        "avg_hr": 124,
+        "training_load": 109,
+        "elevation_m": 682.0,
+        "cadence_spm": 166.5
+      }
+    ],
+    "weekly_breakdown": {
+      "2026-W03": {
+        "count": 1,
+        "total_distance_km": 51.07,
+        "avg_pace_minkm": "6:35",
+        "avg_hr": 141.0,
+        "total_load": 310,
+        "total_elevation_m": 790.0,
+        "runs": [
+          {
+            "date": "2026-01-25T07:00:04",
+            "distance_km": 51.07,
+            "duration_min": 336.6,
+            "pace_minkm": "6:35",
+            "avg_hr": 141,
+            "training_load": 310,
+            "elevation_m": 790.0,
+            "cadence_spm": 178.3
+          }
+        ]
+      },
+      "2026-W05": {
+        "count": 5,
+        "total_distance_km": 94.63,
+        "avg_pace_minkm": "7:50",
+        "avg_hr": 134.0,
+        "total_load": 582,
+        "total_elevation_m": 1432.0,
+        "runs": [
+          {
+            "date": "2026-02-03T23:02:46",
+            "distance_km": 13.75,
+            "duration_min": 117.6,
+            "pace_minkm": "8:33",
+            "avg_hr": 144,
+            "training_load": 108,
+            "elevation_m": 404.0,
+            "cadence_spm": 178.0
+          },
+          {
+            "date": "2026-02-05T14:46:04",
+            "distance_km": 17.78,
+            "duration_min": 131.1,
+            "pace_minkm": "7:22",
+            "avg_hr": 129,
+            "training_load": 85,
+            "elevation_m": 140.0,
+            "cadence_spm": 176.2
+          },
+          {
+            "date": "2026-02-05T14:46:04",
+            "distance_km": 23.12,
+            "duration_min": 175.2,
+            "pace_minkm": "7:34",
+            "avg_hr": 129,
+            "training_load": 111,
+            "elevation_m": 202.0,
+            "cadence_spm": 174.8
+          },
+          {
+            "date": "2026-02-05T17:05:09",
+            "distance_km": 5.1,
+            "duration_min": 39.1,
+            "pace_minkm": "7:40",
+            "avg_hr": 127,
+            "training_load": 23,
+            "elevation_m": 62.0,
+            "cadence_spm": 170.1
+          },
+          {
+            "date": "2026-02-08T12:54:50",
+            "distance_km": 34.88,
+            "duration_min": 280.1,
+            "pace_minkm": "8:01",
+            "avg_hr": 141,
+            "training_load": 255,
+            "elevation_m": 624.0,
+            "cadence_spm": 167.6
+          }
+        ]
+      },
+      "2026-W06": {
+        "count": 5,
+        "total_distance_km": 75.97,
+        "avg_pace_minkm": "7:04",
+        "avg_hr": 140.0,
+        "total_load": 304,
+        "total_elevation_m": 1427.0,
+        "runs": [
+          {
+            "date": "2026-02-10T20:45:32",
+            "distance_km": 9.12,
+            "duration_min": 63.1,
+            "pace_minkm": "6:55",
+            "avg_hr": 145,
+            "training_load": 62,
+            "elevation_m": 236.0,
+            "cadence_spm": 175.5
+          },
+          {
+            "date": "2026-02-12T19:05:57",
+            "distance_km": 21.81,
+            "duration_min": 167.5,
+            "pace_minkm": "7:40",
+            "avg_hr": 137,
+            "training_load": 131,
+            "elevation_m": 527.0,
+            "cadence_spm": 177.8
+          },
+          {
+            "date": "2026-02-13T22:09:14",
+            "distance_km": 13.12,
+            "duration_min": 82.3,
+            "pace_minkm": "6:16",
+            "avg_hr": 142,
+            "training_load": 74,
+            "elevation_m": 152.0,
+            "cadence_spm": 187.4
+          },
+          {
+            "date": "2026-02-14T14:25:40",
+            "distance_km": 24.23,
+            "duration_min": 192.8,
+            "pace_minkm": "7:57",
+            "avg_hr": null,
+            "training_load": null,
+            "elevation_m": 396.0,
+            "cadence_spm": 170.3
+          },
+          {
+            "date": "2026-02-15T13:43:59",
+            "distance_km": 7.7,
+            "duration_min": 50.6,
+            "pace_minkm": "6:34",
+            "avg_hr": 136,
+            "training_load": 37,
+            "elevation_m": 116.0,
+            "cadence_spm": 185.0
+          }
+        ]
+      },
+      "2026-W07": {
+        "count": 5,
+        "total_distance_km": 66.76,
+        "avg_pace_minkm": "7:00",
+        "avg_hr": 133.8,
+        "total_load": 332,
+        "total_elevation_m": 1293.0,
+        "runs": [
+          {
+            "date": "2026-02-17T20:56:51",
+            "distance_km": 4.89,
+            "duration_min": 35.2,
+            "pace_minkm": "7:11",
+            "avg_hr": 145,
+            "training_load": 35,
+            "elevation_m": 157.0,
+            "cadence_spm": 179.1
+          },
+          {
+            "date": "2026-02-18T15:40:00",
+            "distance_km": 21.14,
+            "duration_min": 124.1,
+            "pace_minkm": "5:52",
+            "avg_hr": 147,
+            "training_load": 127,
+            "elevation_m": 252.0,
+            "cadence_spm": 192.2
+          },
+          {
+            "date": "2026-02-19T15:30:52",
+            "distance_km": 6.8,
+            "duration_min": 46.2,
+            "pace_minkm": "6:47",
+            "avg_hr": 127,
+            "training_load": 26,
+            "elevation_m": 84.0,
+            "cadence_spm": 182.9
+          },
+          {
+            "date": "2026-02-20T22:22:31",
+            "distance_km": 9.39,
+            "duration_min": 64.7,
+            "pace_minkm": "6:53",
+            "avg_hr": 126,
+            "training_load": 35,
+            "elevation_m": 118.0,
+            "cadence_spm": 181.6
+          },
+          {
+            "date": "2026-02-21T13:42:46",
+            "distance_km": 24.53,
+            "duration_min": 204.1,
+            "pace_minkm": "8:19",
+            "avg_hr": 124,
+            "training_load": 109,
+            "elevation_m": 682.0,
+            "cadence_spm": 166.5
+          }
+        ]
+      }
+    }
+  }
+}
