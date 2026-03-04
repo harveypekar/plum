@@ -31,6 +31,10 @@ def api_call(description: str, func, *args, **kwargs):
             raise  # don't retry auth errors
         except Exception as e:
             err = str(e)
+            # Don't retry client errors (400, 403, 404) — they won't succeed
+            if any(code in err for code in ("400", "403", "404", "Bad Request", "Forbidden", "Not Found")):
+                print(f"  SKIP {description}: {err.splitlines()[-1] if err else e}")
+                return None
             if "429" in err or "Too Many" in err:
                 wait = 2 ** (attempt + 1)
                 print(f"  Rate limited on {description}, waiting {wait}s...")
@@ -40,7 +44,7 @@ def api_call(description: str, func, *args, **kwargs):
                 print(f"  Retry {attempt + 1} for {description}: {e}")
                 time.sleep(2)
                 continue
-            print(f"  SKIP {description}: {e}")
+            print(f"  SKIP {description}: {err.splitlines()[-1] if err else e}")
             return None
     return None
 
@@ -178,39 +182,6 @@ def fetch_gear(garmin: Garmin) -> None:
     print(f"  Saved data for {len(items)} gear items")
 
 
-def fetch_badges_and_challenges(garmin: Garmin) -> None:
-    """Fetch all badges and challenges."""
-    print("Fetching badges & challenges...")
-    badges_dir = DATA_DIR / "badges"
-    challenges_dir = DATA_DIR / "challenges"
-
-    badge_endpoints = [
-        ("earned.json", "earned badges", garmin.get_earned_badges),
-        ("available.json", "available badges", garmin.get_available_badges),
-        ("in_progress.json", "in-progress badges", garmin.get_in_progress_badges),
-    ]
-    for filename, desc, func in badge_endpoints:
-        data = api_call(desc, func)
-        if data is not None:
-            save_json(badges_dir / filename, data)
-
-    challenge_endpoints = [
-        ("adhoc.json", "adhoc challenges", lambda: garmin.get_adhoc_challenges(0, 100)),
-        ("badge.json", "badge challenges", lambda: garmin.get_badge_challenges(0, 100)),
-        ("available_badge.json", "available badge challenges",
-         lambda: garmin.get_available_badge_challenges(0, 100)),
-        ("non_completed_badge.json", "non-completed badge challenges",
-         lambda: garmin.get_non_completed_badge_challenges(0, 100)),
-        ("virtual_in_progress.json", "virtual challenges in progress",
-         lambda: garmin.get_inprogress_virtual_challenges(0, 100)),
-    ]
-    for filename, desc, func in challenge_endpoints:
-        data = api_call(desc, func)
-        if data is not None:
-            save_json(challenges_dir / filename, data)
-
-    print("  Saved badges & challenges")
-
 
 def fetch_goals(garmin: Garmin) -> None:
     """Fetch all goals."""
@@ -272,38 +243,23 @@ def fetch_activities(garmin: Garmin, today: date, full: bool = False) -> list:
 
     start_date = newest_date if newest_date else "2000-01-01"
     end_date = str(today)
-    new_activities = []
-    page = 0
+    existing_ids = {a.get("activityId") for a in existing}
 
-    while True:
-        batch = api_call(
-            f"activities page {page}",
-            garmin.get_activities_by_date, start_date, end_date,
-        )
-        if not batch:
-            break
-        new_activities.extend(batch)
-        print(f"  Fetched {len(new_activities)} activities so far...")
-        if len(batch) < 100:
-            break
-        page += 1
-        time.sleep(1)
+    batch = api_call("activities", garmin.get_activities_by_date, start_date, end_date)
+    if not batch:
+        batch = []
 
-    if newest_date and not full:
-        existing_ids = {a.get("activityId") for a in existing}
-        added = 0
-        for a in new_activities:
-            if a.get("activityId") not in existing_ids:
-                existing.append(a)
-                added += 1
-        print(f"  Added {added} new activities (total: {len(existing)})")
-        all_activities = existing
-    else:
-        all_activities = new_activities
-        print(f"  Fetched {len(all_activities)} total activities")
+    added = 0
+    for a in batch:
+        aid = a.get("activityId")
+        if aid not in existing_ids:
+            existing.append(a)
+            existing_ids.add(aid)
+            added += 1
 
-    save_json(list_path, all_activities)
-    return all_activities
+    save_json(list_path, existing)
+    print(f"  Fetched {len(batch)}, {added} new (total: {len(existing)})")
+    return existing
 
 
 ACTIVITY_ENDPOINTS = [
@@ -373,7 +329,7 @@ DAILY_ENDPOINTS = [
     ("endurance_score.json", "endurance score", lambda g, d: g.get_endurance_score(d)),
     ("hill_score.json", "hill score", lambda g, d: g.get_hill_score(d)),
     ("max_metrics.json", "max metrics", lambda g, d: g.get_max_metrics(d)),
-    ("race_predictions.json", "race predictions", lambda g, d: g.get_race_predictions(d)),
+    ("race_predictions.json", "race predictions", lambda g, d: g.get_race_predictions()),
     ("body_composition.json", "body composition", lambda g, d: g.get_body_composition(d)),
     ("weigh_ins.json", "weigh-ins", lambda g, d: g.get_daily_weigh_ins(d)),
     ("hydration.json", "hydration", lambda g, d: g.get_hydration_data(d)),
@@ -386,24 +342,24 @@ def fetch_daily(garmin: Garmin, activities: list, today: date, full: bool = Fals
     """Fetch daily wellness data for every date that has activity data, plus recent 90 days."""
     daily_dir = DATA_DIR / "daily"
 
-    activity_dates = []
+    # Find earliest activity date to determine start of range
+    earliest = today - timedelta(days=90)
     for a in activities:
         d = a.get("startTimeLocal", "")[:10]
         if d:
             try:
-                activity_dates.append(date.fromisoformat(d))
+                dt = date.fromisoformat(d)
+                if dt < earliest:
+                    earliest = dt
             except ValueError:
                 pass
 
-    if not activity_dates:
-        start = today - timedelta(days=90)
-    else:
-        start = min(activity_dates)
-
-    dates_to_fetch = set(activity_dates)
-    for i in range(90):
-        dates_to_fetch.add(today - timedelta(days=i))
-    dates_to_fetch = sorted(dates_to_fetch)
+    # Every single day from earliest activity to today
+    dates_to_fetch = []
+    d = earliest
+    while d <= today:
+        dates_to_fetch.append(d)
+        d += timedelta(days=1)
 
     total = len(dates_to_fetch)
     print(f"Fetching daily data for {total} dates ({dates_to_fetch[0]} to {dates_to_fetch[-1]})...")
@@ -498,7 +454,7 @@ def main():
     fetch_profile(garmin)
     fetch_devices(garmin)
     fetch_gear(garmin)
-    fetch_badges_and_challenges(garmin)
+
     fetch_goals(garmin)
     fetch_workouts(garmin)
 
