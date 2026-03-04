@@ -508,6 +508,11 @@ def main():
     fetch_weekly(garmin, today, full=args.full)
     fetch_range_data(garmin, activities, today)
 
+    # Print summary
+    total_files = sum(1 for _ in DATA_DIR.rglob("*.json"))
+    total_size_mb = sum(f.stat().st_size for f in DATA_DIR.rglob("*.json")) / 1024 / 1024
+    print(f"\nTotal: {total_files} JSON files, {total_size_mb:.1f} MB")
+
     print("\nDone.")
 
 
