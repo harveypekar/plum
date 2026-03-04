@@ -253,6 +253,59 @@ def fetch_workouts(garmin: Garmin) -> None:
     print(f"  Saved {len(all_workouts)} workouts")
 
 
+def fetch_activities(garmin: Garmin, today: date, full: bool = False) -> list:
+    """Fetch all activities. Returns the full list."""
+    print("Fetching activities list...")
+    activities_dir = DATA_DIR / "activities"
+    list_path = activities_dir / "list.json"
+
+    existing = []
+    newest_date = None
+    if not full and list_path.exists():
+        with open(list_path, encoding="utf-8") as f:
+            existing = json.load(f)
+        if existing:
+            dates = [a.get("startTimeLocal", "") for a in existing if a.get("startTimeLocal")]
+            if dates:
+                newest_date = max(dates)[:10]
+                print(f"  Found {len(existing)} cached activities (newest: {newest_date})")
+
+    start_date = newest_date if newest_date else "2000-01-01"
+    end_date = str(today)
+    new_activities = []
+    page = 0
+
+    while True:
+        batch = api_call(
+            f"activities page {page}",
+            garmin.get_activities_by_date, start_date, end_date,
+        )
+        if not batch:
+            break
+        new_activities.extend(batch)
+        print(f"  Fetched {len(new_activities)} activities so far...")
+        if len(batch) < 100:
+            break
+        page += 1
+        time.sleep(1)
+
+    if newest_date and not full:
+        existing_ids = {a.get("activityId") for a in existing}
+        added = 0
+        for a in new_activities:
+            if a.get("activityId") not in existing_ids:
+                existing.append(a)
+                added += 1
+        print(f"  Added {added} new activities (total: {len(existing)})")
+        all_activities = existing
+    else:
+        all_activities = new_activities
+        print(f"  Fetched {len(all_activities)} total activities")
+
+    save_json(list_path, all_activities)
+    return all_activities
+
+
 def main():
     args = parse_args()
     garmin = authenticate()
