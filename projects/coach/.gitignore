@@ -1,0 +1,14 @@
+data/garmin/.tokens/
+data/garmin/activities/
+data/garmin/daily/
+data/garmin/weekly/
+data/garmin/profile/
+data/garmin/devices/
+data/garmin/gear/
+data/garmin/goals/
+data/garmin/badges/
+data/garmin/challenges/
+data/garmin/workouts/
+data/garmin/blood_pressure/
+data/garmin/weight/
+data/garmin/progress/
