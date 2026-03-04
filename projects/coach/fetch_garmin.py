@@ -306,6 +306,52 @@ def fetch_activities(garmin: Garmin, today: date, full: bool = False) -> list:
     return all_activities
 
 
+ACTIVITY_ENDPOINTS = [
+    ("summary.json", "summary", lambda g, aid: g.get_activity(aid)),
+    ("details.json", "details", lambda g, aid: g.get_activity_details(aid, maxchart=10000, maxpoly=10000)),
+    ("splits.json", "splits", lambda g, aid: g.get_activity_splits(aid)),
+    ("typed_splits.json", "typed splits", lambda g, aid: g.get_activity_typed_splits(aid)),
+    ("split_summaries.json", "split summaries", lambda g, aid: g.get_activity_split_summaries(aid)),
+    ("hr_zones.json", "HR zones", lambda g, aid: g.get_activity_hr_in_timezones(aid)),
+    ("power_zones.json", "power zones", lambda g, aid: g.get_activity_power_in_timezones(aid)),
+    ("weather.json", "weather", lambda g, aid: g.get_activity_weather(aid)),
+    ("exercise_sets.json", "exercise sets", lambda g, aid: g.get_activity_exercise_sets(aid)),
+    ("gear.json", "gear", lambda g, aid: g.get_activity_gear(aid)),
+]
+
+
+def fetch_activity_details(garmin: Garmin, activities: list, full: bool = False) -> None:
+    """Fetch all sub-endpoints for each activity."""
+    total = len(activities)
+    print(f"Fetching details for {total} activities...")
+    activities_dir = DATA_DIR / "activities"
+
+    for i, activity in enumerate(activities):
+        aid = str(activity.get("activityId", ""))
+        if not aid:
+            continue
+
+        act_dir = activities_dir / aid
+
+        if not full and act_dir.exists():
+            existing_files = set(f.name for f in act_dir.iterdir())
+            expected_files = set(fname for fname, _, _ in ACTIVITY_ENDPOINTS)
+            if expected_files.issubset(existing_files):
+                continue
+
+        print(f"  [{i + 1}/{total}] Activity {aid}")
+        for filename, desc, func in ACTIVITY_ENDPOINTS:
+            if not full and (act_dir / filename).exists():
+                continue
+            data = api_call(f"activity {aid} {desc}", func, garmin, aid)
+            if data is not None:
+                save_json(act_dir / filename, data)
+
+        time.sleep(1)
+
+    print("  Activity details complete")
+
+
 def main():
     args = parse_args()
     garmin = authenticate()
