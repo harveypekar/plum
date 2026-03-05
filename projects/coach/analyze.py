@@ -10,6 +10,13 @@ import webbrowser
 from datetime import datetime, timedelta
 from pathlib import Path
 
+from vo2max import calc_uth, calc_vdot, calc_hr_speed, calc_composite, HR_MAX
+from garmin_loader import (
+    load_garmin_runs, find_latest_run, load_garmin_activity,
+    load_garmin_daily_context, extract_steady_state_speed,
+)
+from db import get_connection, upsert_activity, load_all_enriched
+
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_DIR = SCRIPT_DIR.parent
 ACTIVITIES_PATH = PROJECT_DIR / "sourceData" / "intervals" / "activities.json"
@@ -1911,6 +1918,101 @@ svg { display: block; margin: 8px 0; max-width: 100%; }
 """
 
 
+def section_vo2max_trend():
+    """VO2max trend chart comparing Garmin vs own estimates over time."""
+    try:
+        conn = get_connection()
+        rows = load_all_enriched(conn)
+    except Exception:
+        return ""
+
+    if not rows:
+        return ""
+
+    # Filter to rows with at least one VO2max value
+    rows = [r for r in rows if r.get("garmin_vo2max") or r.get("vo2max_composite")]
+    if not rows:
+        return ""
+
+    html = '<div class="section"><h2>VO2max Estimates</h2>'
+
+    # Build chart data
+    dates = []
+    garmin_vals = []
+    composite_vals = []
+    vdot_vals = []
+    for r in rows:
+        d = r["activity_date"]
+        if d is None:
+            continue
+        day_num = (d - rows[0]["activity_date"]).total_seconds() / 86400
+        dates.append(day_num)
+        garmin_vals.append(r.get("garmin_vo2max"))
+        composite_vals.append(r.get("vo2max_composite"))
+        vdot_vals.append(r.get("vo2max_vdot"))
+
+    # Date labels for x-axis
+    first_date = rows[0]["activity_date"]
+    x_labels = []
+    for r in rows:
+        d = r["activity_date"]
+        if d and d.day <= 7:
+            day_num = (d - first_date).total_seconds() / 86400
+            x_labels.append((d.strftime("%b %y"), day_num))
+
+    chart = SvgChart(width=700, height=300)
+
+    # Filter None values for each series
+    garmin_xs = [dates[i] for i in range(len(dates)) if garmin_vals[i] is not None]
+    garmin_ys = [v for v in garmin_vals if v is not None]
+    comp_xs = [dates[i] for i in range(len(dates)) if composite_vals[i] is not None]
+    comp_ys = [v for v in composite_vals if v is not None]
+    vdot_xs = [dates[i] for i in range(len(dates)) if vdot_vals[i] is not None]
+    vdot_ys = [v for v in vdot_vals if v is not None]
+
+    extra_lines = []
+    if comp_xs:
+        extra_lines.append((comp_xs, comp_ys, "#FF6B35"))
+    if vdot_xs:
+        extra_lines.append((vdot_xs, vdot_ys, "#4ECDC4"))
+
+    if garmin_xs:
+        svg = chart.line(garmin_xs, garmin_ys, color="#00FF00",
+                         title="VO2max Estimates Over Time",
+                         x_labels=x_labels,
+                         extra_lines=extra_lines if extra_lines else None,
+                         trend=False)
+        html += svg
+
+    # Legend
+    html += '<div style="text-align:center; margin-top:8px; font-size:13px;">'
+    html += '<span style="color:#00FF00">&#9632; Garmin</span> &nbsp; '
+    html += '<span style="color:#FF6B35">&#9632; Composite</span> &nbsp; '
+    html += '<span style="color:#4ECDC4">&#9632; VDOT</span>'
+    html += '</div>'
+
+    # Latest values table
+    latest = rows[-1]
+    html += '<table style="margin:16px auto; border-collapse:collapse;">'
+    html += '<tr><th style="padding:4px 16px; text-align:left;">Method</th>'
+    html += '<th style="padding:4px 16px; text-align:right;">Latest</th></tr>'
+    for label, key, color in [
+        ("Garmin Firstbeat", "garmin_vo2max", "#00FF00"),
+        ("Uth (HR ratio)", "vo2max_uth", "#FFD700"),
+        ("VDOT (Daniels)", "vo2max_vdot", "#4ECDC4"),
+        ("HR-speed regression", "vo2max_hr_speed", "#FF69B4"),
+        ("Composite", "vo2max_composite", "#FF6B35"),
+    ]:
+        val = latest.get(key)
+        val_str = f"{val:.1f}" if val else "—"
+        html += f'<tr><td style="padding:4px 16px; color:{color};">{label}</td>'
+        html += f'<td style="padding:4px 16px; text-align:right;">{val_str}</td></tr>'
+    html += '</table>'
+
+    html += '</div>'
+    return html
+
+
 def build_report(runs, panel_discussions):
     last = runs[-1]
     dt = parse_date(last.get("start_date_local"))
@@ -1944,6 +2046,10 @@ def build_report(runs, panel_discussions):
             html += '</div>'
         html += '</div>'
 
+    # VO2max trend (from enriched Postgres data)
+    print("  Section: VO2max Trend...")
+    html += section_vo2max_trend()
+
     # Data sections
     print("  Section A: Last Run Deep-Dive...")
     html += section_last_run(runs, chart)
@@ -1966,12 +2072,114 @@ def build_report(runs, panel_discussions):
     return html
 
 # ---------------------------------------------------------------------------
+# VO2max Enrichment
+# ---------------------------------------------------------------------------
+
+def enrich_activity(garmin_id: int) -> dict:
+    """Load a Garmin activity, compute VO2max estimates, store in Postgres."""
+    activity = load_garmin_activity(garmin_id)
+    date_str = activity["activity_date"].strftime("%Y-%m-%d") if activity["activity_date"] else None
+
+    # Daily context
+    ctx = load_garmin_daily_context(date_str) if date_str else {"rhr": None, "hrv": None}
+    rhr = ctx["rhr"]
+
+    # Compute pace
+    if activity["distance_m"] and activity["duration_s"]:
+        activity["pace_minkm"] = activity["duration_s"] / activity["distance_m"] * 1000 / 60
+    else:
+        activity["pace_minkm"] = None
+
+    # --- VO2max estimates ---
+    # 1. Uth
+    vo2_uth = calc_uth(HR_MAX, rhr) if rhr else None
+
+    # 2. VDOT
+    vo2_vdot = None
+    if activity["distance_m"] > 0 and activity["duration_s"] > 0:
+        vo2_vdot = calc_vdot(activity["distance_m"], activity["duration_s"])
+
+    # 3. HR-speed regression (from steady-state time-series)
+    vo2_hr_speed = None
+    steady = extract_steady_state_speed(garmin_id)
+    if steady and rhr:
+        vo2_hr_speed = calc_hr_speed(
+            avg_speed_m_per_min=steady["avg_speed_m_per_min"],
+            avg_hr=steady["avg_hr"],
+            hr_max=HR_MAX,
+            rhr=rhr,
+        )
+
+    # 4. Composite
+    vo2_composite = None
+    pct_hrr = None
+    if activity["avg_hr"] and rhr:
+        pct_hrr = (activity["avg_hr"] - rhr) / (HR_MAX - rhr)
+    if vo2_uth is not None and vo2_vdot is not None and pct_hrr is not None:
+        vo2_composite = calc_composite(
+            uth=vo2_uth,
+            vdot=vo2_vdot,
+            hr_speed=vo2_hr_speed,
+            pct_hrr=pct_hrr,
+            duration_s=activity["duration_s"],
+        )
+
+    # Build row
+    row = {
+        **activity,
+        "vo2max_uth": vo2_uth,
+        "vo2max_vdot": vo2_vdot,
+        "vo2max_hr_speed": vo2_hr_speed,
+        "vo2max_composite": vo2_composite,
+        "rhr_on_day": rhr,
+        "hrv_on_day": ctx["hrv"],
+    }
+
+    # Store in Postgres
+    conn = get_connection()
+    upsert_activity(conn, row)
+
+    # Print summary
+    name = f"{activity['distance_m']/1000:.1f}km" if activity["distance_m"] else "?"
+    date = activity["activity_date"].strftime("%Y-%m-%d") if activity["activity_date"] else "?"
+    pace = fmt_pace(activity["pace_minkm"]) if activity.get("pace_minkm") else "--:--"
+
+    print(f"\nActivity: {date}, {name}, {pace}/km")
+    print(f"\nVO2max estimates:")
+    print(f"  Garmin Firstbeat:   {activity['garmin_vo2max'] or '—'}")
+    print(f"  Uth (HR ratio):     {vo2_uth:.1f}" if vo2_uth else "  Uth (HR ratio):     —")
+    if vo2_uth and rhr:
+        print(f"                      (HRmax={HR_MAX}, RHR={rhr:.0f})")
+    print(f"  VDOT (Daniels):     {vo2_vdot:.1f}" if vo2_vdot else "  VDOT (Daniels):     —")
+    print(f"  HR-speed regress:   {vo2_hr_speed:.1f}" if vo2_hr_speed else "  HR-speed regress:   —")
+    if pct_hrr:
+        print(f"                      ({pct_hrr:.0%} HRR)")
+    print(f"  {'─' * 25}")
+    print(f"  Composite:          {vo2_composite:.1f}" if vo2_composite else "  Composite:          —")
+
+    if activity.get("weather_temp_f") or ctx.get("hrv"):
+        parts = []
+        if activity.get("weather_temp_f"):
+            parts.append(f"temp={activity['weather_temp_f']}°F")
+        if ctx.get("hrv"):
+            parts.append(f"HRV={ctx['hrv']}")
+        print(f"\n  Context: {', '.join(parts)}")
+
+    print(f"\n  Stored → enriched_activities (garmin_id={garmin_id})")
+    return row
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
 def main():
     import argparse
     parser = argparse.ArgumentParser(description="Generate running coach report.")
+    parser.add_argument("activity_id", nargs="?", default=None,
+                        help="Garmin activity ID to enrich (default: latest run)")
+    parser.add_argument("--all", action="store_true",
+                        help="Enrich all running activities (backfill)")
     parser.add_argument("--no-ai", action="store_true",
                         help="Skip AI coach commentary (faster, no Claude CLI needed)")
     parser.add_argument("--no-rag", action="store_true",
@@ -1982,7 +2190,29 @@ def main():
                         help="Extended thinking token budget for opus (default: 10000)")
     args = parser.parse_args()
 
-    print("Loading activities...")
+    # --- Enrichment ---
+    if args.all:
+        print("Enriching all activities...")
+        runs_garmin = load_garmin_runs()
+        for i, run in enumerate(runs_garmin):
+            print(f"\n[{i + 1}/{len(runs_garmin)}]", end="")
+            try:
+                enrich_activity(run["activityId"])
+            except Exception as e:
+                print(f"  ERROR: {e}")
+    else:
+        if args.activity_id:
+            garmin_id = int(args.activity_id)
+        else:
+            latest = find_latest_run()
+            if not latest:
+                print("No running activities found in Garmin data.")
+                sys.exit(1)
+            garmin_id = latest["activityId"]
+        enrich_activity(garmin_id)
+
+    # --- Report (always) ---
+    print("\nLoading activities for report...")
     activities = load_activities()
     runs = filter_runs(activities)
     print(f"  {len(runs)} runs after filtering (>2km, >10min)")

@@ -1,4 +1,4 @@
-"""Shared DB helper module for Garmin + Intervals.icu data and RAG knowledge base.
+"""Shared DB helper module for Garmin + Intervals.icu data, RAG, and enriched activities.
 
 Connection via DATABASE_URL env var, or reads projects/db/.env for password.
 All upsert functions use ON CONFLICT DO UPDATE for idempotent loading.
@@ -16,6 +16,9 @@ import psycopg2.extras
 SCRIPT_DIR = Path(__file__).resolve().parent
 SCHEMA_PATH = SCRIPT_DIR.parent / "db" / "schema.sql"
 DB_ENV_PATH = SCRIPT_DIR.parent / "db" / ".env"
+if not DB_ENV_PATH.exists():
+    # In a worktree, resolve via the main checkout
+    DB_ENV_PATH = Path("/mnt/d/prg/plum/projects/db/.env")
 
 _conn = None
 
@@ -1182,3 +1185,58 @@ def vector_search(embedding, top_k=5, exclude_chunk_ids=None):
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         cur.execute(sql, params)
         return [dict(row) for row in cur.fetchall()]
+
+
+# ---------------------------------------------------------------------------
+# Enriched activities operations
+# ---------------------------------------------------------------------------
+
+ENRICHED_COLUMNS = [
+    "garmin_id", "intervals_id", "strava_id",
+    "activity_date", "distance_m", "duration_s", "moving_time_s",
+    "pace_minkm", "avg_hr", "max_hr", "elevation_m",
+    "avg_cadence", "avg_stride_m", "training_load",
+    "garmin_vo2max", "intervals_ctl", "intervals_atl",
+    "vo2max_uth", "vo2max_vdot", "vo2max_hr_speed", "vo2max_composite",
+    "rhr_on_day", "hrv_on_day", "weather_temp_f", "weather_humidity",
+]
+
+
+def upsert_activity(conn, row: dict) -> None:
+    """Insert or update an enriched activity by garmin_id."""
+    cols = [c for c in ENRICHED_COLUMNS if c in row and row[c] is not None]
+    vals = [row[c] for c in cols]
+
+    placeholders = ", ".join(["%s"] * len(cols))
+    col_names = ", ".join(cols)
+    updates = ", ".join(f"{c} = EXCLUDED.{c}" for c in cols if c != "garmin_id")
+    updates += ", updated_at = NOW()"
+
+    sql = f"""
+        INSERT INTO enriched_activities ({col_names})
+        VALUES ({placeholders})
+        ON CONFLICT (garmin_id) DO UPDATE SET {updates}
+    """
+    with conn.cursor() as cur:
+        cur.execute(sql, vals)
+    conn.commit()
+
+
+def load_enriched_by_garmin_id(conn, garmin_id: int) -> dict | None:
+    """Load a single enriched activity by Garmin ID."""
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.execute(
+            "SELECT * FROM enriched_activities WHERE garmin_id = %s",
+            (garmin_id,)
+        )
+        row = cur.fetchone()
+    return dict(row) if row else None
+
+
+def load_all_enriched(conn) -> list[dict]:
+    """Load all enriched activities, ordered by date."""
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.execute(
+            "SELECT * FROM enriched_activities ORDER BY activity_date"
+        )
+        return [dict(r) for r in cur.fetchall()]
