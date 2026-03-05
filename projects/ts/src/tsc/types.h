@@ -531,7 +531,7 @@ struct ts_state
     int ar;
     int defcon;
     int vp;
-    int mil;
+    int mil[2];
     ts_player phasing;
     ts_china_card_state china_card_state;
 
@@ -584,6 +584,14 @@ inline void ts_shuffle_discard_into_draw_pile(ts_state &state)
     }
     state.discardDeckSize = 0;
     ts_shuffle(state.drawPile, state.drawDeckSize);
+}
+
+inline ts_state ts_create_state()
+{
+    ts_state state;
+    memset(&state, 0, sizeof(ts_state));
+    state._current_step = TS_STEP_INIT;
+    return state;
 }
 
 inline ts_state ts_advance_game(ts_state const &state)
@@ -793,7 +801,7 @@ inline ts_state ts_advance_game(ts_state const &state)
     }
 }
 
-bool ts_gameover(ts_state &state)
+bool ts_game_over(ts_state &state)
 {
 }
 
