@@ -31,10 +31,6 @@ def api_call(description: str, func, *args, **kwargs):
             raise  # don't retry auth errors
         except Exception as e:
             err = str(e)
-            # Don't retry client errors (400, 403, 404) — they won't succeed
-            if any(code in err for code in ("400", "403", "404", "Bad Request", "Forbidden", "Not Found")):
-                print(f"  SKIP {description}: {err.splitlines()[-1] if err else e}")
-                return None
             if "429" in err or "Too Many" in err:
                 wait = 2 ** (attempt + 1)
                 print(f"  Rate limited on {description}, waiting {wait}s...")
@@ -44,7 +40,7 @@ def api_call(description: str, func, *args, **kwargs):
                 print(f"  Retry {attempt + 1} for {description}: {e}")
                 time.sleep(2)
                 continue
-            print(f"  SKIP {description}: {err.splitlines()[-1] if err else e}")
+            print(f"  SKIP {description}: {e}")
             return None
     return None
 
@@ -79,7 +75,27 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Fetch all data from Garmin Connect.")
     parser.add_argument("--full", action="store_true",
                         help="Force re-fetch everything (ignore incremental cache)")
+    parser.add_argument("--no-db", action="store_true",
+                        help="Skip writing to Postgres (JSON only)")
     return parser.parse_args()
+
+
+# DB module — loaded conditionally based on --no-db flag
+_db = None
+
+
+def init_db():
+    """Import and initialize the DB module. Returns True if DB is available."""
+    global _db
+    try:
+        import db as db_module
+        db_module.ensure_schema()
+        _db = db_module
+        print("DB: Connected to Postgres")
+        return True
+    except Exception as e:
+        print(f"DB: Could not connect ({e}), continuing without DB")
+        return False
 
 
 def fetch_profile(garmin: Garmin) -> None:
@@ -102,6 +118,8 @@ def fetch_profile(garmin: Garmin) -> None:
         data = api_call(desc, func)
         if data is not None:
             save_json(profile_dir / filename, data)
+            if _db:
+                _db.upsert_garmin_reference("profile", filename, data)
     print(f"  Saved {len(endpoints)} profile files")
 
 
@@ -114,14 +132,20 @@ def fetch_devices(garmin: Garmin) -> None:
     if devices is None:
         return
     save_json(devices_dir / "list.json", devices)
+    if _db:
+        _db.upsert_garmin_reference("devices", "list.json", devices)
 
     primary = api_call("primary device", garmin.get_primary_training_device)
     if primary is not None:
         save_json(devices_dir / "primary.json", primary)
+        if _db:
+            _db.upsert_garmin_reference("devices", "primary.json", primary)
 
     last_used = api_call("last used device", garmin.get_device_last_used)
     if last_used is not None:
         save_json(devices_dir / "last_used.json", last_used)
+        if _db:
+            _db.upsert_garmin_reference("devices", "last_used.json", last_used)
 
     for device in devices:
         device_id = str(device.get("deviceId", ""))
@@ -132,11 +156,15 @@ def fetch_devices(garmin: Garmin) -> None:
         settings = api_call(f"device {device_id} settings", garmin.get_device_settings, device_id)
         if settings is not None:
             save_json(dev_dir / "settings.json", settings)
+            if _db:
+                _db.upsert_garmin_reference("devices", f"{device_id}/settings.json", settings)
 
         solar = api_call(f"device {device_id} solar", garmin.get_device_solar_data,
                          device_id, str(date.today() - timedelta(days=30)), str(date.today()))
         if solar is not None:
             save_json(dev_dir / "solar.json", solar)
+            if _db:
+                _db.upsert_garmin_reference("devices", f"{device_id}/solar.json", solar)
 
     print(f"  Saved data for {len(devices)} devices")
 
@@ -159,10 +187,14 @@ def fetch_gear(garmin: Garmin) -> None:
     if gear_list is None:
         return
     save_json(gear_dir / "list.json", gear_list)
+    if _db:
+        _db.upsert_garmin_reference("gear", "list.json", gear_list)
 
     defaults = api_call("gear defaults", garmin.get_gear_defaults, profile_number)
     if defaults is not None:
         save_json(gear_dir / "defaults.json", defaults)
+        if _db:
+            _db.upsert_garmin_reference("gear", "defaults.json", defaults)
 
     items = gear_list if isinstance(gear_list, list) else gear_list.get("gearItems", [])
     for item in items:
@@ -174,13 +206,54 @@ def fetch_gear(garmin: Garmin) -> None:
         stats = api_call(f"gear {gear_uuid} stats", garmin.get_gear_stats, gear_uuid)
         if stats is not None:
             save_json(g_dir / "stats.json", stats)
+            if _db:
+                _db.upsert_garmin_reference("gear", f"{gear_uuid}/stats.json", stats)
 
         activities = api_call(f"gear {gear_uuid} activities", garmin.get_gear_activities, gear_uuid)
         if activities is not None:
             save_json(g_dir / "activities.json", activities)
+            if _db:
+                _db.upsert_garmin_reference("gear", f"{gear_uuid}/activities.json", activities)
 
     print(f"  Saved data for {len(items)} gear items")
 
+
+def fetch_badges_and_challenges(garmin: Garmin) -> None:
+    """Fetch all badges and challenges."""
+    print("Fetching badges & challenges...")
+    badges_dir = DATA_DIR / "badges"
+    challenges_dir = DATA_DIR / "challenges"
+
+    badge_endpoints = [
+        ("earned.json", "earned badges", garmin.get_earned_badges),
+        ("available.json", "available badges", garmin.get_available_badges),
+        ("in_progress.json", "in-progress badges", garmin.get_in_progress_badges),
+    ]
+    for filename, desc, func in badge_endpoints:
+        data = api_call(desc, func)
+        if data is not None:
+            save_json(badges_dir / filename, data)
+            if _db:
+                _db.upsert_garmin_reference("badges", filename, data)
+
+    challenge_endpoints = [
+        ("adhoc.json", "adhoc challenges", lambda: garmin.get_adhoc_challenges(0, 100)),
+        ("badge.json", "badge challenges", lambda: garmin.get_badge_challenges(0, 100)),
+        ("available_badge.json", "available badge challenges",
+         lambda: garmin.get_available_badge_challenges(0, 100)),
+        ("non_completed_badge.json", "non-completed badge challenges",
+         lambda: garmin.get_non_completed_badge_challenges(0, 100)),
+        ("virtual_in_progress.json", "virtual challenges in progress",
+         lambda: garmin.get_inprogress_virtual_challenges(0, 100)),
+    ]
+    for filename, desc, func in challenge_endpoints:
+        data = api_call(desc, func)
+        if data is not None:
+            save_json(challenges_dir / filename, data)
+            if _db:
+                _db.upsert_garmin_reference("challenges", filename, data)
+
+    print("  Saved badges & challenges")
 
 
 def fetch_goals(garmin: Garmin) -> None:
@@ -191,6 +264,8 @@ def fetch_goals(garmin: Garmin) -> None:
         data = api_call(f"{status} goals", garmin.get_goals, status, 0, 100)
         if data is not None:
             save_json(goals_dir / f"{status}.json", data)
+            if _db:
+                _db.upsert_garmin_reference("goals", f"{status}.json", data)
     print("  Saved goals")
 
 
@@ -214,12 +289,16 @@ def fetch_workouts(garmin: Garmin) -> None:
 
     if all_workouts:
         save_json(workouts_dir / "list.json", all_workouts)
+        if _db:
+            _db.upsert_garmin_reference("workouts", "list.json", all_workouts)
         for w in all_workouts:
             wid = w.get("workoutId", "")
             if wid:
                 detail = api_call(f"workout {wid}", garmin.get_workout_by_id, wid)
                 if detail is not None:
                     save_json(workouts_dir / f"{wid}.json", detail)
+                    if _db:
+                        _db.upsert_garmin_reference("workouts", f"{wid}.json", detail)
                 time.sleep(0.5)
     print(f"  Saved {len(all_workouts)} workouts")
 
@@ -243,23 +322,41 @@ def fetch_activities(garmin: Garmin, today: date, full: bool = False) -> list:
 
     start_date = newest_date if newest_date else "2000-01-01"
     end_date = str(today)
-    existing_ids = {a.get("activityId") for a in existing}
+    new_activities = []
+    page = 0
 
-    batch = api_call("activities", garmin.get_activities_by_date, start_date, end_date)
-    if not batch:
-        batch = []
+    while True:
+        batch = api_call(
+            f"activities page {page}",
+            garmin.get_activities_by_date, start_date, end_date,
+        )
+        if not batch:
+            break
+        new_activities.extend(batch)
+        print(f"  Fetched {len(new_activities)} activities so far...")
+        if len(batch) < 100:
+            break
+        page += 1
+        time.sleep(1)
 
-    added = 0
-    for a in batch:
-        aid = a.get("activityId")
-        if aid not in existing_ids:
-            existing.append(a)
-            existing_ids.add(aid)
-            added += 1
+    if newest_date and not full:
+        existing_ids = {a.get("activityId") for a in existing}
+        added = 0
+        for a in new_activities:
+            if a.get("activityId") not in existing_ids:
+                existing.append(a)
+                added += 1
+        print(f"  Added {added} new activities (total: {len(existing)})")
+        all_activities = existing
+    else:
+        all_activities = new_activities
+        print(f"  Fetched {len(all_activities)} total activities")
 
-    save_json(list_path, existing)
-    print(f"  Fetched {len(batch)}, {added} new (total: {len(existing)})")
-    return existing
+    save_json(list_path, all_activities)
+    if _db:
+        for a in all_activities:
+            _db.upsert_garmin_activity(a)
+    return all_activities
 
 
 ACTIVITY_ENDPOINTS = [
@@ -303,6 +400,30 @@ def fetch_activity_details(garmin: Garmin, activities: list, full: bool = False)
             if data is not None:
                 save_json(act_dir / filename, data)
 
+        # DB: upsert details and streams from saved files
+        if _db and act_dir.exists():
+            files = {}
+            for fname in ["summary.json", "splits.json", "split_summaries.json",
+                           "typed_splits.json", "hr_zones.json", "power_zones.json",
+                           "exercise_sets.json", "gear.json", "weather.json"]:
+                fpath = act_dir / fname
+                if fpath.exists():
+                    try:
+                        with open(fpath, encoding="utf-8") as f:
+                            files[fname] = json.load(f)
+                    except (json.JSONDecodeError, OSError):
+                        pass
+            if files:
+                _db.upsert_garmin_activity_details(int(aid), files)
+            details_path = act_dir / "details.json"
+            if details_path.exists():
+                try:
+                    with open(details_path, encoding="utf-8") as f:
+                        details_data = json.load(f)
+                    _db.upsert_garmin_activity_streams(int(aid), details_data)
+                except (json.JSONDecodeError, OSError):
+                    pass
+
         time.sleep(1)
 
     print("  Activity details complete")
@@ -329,7 +450,7 @@ DAILY_ENDPOINTS = [
     ("endurance_score.json", "endurance score", lambda g, d: g.get_endurance_score(d)),
     ("hill_score.json", "hill score", lambda g, d: g.get_hill_score(d)),
     ("max_metrics.json", "max metrics", lambda g, d: g.get_max_metrics(d)),
-    ("race_predictions.json", "race predictions", lambda g, d: g.get_race_predictions()),
+    ("race_predictions.json", "race predictions", lambda g, d: g.get_race_predictions(d)),
     ("body_composition.json", "body composition", lambda g, d: g.get_body_composition(d)),
     ("weigh_ins.json", "weigh-ins", lambda g, d: g.get_daily_weigh_ins(d)),
     ("hydration.json", "hydration", lambda g, d: g.get_hydration_data(d)),
@@ -342,24 +463,24 @@ def fetch_daily(garmin: Garmin, activities: list, today: date, full: bool = Fals
     """Fetch daily wellness data for every date that has activity data, plus recent 90 days."""
     daily_dir = DATA_DIR / "daily"
 
-    # Find earliest activity date to determine start of range
-    earliest = today - timedelta(days=90)
+    activity_dates = []
     for a in activities:
         d = a.get("startTimeLocal", "")[:10]
         if d:
             try:
-                dt = date.fromisoformat(d)
-                if dt < earliest:
-                    earliest = dt
+                activity_dates.append(date.fromisoformat(d))
             except ValueError:
                 pass
 
-    # Every single day from earliest activity to today
-    dates_to_fetch = []
-    d = earliest
-    while d <= today:
-        dates_to_fetch.append(d)
-        d += timedelta(days=1)
+    if not activity_dates:
+        start = today - timedelta(days=90)
+    else:
+        start = min(activity_dates)
+
+    dates_to_fetch = set(activity_dates)
+    for i in range(90):
+        dates_to_fetch.add(today - timedelta(days=i))
+    dates_to_fetch = sorted(dates_to_fetch)
 
     total = len(dates_to_fetch)
     print(f"Fetching daily data for {total} dates ({dates_to_fetch[0]} to {dates_to_fetch[-1]})...")
@@ -384,6 +505,21 @@ def fetch_daily(garmin: Garmin, activities: list, today: date, full: bool = Fals
             if data is not None:
                 save_json(day_dir / filename, data)
 
+        # DB: upsert daily + sleep from saved files
+        if _db and day_dir.exists():
+            endpoint_data = {}
+            for fpath in day_dir.iterdir():
+                if fpath.suffix == ".json":
+                    try:
+                        with open(fpath, encoding="utf-8") as f:
+                            endpoint_data[fpath.name] = json.load(f)
+                    except (json.JSONDecodeError, OSError):
+                        pass
+            if endpoint_data:
+                _db.upsert_garmin_daily(d_str, endpoint_data)
+            if "sleep.json" in endpoint_data and endpoint_data["sleep.json"]:
+                _db.upsert_garmin_sleep(d_str, endpoint_data["sleep.json"])
+
         time.sleep(0.5)
 
     print("  Daily data complete")
@@ -398,16 +534,22 @@ def fetch_weekly(garmin: Garmin, today: date, full: bool = False) -> None:
     steps = api_call("weekly steps", garmin.get_weekly_steps, today_str, 52)
     if steps is not None:
         save_json(weekly_dir / "steps.json", steps)
+        if _db:
+            _db.upsert_garmin_reference("weekly", "steps.json", steps)
 
     stress = api_call("weekly stress", garmin.get_weekly_stress, today_str, 52)
     if stress is not None:
         save_json(weekly_dir / "stress.json", stress)
+        if _db:
+            _db.upsert_garmin_reference("weekly", "stress.json", stress)
 
     start_str = str(today - timedelta(weeks=52))
     intensity = api_call("weekly intensity minutes",
                          garmin.get_weekly_intensity_minutes, start_str, today_str)
     if intensity is not None:
         save_json(weekly_dir / "intensity_minutes.json", intensity)
+        if _db:
+            _db.upsert_garmin_reference("weekly", "intensity_minutes.json", intensity)
 
     print("  Weekly data complete")
 
@@ -433,28 +575,36 @@ def fetch_range_data(garmin: Garmin, activities: list, today: date) -> None:
     bp = api_call("blood pressure", garmin.get_blood_pressure, earliest_str, today_str)
     if bp is not None:
         save_json(DATA_DIR / "blood_pressure" / "all.json", bp)
+        if _db:
+            _db.upsert_garmin_reference("blood_pressure", "all.json", bp)
 
     weight = api_call("weight", garmin.get_weigh_ins, earliest_str, today_str)
     if weight is not None:
         save_json(DATA_DIR / "weight" / "all.json", weight)
+        if _db:
+            _db.upsert_garmin_reference("weight", "all.json", weight)
 
     progress = api_call("progress summary",
                         garmin.get_progress_summary_between_dates, earliest_str, today_str)
     if progress is not None:
         save_json(DATA_DIR / "progress" / "summary.json", progress)
+        if _db:
+            _db.upsert_garmin_reference("progress", "summary.json", progress)
 
     print("  Range data complete")
 
 
 def main():
     args = parse_args()
+    if not args.no_db:
+        init_db()
     garmin = authenticate()
     today = date.today()
 
     fetch_profile(garmin)
     fetch_devices(garmin)
     fetch_gear(garmin)
-
+    fetch_badges_and_challenges(garmin)
     fetch_goals(garmin)
     fetch_workouts(garmin)
 

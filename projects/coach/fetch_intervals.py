@@ -81,7 +81,27 @@ def authenticate() -> requests.Session:
     athlete = resp.json()
     print(f"Authenticated as {athlete.get('name', athlete.get('id', '?'))}")
     save_json(DATA_DIR / "athlete.json", athlete)
+    if _db:
+        _db.upsert_intervals_reference("athlete", "athlete.json", athlete)
     return session
+
+
+# DB module — loaded conditionally based on --no-db flag
+_db = None
+
+
+def init_db():
+    """Import and initialize the DB module. Returns True if DB is available."""
+    global _db
+    try:
+        import db as db_module
+        db_module.ensure_schema()
+        _db = db_module
+        print("DB: Connected to Postgres")
+        return True
+    except Exception as e:
+        print(f"DB: Could not connect ({e}), continuing without DB")
+        return False
 
 
 # ---------------------------------------------------------------------------
@@ -122,6 +142,9 @@ def fetch_activities(session: requests.Session, today: date, full: bool = False)
             added += 1
 
     save_json(list_path, existing)
+    if _db:
+        for a in existing:
+            _db.upsert_intervals_activity(a)
     print(f"  Fetched {len(batch)}, {added} new (total: {len(existing)})")
     return existing
 
@@ -153,12 +176,32 @@ def fetch_activity_details(session: requests.Session, activities: list,
                              params={"intervals": "true"})
             if detail is not None:
                 save_json(act_dir / "detail.json", detail)
+                if _db:
+                    _db.upsert_intervals_activity_details(str(aid), detail)
+        elif _db:
+            # Read existing detail for DB upsert
+            try:
+                with open(act_dir / "detail.json", encoding="utf-8") as f:
+                    detail = json.load(f)
+                _db.upsert_intervals_activity_details(str(aid), detail)
+            except (json.JSONDecodeError, OSError):
+                pass
 
         if full or not (act_dir / "streams.json").exists():
             streams = api_get(session, f"/activity/{aid}/streams.json",
                               f"activity {aid} streams")
             if streams is not None:
                 save_json(act_dir / "streams.json", streams)
+                if _db and isinstance(streams, list):
+                    _db.upsert_intervals_activity_streams(str(aid), streams)
+        elif _db:
+            try:
+                with open(act_dir / "streams.json", encoding="utf-8") as f:
+                    streams = json.load(f)
+                if isinstance(streams, list):
+                    _db.upsert_intervals_activity_streams(str(aid), streams)
+            except (json.JSONDecodeError, OSError):
+                pass
 
         time.sleep(0.5)
 
@@ -200,13 +243,15 @@ def fetch_wellness(session: requests.Session, activities: list, today: date,
     # Save bulk file
     save_json(wellness_dir / "all.json", all_wellness)
 
-    # Also save per-day files
+    # Also save per-day files + DB
     for record in all_wellness:
         day = record.get("id", "")
         if day:
             day_path = wellness_dir / f"{day}.json"
             if full or not day_path.exists():
                 save_json(day_path, record)
+            if _db:
+                _db.upsert_intervals_daily(day, record)
 
     print(f"  Saved {len(all_wellness)} wellness records")
 
@@ -232,6 +277,8 @@ def fetch_events(session: requests.Session, activities: list, today: date) -> No
                    params={"oldest": str(earliest), "newest": str(today)})
     if data is not None:
         save_json(DATA_DIR / "events.json", data)
+        if _db:
+            _db.upsert_intervals_reference("events", "events.json", data)
         print(f"  Saved {len(data) if isinstance(data, list) else '?'} events")
 
 
@@ -241,6 +288,8 @@ def fetch_workouts(session: requests.Session) -> None:
     data = api_get(session, "/athlete/0/workouts", "workouts")
     if data is not None:
         save_json(DATA_DIR / "workouts.json", data)
+        if _db:
+            _db.upsert_intervals_reference("workouts", "workouts.json", data)
         count = len(data) if isinstance(data, list) else "?"
         print(f"  Saved {count} workouts")
 
@@ -253,8 +302,12 @@ def main():
     parser = argparse.ArgumentParser(description="Fetch all data from Intervals.icu.")
     parser.add_argument("--full", action="store_true",
                         help="Force re-fetch everything (ignore incremental cache)")
+    parser.add_argument("--no-db", action="store_true",
+                        help="Skip writing to Postgres (JSON only)")
     args = parser.parse_args()
 
+    if not args.no_db:
+        init_db()
     session = authenticate()
     today = date.today()
 
