@@ -92,6 +92,44 @@ python rag.py --stats
 
 **Dependencies:** `sentence-transformers` (pulls in PyTorch), `pymupdf`, `psycopg2`. Requires the Postgres container with pgvector (`projects/db/docker-compose.yml`).
 
+## Intervals.icu Data Fetcher
+
+```bash
+# Fetch all data (incremental — skips already-fetched data)
+python fetch_intervals.py
+
+# Force re-fetch everything
+python fetch_intervals.py --full
+
+# JSON only, no Postgres writes
+python fetch_intervals.py --no-db
+```
+
+Requires: `pip install requests`. Prompts for API key on first run, caches in `data/intervals/.api_key`.
+
+Fetches activities, per-activity details+streams, wellness data (CTL/ATL/TSB/weight/sleep), calendar events, and workout library. All saved as raw JSON to `data/intervals/`.
+
+## Postgres Database
+
+Both fetchers write to Postgres simultaneously with JSON on disk. Schema in `../db/schema.sql`, connection configured via `../db/.env`.
+
+```bash
+# One-time bulk load from existing JSON files
+python load_db.py
+
+# Fetchers write to DB by default; skip with --no-db
+python fetch_garmin.py --no-db
+python fetch_intervals.py --no-db
+```
+
+Requires: `pip install psycopg2-binary`. Postgres 17 runs in Docker (`../db/docker-compose.yml`).
+
+11 tables: `garmin_activities`, `intervals_activities`, `garmin_activity_details`, `garmin_activity_streams`, `intervals_activity_details`, `intervals_activity_streams`, `garmin_daily`, `garmin_sleep`, `intervals_daily`, `garmin_reference_data`, `intervals_reference_data`.
+
+Cross-source join: `intervals_activities.external_id = garmin_activities.activity_id::text`
+
+`db.py` is the shared helper module with `get_connection()`, `ensure_schema()`, and `upsert_*()` functions for all tables.
+
 ## Domain Context
 
 See `research.md` for the sport-science rationale behind cardiac drift thresholds, CTL/ATL/TSB model, and other analysis decisions.
