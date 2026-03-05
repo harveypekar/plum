@@ -15,10 +15,14 @@ logs/
 __pycache__/
 *.pyc
 
+# Build artifacts
+build/
+
 # System files
 .DS_Store
 .vscode/
 .idea/
+*.session.sql
 
 # Claude Code worktrees (subagent isolation)
 .claude/worktrees/
