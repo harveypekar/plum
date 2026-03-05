@@ -52,6 +52,7 @@ def get_connection():
             user=env.get("POSTGRES_USER", "plum"),
             password=env.get("POSTGRES_PASSWORD", ""),
             dbname=env.get("POSTGRES_DB", "plum"),
+            sslmode="disable",
         )
     _conn.autocommit = True
     return _conn
