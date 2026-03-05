@@ -18,9 +18,8 @@ from garmin_loader import (
 from db import get_connection, upsert_activity, load_all_enriched
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-PROJECT_DIR = SCRIPT_DIR.parent
-ACTIVITIES_PATH = PROJECT_DIR / "sourceData" / "intervals" / "activities.json"
-STREAMS_DIR = PROJECT_DIR / "sourceData" / "intervals" / "streams"
+DATA_DIR = SCRIPT_DIR / "data" / "intervals"
+ACTIVITIES_DIR = DATA_DIR / "activities"
 REPORT_PATH = SCRIPT_DIR / "report.html"
 METRICS_PATH = SCRIPT_DIR / "metrics.json"
 
@@ -33,9 +32,13 @@ TODAY = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
 # ---------------------------------------------------------------------------
 
 def load_activities():
-    with open(ACTIVITIES_PATH, encoding="utf-8") as f:
-        data = json.load(f)
-    return data
+    activities = []
+    for act_dir in ACTIVITIES_DIR.iterdir():
+        detail = act_dir / "detail.json"
+        if detail.exists():
+            with open(detail, encoding="utf-8") as f:
+                activities.append(json.load(f))
+    return activities
 
 
 def filter_runs(activities):
@@ -53,7 +56,7 @@ def filter_runs(activities):
 
 
 def load_stream(activity_id):
-    path = STREAMS_DIR / f"{activity_id}.json"
+    path = ACTIVITIES_DIR / str(activity_id) / "streams.json"
     if not path.exists():
         return {}
     with open(path, encoding="utf-8") as f:
