@@ -1918,6 +1918,101 @@ svg { display: block; margin: 8px 0; max-width: 100%; }
 """
 
 
+def section_vo2max_trend():
+    """VO2max trend chart comparing Garmin vs own estimates over time."""
+    try:
+        conn = get_connection()
+        rows = load_all_enriched(conn)
+    except Exception:
+        return ""
+
+    if not rows:
+        return ""
+
+    # Filter to rows with at least one VO2max value
+    rows = [r for r in rows if r.get("garmin_vo2max") or r.get("vo2max_composite")]
+    if not rows:
+        return ""
+
+    html = '<div class="section"><h2>VO2max Estimates</h2>'
+
+    # Build chart data
+    dates = []
+    garmin_vals = []
+    composite_vals = []
+    vdot_vals = []
+    for r in rows:
+        d = r["activity_date"]
+        if d is None:
+            continue
+        day_num = (d - rows[0]["activity_date"]).total_seconds() / 86400
+        dates.append(day_num)
+        garmin_vals.append(r.get("garmin_vo2max"))
+        composite_vals.append(r.get("vo2max_composite"))
+        vdot_vals.append(r.get("vo2max_vdot"))
+
+    # Date labels for x-axis
+    first_date = rows[0]["activity_date"]
+    x_labels = []
+    for r in rows:
+        d = r["activity_date"]
+        if d and d.day <= 7:
+            day_num = (d - first_date).total_seconds() / 86400
+            x_labels.append((d.strftime("%b %y"), day_num))
+
+    chart = SvgChart(width=700, height=300)
+
+    # Filter None values for each series
+    garmin_xs = [dates[i] for i in range(len(dates)) if garmin_vals[i] is not None]
+    garmin_ys = [v for v in garmin_vals if v is not None]
+    comp_xs = [dates[i] for i in range(len(dates)) if composite_vals[i] is not None]
+    comp_ys = [v for v in composite_vals if v is not None]
+    vdot_xs = [dates[i] for i in range(len(dates)) if vdot_vals[i] is not None]
+    vdot_ys = [v for v in vdot_vals if v is not None]
+
+    extra_lines = []
+    if comp_xs:
+        extra_lines.append((comp_xs, comp_ys, "#FF6B35"))
+    if vdot_xs:
+        extra_lines.append((vdot_xs, vdot_ys, "#4ECDC4"))
+
+    if garmin_xs:
+        svg = chart.line(garmin_xs, garmin_ys, color="#00FF00",
+                         title="VO2max Estimates Over Time",
+                         x_labels=x_labels,
+                         extra_lines=extra_lines if extra_lines else None,
+                         trend=False)
+        html += svg
+
+    # Legend
+    html += '<div style="text-align:center; margin-top:8px; font-size:13px;">'
+    html += '<span style="color:#00FF00">&#9632; Garmin</span> &nbsp; '
+    html += '<span style="color:#FF6B35">&#9632; Composite</span> &nbsp; '
+    html += '<span style="color:#4ECDC4">&#9632; VDOT</span>'
+    html += '</div>'
+
+    # Latest values table
+    latest = rows[-1]
+    html += '<table style="margin:16px auto; border-collapse:collapse;">'
+    html += '<tr><th style="padding:4px 16px; text-align:left;">Method</th>'
+    html += '<th style="padding:4px 16px; text-align:right;">Latest</th></tr>'
+    for label, key, color in [
+        ("Garmin Firstbeat", "garmin_vo2max", "#00FF00"),
+        ("Uth (HR ratio)", "vo2max_uth", "#FFD700"),
+        ("VDOT (Daniels)", "vo2max_vdot", "#4ECDC4"),
+        ("HR-speed regression", "vo2max_hr_speed", "#FF69B4"),
+        ("Composite", "vo2max_composite", "#FF6B35"),
+    ]:
+        val = latest.get(key)
+        val_str = f"{val:.1f}" if val else "—"
+        html += f'<tr><td style="padding:4px 16px; color:{color};">{label}</td>'
+        html += f'<td style="padding:4px 16px; text-align:right;">{val_str}</td></tr>'
+    html += '</table>'
+
+    html += '</div>'
+    return html
+
+
 def build_report(runs, panel_discussions):
     last = runs[-1]
     dt = parse_date(last.get("start_date_local"))
@@ -1950,6 +2045,10 @@ def build_report(runs, panel_discussions):
                          f'<div class="coach-text">{tooltip_text}</div></div>')
             html += '</div>'
         html += '</div>'
+
+    # VO2max trend (from enriched Postgres data)
+    print("  Section: VO2max Trend...")
+    html += section_vo2max_trend()
 
     # Data sections
     print("  Section A: Last Run Deep-Dive...")
