@@ -1,13 +1,15 @@
 # Plum: Sysadmin Scripts Project Design
 
 **Created:** 2026-03-01
-**Purpose:** Small collection of sysadmin scripts for local PC (Windows/WSL2) and VPS administration
+**Purpose:** Monorepo for sysadmin scripts (Windows/WSL2 + Linux VPS) and side projects
 
 ## Overview
 
-Plum is a lightweight framework for managing sysadmin tasks across two environments:
+Plum is a monorepo managing sysadmin tasks and side projects across two environments:
 - **Local:** Windows machine with Zsh in WSL2
 - **Remote:** Single Linux VPS (currently running static HTML website)
+
+Side projects live in `projects/` with their own CLAUDE.md and .claude/ rules.
 
 ## Use Cases
 
@@ -36,7 +38,8 @@ plum/
 ├── CLAUDE.md                      # Claude Code project instructions
 ├── claude-quad.bat                # Windows Terminal multi-pane launcher
 ├── .claude/
-│   ├── hooks/                     # Claude Code hooks (block-env, lint-shell)
+│   ├── hooks/                     # Claude Code hooks
+│   ├── rules/                     # Per-project rules (auto-loaded by path)
 │   └── skills/                    # Slash command skills
 │       ├── plum-design-update/    # /plum-design-update
 │       ├── plum-postmortem/       # /plum-postmortem
@@ -68,7 +71,13 @@ plum/
 │       ├── design-drift.sh        # Design drift detection helper
 │       ├── validate-secrets.py    # Pre-commit secret file blocker
 │       ├── pre-commit             # Master pre-commit hook (secrets, CRLF, shellcheck, ruff)
+│       ├── pre-push               # Master pre-push hook (worktree + master protection)
 │       └── test-logging.sh        # Logging test script
+├── projects/
+│   ├── coach/                     # Running analysis tool (Python)
+│   ├── ts/                        # Twilight Struggle engine (C++/Python)
+│   ├── db/                        # Database schemas (PostgreSQL)
+│   └── bogartindustries/          # Side project
 ├── docker/
 │   ├── Dockerfile                 # VPS environment replica
 │   └── docker-compose.local.yml   # Local testing setup
@@ -174,6 +183,7 @@ All VPS system information documented in `docs/staging.md`:
 - `validate-secrets.py` — Pre-commit hook blocking forbidden file types
 - `test-logging.sh` — Verify logging infrastructure works
 - `pre-commit` — Master pre-commit hook orchestrating secrets, CRLF, shellcheck, and ruff checks
+- `pre-push` — Master pre-push hook blocking worktree pushes and direct pushes to master
 - Future: SSH/remote execution utilities, encryption helpers
 
 ## Logging Strategy
@@ -207,6 +217,9 @@ Example:
 - **Docker:** Testing environment for VPS replication
 - **Git:** Version control, deployment tracking
 - **SSH:** Secure remote execution
+- **C++:** Twilight Struggle game engine (projects/ts/)
+- **CMake:** Build system for C++ projects
+- **PostgreSQL:** Database backend for running analysis (projects/coach/, projects/db/)
 - **Cron:** Scheduled task execution on VPS
 
 ## Claude Code Integration
