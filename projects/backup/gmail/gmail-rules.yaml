@@ -1,0 +1,19 @@
+rules:
+  - name: old-promotions
+    category: promotions
+    older_than_days: 365
+    action: trash
+
+  - name: old-social
+    category: social
+    older_than_days: 180
+    action: trash
+
+  - name: large-attachments
+    larger_than_mb: 10
+    older_than_days: 730
+    action: trash
+
+protect:
+  - starred: true
+  - label: "IMPORTANT"
