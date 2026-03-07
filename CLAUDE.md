@@ -30,3 +30,8 @@ Monorepo: sysadmin scripts (Windows/WSL2 + Linux VPS), side projects. Bash and P
 - Shell scripts: must pass shellcheck (hook runs automatically)
 - Python preferred over bash when logic gets complex; use a virtual environment
 - Agents commit on their own name/email, never the one for user
+
+## Research
+
+- Add a reference to all statements, with links at the bottom. Also add a date
+- If the information comes your model knowledge, look online for a source to reference
