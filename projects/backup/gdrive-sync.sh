@@ -7,7 +7,7 @@
 #
 # Normal run: bash projects/backup/gdrive-sync.sh
 #   Syncs changes both directions. Newer file wins on conflicts.
-#   Deleted/overwritten files are moved to .trash/ with timestamps.
+#   Deleted/overwritten files are moved to .trash/ on Google Drive with timestamps.
 
 set -euo pipefail
 
@@ -27,8 +27,8 @@ LOCAL_PATH="${GDRIVE_LOCAL_PATH:?GDRIVE_LOCAL_PATH is required in .env}"
 RCLONE_REMOTE="${GDRIVE_RCLONE_REMOTE:?GDRIVE_RCLONE_REMOTE is required in .env}"
 TRASH_DAYS="${GDRIVE_TRASH_DAYS:-30}"
 
-TRASH_DIR="$LOCAL_PATH/.trash"
 REMOTE="$RCLONE_REMOTE:"
+REMOTE_TRASH="$RCLONE_REMOTE:.trash"
 
 # Parse --resync flag
 RESYNC=false
@@ -53,7 +53,7 @@ mkdir -p "$LOCAL_PATH" "$TRASH_DIR"
 TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
 BISYNC_ARGS=(
     "$LOCAL_PATH" "$REMOTE"
-    --backup-dir1 "$TRASH_DIR"
+    --backup-dir2 "$REMOTE_TRASH"
     --suffix ".$TIMESTAMP"
     --verbose
     --log-file "$LOG_FILE"
@@ -78,10 +78,10 @@ else
     exit 1
 fi
 
-# Prune old trash entries
-if [[ -d "$TRASH_DIR" ]]; then
-    log_info "Pruning trash entries older than $TRASH_DAYS days"
-    find "$TRASH_DIR" -mindepth 1 -mtime +"$TRASH_DAYS" -delete
-fi
+# Prune old trash entries on Google Drive
+log_info "Pruning remote trash entries older than ${TRASH_DAYS}d"
+rclone delete "$REMOTE_TRASH" --min-age "${TRASH_DAYS}d" --verbose 2>&1 | while read -r line; do
+    log_info "trash cleanup: $line"
+done
 
 log_info "Google Drive sync complete"
