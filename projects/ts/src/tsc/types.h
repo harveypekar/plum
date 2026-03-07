@@ -518,6 +518,11 @@ enum ts_current_step
     TS_STEP_HEADLINE_B,
     TS_STEP_RESOLVE_FIRST_HEADLINE,
     TS_STEP_RESOLVE_SECOND_HEADLINE,
+
+    TS_STEP_US_VICTORY,
+    TS_STEP_USSR_VICTORY,
+    TS_STEP_TIE_VICTORY,
+    TS_NO_VICTORY
 };
 
 
@@ -558,6 +563,16 @@ struct ts_move
     ts_card card;
     int target_country;
     int target_influence;
+};
+
+
+enum ts_move_type
+{
+    TS_MOVE_TYPE_EVENT,
+    TS_MOVE_TYPE_SPACE,
+    TS_MOVE_TYPE_INFLUENCE,
+    TS_MOVE_TYPE_REALIGNMENT,
+    TS_MOVE_TYPE_COUP
 };
 
 void ts_shuffle(ts_card_id *deck, int size)
@@ -801,8 +816,19 @@ inline ts_state ts_advance_game(ts_state const &state)
     }
 }
 
-bool ts_game_over(ts_state &state)
+ts_player ts_game_over(ts_state &state)
 {
+    if (state.vp >= 20)
+        return TS_US;
+    else if (state.vp <= -20)
+        return TS_USSR;
+    else if (state.defcon == 1)
+        return state.phasing == TS_US ? TS_USSR : TS_US;
+    else
+        return TS_PLAYER_NONE;
+
+    // TODO check for wargames
+    // TODO wasn't there a tie condition?
 }
 
 void ts_game()
