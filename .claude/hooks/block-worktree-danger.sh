@@ -14,15 +14,15 @@ if [[ "$cwd" != */.claude/worktrees/* ]]; then
   exit 0
 fi
 
-# Block dangerous commands
-if echo "$command" | grep -qE '(git\s+push|git\s+merge|git\s+checkout\s+(main|master)|gh\s+pr\s+create)'; then
-  reason=$(echo "$command" | grep -oE '(git\s+push|git\s+merge|git\s+checkout\s+(main|master)|gh\s+pr\s+create)' | head -1)
+# Block dangerous commands (but allow pushing feature branches and creating PRs)
+if echo "$command" | grep -qE 'git\s+push.*\s+(main|master)\b|git\s+merge|git\s+checkout\s+(main|master)'; then
+  reason=$(echo "$command" | grep -oE 'git\s+push.*\s+(main|master)|git\s+merge|git\s+checkout\s+(main|master)' | head -1)
   cat <<EOF
 {
   "hookSpecificOutput": {
     "hookEventName": "PreToolUse",
     "permissionDecision": "deny",
-    "permissionDecisionReason": "BLOCKED: '${reason}' is not allowed inside a worktree. Commit your work on this branch — the user will review and merge manually."
+    "permissionDecisionReason": "BLOCKED: '${reason}' is not allowed inside a worktree."
   }
 }
 EOF
