@@ -1,5 +1,13 @@
 #!/bin/bash
 # Two-way sync between local folder and Google Drive via rclone bisync
+# Usage: bash projects/backup/gdrive-sync.sh [--resync]
+#
+# First run:  bash projects/backup/gdrive-sync.sh --resync
+#   Seeds rclone bisync tracking files and does initial sync.
+#
+# Normal run: bash projects/backup/gdrive-sync.sh
+#   Syncs changes both directions. Newer file wins on conflicts.
+#   Deleted/overwritten files are moved to .trash/ with timestamps.
 
 set -euo pipefail
 
@@ -73,7 +81,7 @@ fi
 # Prune old trash entries
 if [[ -d "$TRASH_DIR" ]]; then
     log_info "Pruning trash entries older than $TRASH_DAYS days"
-    find "$TRASH_DIR" -mtime +"$TRASH_DAYS" -delete
+    find "$TRASH_DIR" -mindepth 1 -mtime +"$TRASH_DAYS" -delete
 fi
 
 log_info "Google Drive sync complete"
