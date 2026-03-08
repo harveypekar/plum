@@ -236,11 +236,12 @@ Custom skills in `.claude/skills/`:
 ### Hooks
 Automated guardrails in `.claude/hooks/`:
 - `block-env.sh` (PreToolUse) — Prevents Claude from editing `.env` files
+- `block-master-commits.sh` (PreToolUse) — Blocks git commit/push on master/main branch
 - `block-worktree-danger.sh` (PreToolUse) — Blocks git push/merge/checkout main inside worktrees
 - `lint-shell.sh` (PostToolUse) — Runs shellcheck after `.sh` file edits
 
 ### Git Hooks
-- `pre-push` — Blocks pushes originating from `.claude/worktrees/` directories
+- `pre-push` — Blocks pushes from `.claude/worktrees/` directories and direct pushes to master/main
 - `pre-commit` — Runs master hook (`scripts/common/pre-commit`): secrets, CRLF, shellcheck, ruff
 
 ### Design Drift Detection
@@ -276,6 +277,8 @@ Keeps design.md in sync with reality:
 
 2. **Claude Code hooks** — Automated guardrails during development:
    - `block-env.sh` (PreToolUse) — Denies any Claude edit/write to `.env` files
+   - `block-master-commits.sh` (PreToolUse) — Blocks git commit/push on master/main branch
+   - `block-worktree-danger.sh` (PreToolUse) — Blocks git push/merge/checkout main inside worktrees
    - `lint-shell.sh` (PostToolUse) — Runs shellcheck on `.sh` files after edits
 
 3. **Script validation** - Before deployment:
