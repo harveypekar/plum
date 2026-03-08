@@ -1,19 +1,22 @@
-"""Download and normalize Reddit dating subreddit posts via Pushshift/HF."""
+"""Download and normalize Reddit dating subreddit posts via Arctic Shift API."""
 
-from datasets import load_dataset
+import time
+
+import requests
 
 from normalize import make_record, write_corpus
 
-TARGET_SUBREDDITS = {"tinder", "hingeapp", "bumble", "onlinedating", "dating_advice"}
+API_BASE = "https://arctic-shift.photon-reddit.com/api"
 
-# Keywords suggesting the post contains a conversation
+TARGET_SUBREDDITS = ["Tinder", "hingeapp", "Bumble", "OnlineDating", "dating_advice"]
+
 CONVERSATION_KEYWORDS = [
     "conversation", "convo", "chat", "message", "opener",
     "replied", "said", "texted", "matched", "she said", "he said",
     "her:", "him:", "me:", "them:",
 ]
 
-MAX_POSTS = 50000  # cap to avoid very long downloads
+MAX_POSTS_PER_SUB = 10000
 
 
 def has_conversation_content(text: str) -> bool:
@@ -22,71 +25,83 @@ def has_conversation_content(text: str) -> bool:
     return any(kw in text_lower for kw in CONVERSATION_KEYWORDS)
 
 
-def fetch_pushshift_dating() -> list[dict]:
-    """Stream Pushshift Reddit data, filtering for dating subreddits."""
-    print("Streaming Pushshift Reddit submissions...")
-    print(f"  Target subreddits: {TARGET_SUBREDDITS}")
-    print(f"  Max posts: {MAX_POSTS}")
-
-    # Stream to avoid downloading the entire dataset
-    ds = load_dataset(
-        "fddemarco/pushshift-reddit",
-        "submissions",
-        split="train",
-        streaming=True,
-    )
-
+def fetch_subreddit(subreddit: str) -> list[dict]:
+    """Fetch posts from a subreddit via Arctic Shift API, paginating by date."""
+    print(f"Fetching r/{subreddit}...")
     records = []
-    seen = 0
-    for row in ds:
-        subreddit = (row.get("subreddit") or "").lower()
-        if subreddit not in TARGET_SUBREDDITS:
-            continue
+    after = None  # pagination cursor (created_utc)
+    page = 0
 
-        text = row.get("selftext", "") or ""
-        title = row.get("title", "") or ""
-        if text in ("[removed]", "[deleted]", ""):
-            text = ""
-
-        full_text = f"{title}\n\n{text}".strip() if text else title.strip()
-        if len(full_text) < 50:
-            continue
-
-        if not has_conversation_content(full_text):
-            continue
-
-        seen += 1
-        if seen % 1000 == 0:
-            print(f"  Found {seen} posts...")
-
-        metadata = {
+    while len(records) < MAX_POSTS_PER_SUB:
+        params = {
             "subreddit": subreddit,
-            "original_format": "reddit_post",
+            "limit": 100,
+            "sort": "asc",
         }
-        for k in ("score", "num_comments", "created_utc", "link_flair_text", "id"):
-            if k in row and row[k]:
-                metadata[k] = row[k]
+        if after:
+            params["after"] = after
 
-        records.append(
-            make_record(
-                id=f"pushshift-{row.get('id', seen)}",
-                source="huggingface/fddemarco/pushshift-reddit",
-                platform="reddit",
-                messages=[{"role": "poster", "text": full_text}],
-                metadata=metadata,
-            )
-        )
+        resp = requests.get(f"{API_BASE}/posts/search", params=params, timeout=30)
+        resp.raise_for_status()
+        data = resp.json().get("data", [])
 
-        if len(records) >= MAX_POSTS:
-            print(f"  Reached {MAX_POSTS} cap, stopping.")
+        if not data:
             break
 
+        page += 1
+        for post in data:
+            text = post.get("selftext", "") or ""
+            title = post.get("title", "") or ""
+            if text in ("[removed]", "[deleted]", ""):
+                text = ""
+
+            full_text = f"{title}\n\n{text}".strip() if text else title.strip()
+            if len(full_text) < 50:
+                continue
+
+            if not has_conversation_content(full_text):
+                continue
+
+            metadata = {
+                "subreddit": subreddit.lower(),
+                "original_format": "reddit_post",
+            }
+            for k in ("score", "num_comments", "created_utc", "link_flair_text", "id"):
+                val = post.get(k)
+                if val is not None:
+                    metadata[k] = val
+
+            records.append(
+                make_record(
+                    id=f"arctic-{post.get('id', len(records))}",
+                    source="arctic-shift.photon-reddit.com",
+                    platform="reddit",
+                    messages=[{"role": "poster", "text": full_text}],
+                    metadata=metadata,
+                )
+            )
+
+        # Paginate using the last post's created_utc
+        after = data[-1].get("created_utc")
+        if page % 10 == 0:
+            print(f"  r/{subreddit}: {len(records)} matching posts, page {page}...")
+
+        # Be polite to the API
+        time.sleep(0.5)
+
+    print(f"  r/{subreddit}: {len(records)} total matching posts")
     return records
 
 
 def main():
-    records = fetch_pushshift_dating()
-    write_corpus(records, "reddit.jsonl")
+    import sys
+
+    # Accept optional subreddit filter: python fetch_reddit.py Tinder hingeapp
+    subs = sys.argv[1:] if len(sys.argv) > 1 else TARGET_SUBREDDITS
+
+    for sub in subs:
+        records = fetch_subreddit(sub)
+        write_corpus(records, f"reddit-{sub.lower()}.jsonl")
 
 
 if __name__ == "__main__":
