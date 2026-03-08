@@ -1,4 +1,6 @@
 raw/
+corpus/
+corpus.md
 __pycache__/
 *.pyc
 .venv/
