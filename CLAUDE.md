@@ -30,6 +30,7 @@ Monorepo: sysadmin scripts (Windows/WSL2 + Linux VPS), side projects. Bash and P
 - Shell scripts: must pass shellcheck (hook runs automatically)
 - Python preferred over bash when logic gets complex; use a virtual environment
 - Agents commit on their own name/email, never the one for user
+- PR test plans must be self-contained: include exact commands to run, what each test covers, and step-by-step manual verification instructions. A reviewer should be able to follow the test plan without opening any other document
 
 ## Research
 
