@@ -9,8 +9,7 @@ import requests
 from normalize import RAW_DIR, make_record, write_corpus
 
 FLIRTATION_ANALYSIS_URLS = {
-    "train": "https://raw.githubusercontent.com/alyssafrndz/Flirtation-analysis/main/flirting_rated.csv",
-    "test": "https://raw.githubusercontent.com/alyssafrndz/Flirtation-analysis/main/test_cv.csv",
+    "all": "https://raw.githubusercontent.com/alyssafrndz/Flirtation-analysis/main/flirting_rated.csv",
 }
 
 

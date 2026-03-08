@@ -1,8 +1,20 @@
 """Download and normalize HuggingFace dating conversation datasets."""
 
+import re
+
 from datasets import load_dataset
 
 from normalize import make_record, write_corpus
+
+
+def parse_dialogue(text: str) -> list[dict[str, str]]:
+    """Parse 'A: ...\nB: ...' formatted dialogue into message list."""
+    messages = []
+    for match in re.finditer(r"([A-Z]):\s*(.+?)(?=\n[A-Z]:|$)", text, re.DOTALL):
+        role, content = match.group(1), match.group(2).strip()
+        if content:
+            messages.append({"role": role, "text": content})
+    return messages
 
 
 def fetch_flirty_dialogue() -> list[dict]:
@@ -14,10 +26,8 @@ def fetch_flirty_dialogue() -> list[dict]:
         if i == 0:
             print(f"  Columns: {list(row.keys())}")
             print(f"  Sample: {row}")
-        messages = []
-        for key in row:
-            if isinstance(row[key], str) and row[key].strip():
-                messages.append({"role": key, "text": row[key].strip()})
+        dialogue = row.get("Dialogue", "")
+        messages = parse_dialogue(dialogue) if dialogue else []
         if messages:
             records.append(
                 make_record(
