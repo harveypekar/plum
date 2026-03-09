@@ -1,5 +1,7 @@
 import asyncio
+import importlib
 import json
+import sys
 import time
 from collections import deque
 from contextlib import asynccontextmanager
@@ -162,6 +164,21 @@ async def ws_dashboard(ws: WebSocket):
         pass
     finally:
         dashboard_clients.remove(queue)
+
+
+def load_plugins(app: FastAPI, ollama: OllamaClient):
+    for plugin_cfg in config.plugins:
+        name = plugin_cfg["name"]
+        path = (Path(__file__).parent / plugin_cfg["path"]).resolve()
+        sys.path.insert(0, str(path.parent))
+        try:
+            mod = importlib.import_module(name)
+            mod.register(app, ollama, resolve_model=config.resolve_model)
+        finally:
+            sys.path.pop(0)
+
+
+load_plugins(app, ollama)
 
 
 # Static files (web UI) — mounted last so API routes take priority
