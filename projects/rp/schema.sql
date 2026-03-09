@@ -12,6 +12,14 @@ CREATE TABLE IF NOT EXISTS rp_character_cards (
 
 CREATE INDEX IF NOT EXISTS idx_rp_cards_name ON rp_character_cards(name);
 
+CREATE TABLE IF NOT EXISTS rp_prompt_templates (
+    id              SERIAL PRIMARY KEY,
+    name            TEXT NOT NULL,
+    content         TEXT NOT NULL DEFAULT '',
+    created_at      TIMESTAMPTZ DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ DEFAULT NOW()
+);
+
 CREATE TABLE IF NOT EXISTS rp_scenarios (
     id              SERIAL PRIMARY KEY,
     name            TEXT NOT NULL,
