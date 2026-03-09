@@ -169,8 +169,8 @@ async def ws_dashboard(ws: WebSocket):
 def load_plugins(app: FastAPI, ollama: OllamaClient):
     for plugin_cfg in config.plugins:
         name = plugin_cfg["name"]
-        path = Path(__file__).parent / plugin_cfg["path"]
-        sys.path.insert(0, str(path.resolve()))
+        path = (Path(__file__).parent / plugin_cfg["path"]).resolve()
+        sys.path.insert(0, str(path.parent))
         mod = importlib.import_module(name)
         mod.register(app, ollama)
         sys.path.pop(0)
