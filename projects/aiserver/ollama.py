@@ -30,6 +30,7 @@ class OllamaClient:
         think = False
         ollama_options = {}
         if options:
+            options = dict(options)
             think = options.pop("think", False)
             ollama_options = {k: v for k, v in options.items() if v is not None}
 
@@ -82,6 +83,8 @@ class OllamaClient:
                             return
         except httpx.ConnectError:
             raise OllamaError(f"Cannot connect to Ollama at {self.base_url}")
+        except httpx.HTTPError as e:
+            raise OllamaError(f"HTTP error communicating with Ollama: {e}") from e
 
     async def generate(
         self,
@@ -103,7 +106,7 @@ class OllamaClient:
             async with httpx.AsyncClient(timeout=5.0) as client:
                 resp = await client.get(f"{self.base_url}/api/tags")
                 return resp.status_code == 200
-        except httpx.ConnectError:
+        except httpx.HTTPError:
             return False
 
     async def list_models(self) -> list[str]:
@@ -114,7 +117,7 @@ class OllamaClient:
                 if resp.status_code == 200:
                     data = resp.json()
                     return [m["name"] for m in data.get("models", [])]
-        except httpx.ConnectError:
+        except httpx.HTTPError:
             pass
         return []
 

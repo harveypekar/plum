@@ -48,15 +48,13 @@ app = FastAPI(title="aiserver", lifespan=lifespan)
 
 @app.post("/generate")
 async def generate(req: GenerateRequest):
-    global active_streams
     model = config.resolve_model(req.model)
     merged = config.merge_options(req.options)
-
-    active_streams += 1
     start = time.time()
 
     async def stream():
         global active_streams
+        active_streams += 1
         total_tokens = 0
         try:
             async for chunk in ollama.generate_stream(
@@ -127,13 +125,16 @@ async def stats():
 async def broadcast_event(event: dict):
     """Send event to all connected dashboard WebSocket clients."""
     for q in dashboard_clients:
-        await q.put(event)
+        try:
+            q.put_nowait(event)
+        except asyncio.QueueFull:
+            pass
 
 
 @app.websocket("/ws/dashboard")
 async def ws_dashboard(ws: WebSocket):
     await ws.accept()
-    queue: asyncio.Queue = asyncio.Queue()
+    queue: asyncio.Queue = asyncio.Queue(maxsize=500)
     dashboard_clients.append(queue)
     try:
         # Send initial stats
