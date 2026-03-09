@@ -111,12 +111,28 @@ class OllamaClient:
 
     async def list_models(self) -> list[str]:
         """Return list of available model names from Ollama."""
+        details = await self.list_models_detail()
+        return [m["name"] for m in details]
+
+    async def list_models_detail(self) -> list[dict]:
+        """Return list of models with name and size info from Ollama."""
         try:
             async with httpx.AsyncClient(timeout=5.0) as client:
                 resp = await client.get(f"{self.base_url}/api/tags")
                 if resp.status_code == 200:
                     data = resp.json()
-                    return [m["name"] for m in data.get("models", [])]
+                    result = []
+                    for m in data.get("models", []):
+                        info = {"name": m["name"]}
+                        details = m.get("details", {})
+                        if details.get("parameter_size"):
+                            info["parameter_size"] = details["parameter_size"]
+                        if details.get("quantization_level"):
+                            info["quantization_level"] = details["quantization_level"]
+                        if m.get("size"):
+                            info["size_bytes"] = m["size"]
+                        result.append(info)
+                    return result
         except httpx.HTTPError:
             pass
         return []
