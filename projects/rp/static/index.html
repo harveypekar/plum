@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RP Chat</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Consolas', 'Monaco', monospace;
+    background: #0d1117;
+    color: #c9d1d9;
+    height: 100vh;
+    display: flex;
+    overflow: hidden;
+  }
+
+  /* --- Sidebar --- */
+  .sidebar {
+    width: 260px;
+    min-width: 260px;
+    background: #161b22;
+    border-right: 1px solid #30363d;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+  }
+  .sidebar-header {
+    padding: 16px;
+    border-bottom: 1px solid #30363d;
+  }
+  .sidebar-header h1 {
+    color: #58a6ff;
+    font-size: 1.2em;
+    margin-bottom: 4px;
+  }
+  .sidebar-header .subtitle {
+    color: #8b949e;
+    font-size: 0.75em;
+  }
+  .sidebar-nav {
+    display: flex;
+    flex-direction: column;
+    padding: 8px 0;
+    border-bottom: 1px solid #30363d;
+  }
+  .sidebar-nav a {
+    color: #c9d1d9;
+    text-decoration: none;
+    padding: 8px 16px;
+    font-size: 0.85em;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: background 0.15s;
+  }
+  .sidebar-nav a:hover { background: #1f2937; }
+  .sidebar-nav a.active {
+    background: #1f2937;
+    color: #58a6ff;
+    border-left: 3px solid #58a6ff;
+    padding-left: 13px;
+  }
+  .sidebar-nav a .nav-icon { font-size: 1em; width: 20px; text-align: center; }
+
+  /* Conversation list (shown in chat view) */
+  .conversation-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 0;
+  }
+  .conversation-list.hidden { display: none; }
+  .conv-list-header {
+    padding: 8px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .conv-list-header span {
+    font-size: 0.7em;
+    color: #8b949e;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .conv-item {
+    padding: 8px 16px;
+    font-size: 0.8em;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: background 0.15s;
+    border-left: 3px solid transparent;
+  }
+  .conv-item:hover { background: #1f2937; }
+  .conv-item.active {
+    background: #1f2937;
+    border-left-color: #58a6ff;
+  }
+  .conv-item .conv-avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: #30363d;
+    flex-shrink: 0;
+    object-fit: cover;
+  }
+  .conv-item .conv-info {
+    overflow: hidden;
+    flex: 1;
+  }
+  .conv-item .conv-name {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .conv-item .conv-date {
+    font-size: 0.75em;
+    color: #8b949e;
+  }
+  .conv-item .conv-delete {
+    opacity: 0;
+    color: #f85149;
+    cursor: pointer;
+    padding: 2px 4px;
+    font-size: 0.9em;
+    transition: opacity 0.15s;
+  }
+  .conv-item:hover .conv-delete { opacity: 1; }
+
+  .new-chat-btn {
+    background: #238636;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    padding: 4px 10px;
+    font-family: inherit;
+    font-size: 0.75em;
+    cursor: pointer;
+  }
+  .new-chat-btn:hover { background: #2ea043; }
+
+  /* --- Main Area --- */
+  .main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  /* --- Views --- */
+  .view { display: none; flex-direction: column; flex: 1; overflow: hidden; }
+  .view.active { display: flex; }
+
+  /* --- Chat View --- */
+  .chat-header {
+    padding: 12px 20px;
+    border-bottom: 1px solid #30363d;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: #161b22;
+  }
+  .chat-header-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: #30363d;
+    object-fit: cover;
+  }
+  .chat-header-info { flex: 1; }
+  .chat-header-name { font-size: 0.95em; color: #f0f6fc; }
+  .chat-header-model { font-size: 0.7em; color: #8b949e; }
+  .chat-header-actions { display: flex; gap: 8px; }
+  .chat-header-actions button {
+    background: #21262d;
+    color: #c9d1d9;
+    border: 1px solid #30363d;
+    border-radius: 4px;
+    padding: 4px 10px;
+    font-family: inherit;
+    font-size: 0.75em;
+    cursor: pointer;
+  }
+  .chat-header-actions button:hover { border-color: #58a6ff; color: #58a6ff; }
+
+  .chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .chat-empty {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #484f58;
+    font-size: 0.9em;
+  }
+
+  .message {
+    display: flex;
+    gap: 10px;
+    max-width: 80%;
+  }
+  .message.user { align-self: flex-start; }
+  .message.assistant { align-self: flex-end; flex-direction: row-reverse; }
+  .message-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #30363d;
+    flex-shrink: 0;
+    object-fit: cover;
+  }
+  .message-bubble {
+    padding: 10px 14px;
+    border-radius: 12px;
+    font-size: 0.88em;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+  }
+  .message.user .message-bubble {
+    background: #1f6feb;
+    color: #f0f6fc;
+    border-bottom-left-radius: 4px;
+  }
+  .message.assistant .message-bubble {
+    background: #21262d;
+    color: #c9d1d9;
+    border-bottom-right-radius: 4px;
+  }
+  .message-actions {
+    display: flex;
+    gap: 4px;
+    margin-top: 4px;
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+  .message:hover .message-actions { opacity: 1; }
+  .message-actions button {
+    background: none;
+    border: none;
+    color: #8b949e;
+    font-size: 0.7em;
+    cursor: pointer;
+    padding: 2px 4px;
+    font-family: inherit;
+  }
+  .message-actions button:hover { color: #58a6ff; }
+
+  /* Thinking section in messages */
+  .msg-thinking {
+    margin-bottom: 8px;
+    border-left: 3px solid #30363d;
+    padding-left: 10px;
+  }
+  .msg-thinking-toggle {
+    font-size: 0.75em;
+    color: #8b949e;
+    cursor: pointer;
+    user-select: none;
+    margin-bottom: 2px;
+  }
+  .msg-thinking-content {
+    color: #6e7681;
+    font-style: italic;
+    font-size: 0.85em;
+    white-space: pre-wrap;
+  }
+  .msg-thinking-content.collapsed { display: none; }
+
+  /* Under the hood panel */
+  .under-hood {
+    border-top: 1px solid #30363d;
+    background: #0d1117;
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease;
+  }
+  .under-hood.open { max-height: 300px; overflow-y: auto; }
+  .under-hood-toggle {
+    padding: 6px 20px;
+    font-size: 0.7em;
+    color: #8b949e;
+    cursor: pointer;
+    user-select: none;
+    border-top: 1px solid #30363d;
+    background: #161b22;
+    text-align: center;
+  }
+  .under-hood-toggle:hover { color: #58a6ff; }
+  .under-hood-content {
+    padding: 12px 20px;
+    font-size: 0.75em;
+    color: #8b949e;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+  }
+
+  .chat-input-area {
+    padding: 12px 20px;
+    border-top: 1px solid #30363d;
+    background: #161b22;
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+  }
+  .chat-input-area textarea {
+    flex: 1;
+    background: #0d1117;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    color: #c9d1d9;
+    padding: 10px 14px;
+    font-family: inherit;
+    font-size: 0.88em;
+    resize: none;
+    min-height: 42px;
+    max-height: 150px;
+    line-height: 1.4;
+  }
+  .chat-input-area textarea:focus {
+    outline: none;
+    border-color: #58a6ff;
+  }
+  .chat-input-area button {
+    background: #238636;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 18px;
+    font-family: inherit;
+    font-size: 0.88em;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .chat-input-area button:hover { background: #2ea043; }
+  .chat-input-area button:disabled { background: #21262d; color: #484f58; cursor: not-allowed; }
+
+  /* --- Cards View --- */
+  .view-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid #30363d;
+    background: #161b22;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .view-header h2 {
+    font-size: 1.1em;
+    color: #f0f6fc;
+  }
+  .view-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+  }
+
+  .cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+  .card-tile {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    padding: 16px;
+    cursor: pointer;
+    transition: border-color 0.15s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    position: relative;
+  }
+  .card-tile:hover { border-color: #58a6ff; }
+  .card-tile .card-avatar {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: #30363d;
+    object-fit: cover;
+  }
+  .card-tile .card-name {
+    font-size: 0.9em;
+    color: #f0f6fc;
+    text-align: center;
+    word-break: break-word;
+  }
+  .card-tile .card-tags {
+    font-size: 0.7em;
+    color: #8b949e;
+    text-align: center;
+  }
+  .card-tile-actions {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    display: flex;
+    gap: 4px;
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+  .card-tile:hover .card-tile-actions { opacity: 1; }
+  .card-tile-actions button {
+    background: #21262d;
+    border: 1px solid #30363d;
+    color: #8b949e;
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-size: 0.7em;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .card-tile-actions button:hover { color: #f0f6fc; border-color: #484f58; }
+  .card-tile-actions button.delete:hover { color: #f85149; }
+
+  /* Drop zone */
+  .drop-zone {
+    border: 2px dashed #30363d;
+    border-radius: 8px;
+    padding: 30px;
+    text-align: center;
+    color: #484f58;
+    font-size: 0.85em;
+    margin-bottom: 20px;
+    transition: border-color 0.2s, background 0.2s;
+  }
+  .drop-zone.dragover {
+    border-color: #58a6ff;
+    background: rgba(88, 166, 255, 0.05);
+    color: #58a6ff;
+  }
+  .drop-zone input[type="file"] { display: none; }
+  .drop-zone a {
+    color: #58a6ff;
+    cursor: pointer;
+    text-decoration: underline;
+  }
+
+  /* Card editor */
+  .card-editor {
+    display: none;
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+  .card-editor.open { display: block; }
+  .card-editor h3 {
+    font-size: 0.95em;
+    color: #f0f6fc;
+    margin-bottom: 16px;
+  }
+  .form-group {
+    margin-bottom: 12px;
+  }
+  .form-group label {
+    display: block;
+    font-size: 0.7em;
+    color: #8b949e;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+    letter-spacing: 0.03em;
+  }
+  .form-group input,
+  .form-group textarea,
+  .form-group select {
+    width: 100%;
+    background: #0d1117;
+    border: 1px solid #30363d;
+    border-radius: 4px;
+    color: #c9d1d9;
+    padding: 8px 10px;
+    font-family: inherit;
+    font-size: 0.85em;
+  }
+  .form-group textarea {
+    resize: vertical;
+    min-height: 60px;
+  }
+  .form-group input:focus,
+  .form-group textarea:focus,
+  .form-group select:focus {
+    outline: none;
+    border-color: #58a6ff;
+  }
+  .form-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 16px;
+  }
+  .form-actions button {
+    padding: 6px 16px;
+    font-size: 0.8em;
+    border-radius: 4px;
+    font-family: inherit;
+  }
+  .btn-secondary {
+    background: #21262d;
+    color: #c9d1d9;
+    border: 1px solid #30363d;
+    cursor: pointer;
+  }
+  .btn-secondary:hover { border-color: #484f58; }
+  .btn-primary {
+    background: #238636;
+    color: #fff;
+    border: none;
+    cursor: pointer;
+  }
+  .btn-primary:hover { background: #2ea043; }
+  .btn-danger {
+    background: #da3633;
+    color: #fff;
+    border: none;
+    cursor: pointer;
+  }
+  .btn-danger:hover { background: #f85149; }
+
+  /* --- Scenarios View --- */
+  .scenario-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+  .scenario-item {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    padding: 14px 16px;
+    cursor: pointer;
+    transition: border-color 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .scenario-item:hover { border-color: #58a6ff; }
+  .scenario-item .scenario-name {
+    font-size: 0.9em;
+    color: #f0f6fc;
+  }
+  .scenario-item .scenario-desc {
+    font-size: 0.75em;
+    color: #8b949e;
+    margin-top: 2px;
+  }
+  .scenario-item-actions {
+    display: flex;
+    gap: 4px;
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+  .scenario-item:hover .scenario-item-actions { opacity: 1; }
+  .scenario-item-actions button {
+    background: #21262d;
+    border: 1px solid #30363d;
+    color: #8b949e;
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-size: 0.7em;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .scenario-item-actions button:hover { color: #f0f6fc; }
+  .scenario-item-actions button.delete:hover { color: #f85149; }
+
+  .scenario-editor {
+    display: none;
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+  .scenario-editor.open { display: block; }
+  .scenario-editor h3 {
+    font-size: 0.95em;
+    color: #f0f6fc;
+    margin-bottom: 16px;
+  }
+
+  /* --- Modal (New Chat Dialog) --- */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0, 0, 0, 0.6);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 10px;
+    padding: 24px;
+    width: 440px;
+    max-width: 90vw;
+    max-height: 80vh;
+    overflow-y: auto;
+  }
+  .modal h3 {
+    font-size: 1em;
+    color: #f0f6fc;
+    margin-bottom: 16px;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #30363d; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #484f58; }
+
+  /* Streaming cursor */
+  .streaming-cursor::after {
+    content: "\25AE";
+    animation: blink 0.8s infinite;
+    color: #58a6ff;
+    margin-left: 1px;
+  }
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+  }
+</style>
+</head>
+<body>
+
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <h1>RP Chat</h1>
+      <div class="subtitle">Roleplay conversations</div>
+    </div>
+    <div class="sidebar-nav">
+      <a href="#chat" class="active" data-view="chat">
+        <span class="nav-icon">&#9993;</span> Chat
+      </a>
+      <a href="#cards" data-view="cards">
+        <span class="nav-icon">&#9824;</span> Cards
+      </a>
+      <a href="#scenarios" data-view="scenarios">
+        <span class="nav-icon">&#9881;</span> Scenarios
+      </a>
+    </div>
+    <div class="conversation-list" id="conversationList">
+      <div class="conv-list-header">
+        <span>Conversations</span>
+        <button class="new-chat-btn" id="newChatBtn">+ New</button>
+      </div>
+      <div id="convListItems"></div>
+    </div>
+  </div>
+
+  <!-- Main Area -->
+  <div class="main">
+
+    <!-- Chat View -->
+    <div class="view active" id="viewChat" data-view="chat">
+      <div class="chat-header" id="chatHeader" style="display:none">
+        <img class="chat-header-avatar" id="chatHeaderAvatar" alt="">
+        <div class="chat-header-info">
+          <div class="chat-header-name" id="chatHeaderName"></div>
+          <div class="chat-header-model" id="chatHeaderModel"></div>
+        </div>
+        <div class="chat-header-actions">
+          <button id="regenerateBtn" title="Regenerate last response">Regenerate</button>
+        </div>
+      </div>
+      <div class="chat-messages" id="chatMessages">
+        <div class="chat-empty" id="chatEmpty">Select or start a conversation</div>
+      </div>
+      <div class="under-hood-toggle" id="underHoodToggle" style="display:none">Under the Hood</div>
+      <div class="under-hood" id="underHood">
+        <div class="under-hood-content" id="underHoodContent"></div>
+      </div>
+      <div class="chat-input-area" id="chatInputArea" style="display:none">
+        <textarea id="chatInput" placeholder="Type a message..." rows="1"></textarea>
+        <button id="sendBtn">Send</button>
+      </div>
+    </div>
+
+    <!-- Cards View -->
+    <div class="view" id="viewCards" data-view="cards">
+      <div class="view-header">
+        <h2>Character Cards</h2>
+        <button class="new-chat-btn" id="newCardBtn">+ New Card</button>
+      </div>
+      <div class="view-body">
+        <div class="drop-zone" id="cardDropZone">
+          Drop a SillyTavern PNG here or <a id="cardFilePickerLink">browse</a>
+          <input type="file" id="cardFilePicker" accept="image/png">
+        </div>
+        <div class="card-editor" id="cardEditor">
+          <h3 id="cardEditorTitle">New Card</h3>
+          <div class="form-group">
+            <label for="cardName">Name</label>
+            <input type="text" id="cardName">
+          </div>
+          <div class="form-group">
+            <label for="cardDescription">Description</label>
+            <textarea id="cardDescription" rows="3"></textarea>
+          </div>
+          <div class="form-group">
+            <label for="cardPersonality">Personality</label>
+            <textarea id="cardPersonality" rows="2"></textarea>
+          </div>
+          <div class="form-group">
+            <label for="cardFirstMessage">First Message</label>
+            <textarea id="cardFirstMessage" rows="3"></textarea>
+          </div>
+          <div class="form-group">
+            <label for="cardExampleMessages">Example Messages</label>
+            <textarea id="cardExampleMessages" rows="3"></textarea>
+          </div>
+          <div class="form-group">
+            <label for="cardScenario">Scenario</label>
+            <textarea id="cardScenario" rows="2"></textarea>
+          </div>
+          <div class="form-group">
+            <label for="cardTags">Tags (comma-separated)</label>
+            <input type="text" id="cardTags">
+          </div>
+          <div class="form-actions">
+            <button class="btn-secondary" id="cardEditorCancel">Cancel</button>
+            <button class="btn-primary" id="cardEditorSave">Save</button>
+          </div>
+        </div>
+        <div class="cards-grid" id="cardsGrid"></div>
+      </div>
+    </div>
+
+    <!-- Scenarios View -->
+    <div class="view" id="viewScenarios" data-view="scenarios">
+      <div class="view-header">
+        <h2>Scenarios</h2>
+        <button class="new-chat-btn" id="newScenarioBtn">+ New Scenario</button>
+      </div>
+      <div class="view-body">
+        <div class="scenario-editor" id="scenarioEditor">
+          <h3 id="scenarioEditorTitle">New Scenario</h3>
+          <div class="form-group">
+            <label for="scenarioName">Name</label>
+            <input type="text" id="scenarioName">
+          </div>
+          <div class="form-group">
+            <label for="scenarioDescription">Description (use ${user} and ${char} for variables)</label>
+            <textarea id="scenarioDescription" rows="4"></textarea>
+          </div>
+          <div class="form-group">
+            <label for="scenarioModel">Model Override (optional)</label>
+            <select id="scenarioModel">
+              <option value="">Use conversation default</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="scenarioContext">Context Strategy</label>
+            <select id="scenarioContext">
+              <option value="sliding_window">Sliding Window</option>
+            </select>
+          </div>
+          <div class="form-actions">
+            <button class="btn-secondary" id="scenarioEditorCancel">Cancel</button>
+            <button class="btn-primary" id="scenarioEditorSave">Save</button>
+          </div>
+        </div>
+        <div class="scenario-list" id="scenarioList"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- New Chat Modal -->
+  <div class="modal-overlay" id="newChatModal">
+    <div class="modal">
+      <h3>New Conversation</h3>
+      <div class="form-group">
+        <label for="modalUserCard">Your Character</label>
+        <select id="modalUserCard"></select>
+      </div>
+      <div class="form-group">
+        <label for="modalAiCard">AI Character</label>
+        <select id="modalAiCard"></select>
+      </div>
+      <div class="form-group">
+        <label for="modalScenario">Scenario (optional)</label>
+        <select id="modalScenario">
+          <option value="">None</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="modalModel">Model</label>
+        <select id="modalModel"></select>
+      </div>
+      <div class="form-actions">
+        <button class="btn-secondary" id="modalCancel">Cancel</button>
+        <button class="btn-primary" id="modalCreate">Start Chat</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
