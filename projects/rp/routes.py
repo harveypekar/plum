@@ -212,10 +212,13 @@ def setup(app: FastAPI, ollama):
                 return
 
             # Save AI response
-            response_text = "".join(tokens)
-            post_ctx = {"response": response_text}
-            post_ctx = await _pipeline.run_post(post_ctx)
-            await db.add_message(conv_id, "assistant", post_ctx["response"], raw_response=raw)
+            try:
+                response_text = "".join(tokens)
+                post_ctx = {"response": response_text}
+                post_ctx = await _pipeline.run_post(post_ctx)
+                await db.add_message(conv_id, "assistant", post_ctx["response"], raw_response=raw)
+            except Exception as e:
+                yield json.dumps({"error": f"Failed to save response: {e}", "done": True}) + "\n"
 
         return StreamingResponse(stream(), media_type="application/x-ndjson")
 
@@ -275,10 +278,13 @@ def setup(app: FastAPI, ollama):
             except Exception as e:
                 yield json.dumps({"error": str(e), "done": True}) + "\n"
                 return
-            response_text = "".join(tokens)
-            post_ctx = {"response": response_text}
-            post_ctx = await _pipeline.run_post(post_ctx)
-            await db.add_message(conv_id, "assistant", post_ctx["response"], raw_response=raw)
+            try:
+                response_text = "".join(tokens)
+                post_ctx = {"response": response_text}
+                post_ctx = await _pipeline.run_post(post_ctx)
+                await db.add_message(conv_id, "assistant", post_ctx["response"], raw_response=raw)
+            except Exception as e:
+                yield json.dumps({"error": f"Failed to save response: {e}", "done": True}) + "\n"
 
         return StreamingResponse(stream(), media_type="application/x-ndjson")
 
