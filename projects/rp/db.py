@@ -6,6 +6,12 @@ from pathlib import Path
 _pool: asyncpg.Pool | None = None
 
 
+async def _init_connection(conn):
+    await conn.set_type_codec(
+        'jsonb', encoder=json.dumps, decoder=json.loads, schema='pg_catalog'
+    )
+
+
 async def get_pool() -> asyncpg.Pool:
     global _pool
     if _pool is None:
@@ -13,6 +19,7 @@ async def get_pool() -> asyncpg.Pool:
             os.environ.get("DATABASE_URL", "postgresql://localhost/plum"),
             min_size=1,
             max_size=5,
+            init=_init_connection,
         )
     return _pool
 
@@ -57,9 +64,9 @@ async def create_card(name: str, card_data: dict, avatar: bytes | None = None) -
     pool = await get_pool()
     row = await pool.fetchrow(
         "INSERT INTO rp_character_cards (name, card_data, avatar) "
-        "VALUES ($1, $2::jsonb, $3) RETURNING id, name, avatar IS NOT NULL as has_avatar, "
+        "VALUES ($1, $2, $3) RETURNING id, name, avatar IS NOT NULL as has_avatar, "
         "card_data, created_at::text, updated_at::text",
-        name, json.dumps(card_data), avatar,
+        name, card_data, avatar,
     )
     return dict(row)
 
@@ -68,17 +75,17 @@ async def update_card(card_id: int, name: str, card_data: dict, avatar: bytes | 
     pool = await get_pool()
     if avatar is not None:
         row = await pool.fetchrow(
-            "UPDATE rp_character_cards SET name=$2, card_data=$3::jsonb, avatar=$4, "
+            "UPDATE rp_character_cards SET name=$2, card_data=$3, avatar=$4, "
             "updated_at=NOW() WHERE id=$1 RETURNING id, name, avatar IS NOT NULL as has_avatar, "
             "card_data, created_at::text, updated_at::text",
-            card_id, name, json.dumps(card_data), avatar,
+            card_id, name, card_data, avatar,
         )
     else:
         row = await pool.fetchrow(
-            "UPDATE rp_character_cards SET name=$2, card_data=$3::jsonb, "
+            "UPDATE rp_character_cards SET name=$2, card_data=$3, "
             "updated_at=NOW() WHERE id=$1 RETURNING id, name, avatar IS NOT NULL as has_avatar, "
             "card_data, created_at::text, updated_at::text",
-            card_id, name, json.dumps(card_data),
+            card_id, name, card_data,
         )
     return dict(row) if row else None
 
@@ -118,9 +125,9 @@ async def create_scenario(name: str, description: str, settings: dict) -> dict:
     pool = await get_pool()
     row = await pool.fetchrow(
         "INSERT INTO rp_scenarios (name, description, settings) "
-        "VALUES ($1, $2, $3::jsonb) RETURNING id, name, description, settings, "
+        "VALUES ($1, $2, $3) RETURNING id, name, description, settings, "
         "created_at::text, updated_at::text",
-        name, description, json.dumps(settings),
+        name, description, settings,
     )
     return dict(row)
 
@@ -128,10 +135,10 @@ async def create_scenario(name: str, description: str, settings: dict) -> dict:
 async def update_scenario(scenario_id: int, name: str, description: str, settings: dict) -> dict | None:
     pool = await get_pool()
     row = await pool.fetchrow(
-        "UPDATE rp_scenarios SET name=$2, description=$3, settings=$4::jsonb, "
+        "UPDATE rp_scenarios SET name=$2, description=$3, settings=$4, "
         "updated_at=NOW() WHERE id=$1 RETURNING id, name, description, settings, "
         "created_at::text, updated_at::text",
-        scenario_id, name, description, json.dumps(settings),
+        scenario_id, name, description, settings,
     )
     return dict(row) if row else None
 
@@ -203,12 +210,11 @@ async def add_message(conv_id: int, role: str, content: str,
     pool = await get_pool()
     row = await pool.fetchrow(
         "INSERT INTO rp_messages (conversation_id, role, content, raw_response, sequence) "
-        "VALUES ($1, $2, $3, $4::jsonb, "
+        "VALUES ($1, $2, $3, $4, "
         "(SELECT COALESCE(MAX(sequence), 0) + 1 FROM rp_messages WHERE conversation_id = $1)) "
         "RETURNING id, conversation_id, role, content, "
         "raw_response, sequence, created_at::text",
-        conv_id, role, content,
-        json.dumps(raw_response) if raw_response else None,
+        conv_id, role, content, raw_response,
     )
     await pool.execute(
         "UPDATE rp_conversations SET updated_at = NOW() WHERE id = $1", conv_id

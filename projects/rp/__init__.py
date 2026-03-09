@@ -2,7 +2,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 
-def register(app: FastAPI, ollama):
+def register(app: FastAPI, ollama, resolve_model=None):
     """Register RP plugin routes on the aiserver app."""
     from . import routes, db
 
@@ -17,4 +17,4 @@ def register(app: FastAPI, ollama):
         await db.close()
 
     app.router.lifespan_context = extended_lifespan
-    routes.setup(app, ollama)
+    routes.setup(app, ollama, resolve_model=resolve_model)
