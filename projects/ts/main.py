@@ -70,10 +70,13 @@ import sqlite3
 import subprocess
 import sys
 import time
-import urllib.request
 import uuid
 from dataclasses import dataclass
 from enum import Enum
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent.parent / "aiserver"))
+from ollama import OllamaClient
 
 
 class Color(Enum):
@@ -282,73 +285,6 @@ class Terminal:
             await self.send(line.strip())
 
 
-# -- Ollama client --
-
-
-class OllamaClient:
-    """Sends prompts to a local Ollama instance."""
-
-    def __init__(self, model: str = "qwen3:8b", base_url: str = "http://localhost:11434"):
-        self.model = model
-        self.base_url = base_url
-
-    async def generate_stream(self, prompt: str, system: str | None = None,
-                              num_predict: int | None = None, think: bool = False):
-        """Async generator yielding (token, is_thinking) tuples as they arrive."""
-        body: dict = {
-            "model": self.model,
-            "prompt": prompt,
-            "stream": True,
-        }
-        if system:
-            body["system"] = system
-        if num_predict is not None:
-            body["options"] = {"num_predict": num_predict}
-        if think:
-            body["think"] = True
-        payload = json.dumps(body).encode()
-        req = urllib.request.Request(
-            f"{self.base_url}/api/generate",
-            data=payload,
-            headers={"Content-Type": "application/json"},
-        )
-        queue = asyncio.Queue()
-        loop = asyncio.get_event_loop()
-
-        def _read_stream():
-            with urllib.request.urlopen(req, timeout=120) as resp:
-                for line in resp:
-                    data = json.loads(line.decode())
-                    thinking = data.get("thinking", "")
-                    token = data.get("response", "")
-                    if thinking:
-                        loop.call_soon_threadsafe(queue.put_nowait, (thinking, True))
-                    if token:
-                        loop.call_soon_threadsafe(queue.put_nowait, (token, False))
-                    if data.get("done"):
-                        break
-            loop.call_soon_threadsafe(queue.put_nowait, None)
-
-        asyncio.get_event_loop().run_in_executor(None, _read_stream)
-
-        while True:
-            item = await queue.get()
-            if item is None:
-                break
-            yield item
-
-    async def generate(self, prompt: str, system: str | None = None, num_predict: int | None = None) -> str:
-        """Send prompt, wait for complete response (thinking tokens discarded)."""
-        tokens = []
-        async for text, is_thinking in self.generate_stream(prompt, system=system, num_predict=num_predict):
-            if not is_thinking:
-                tokens.append(text)
-        return "".join(tokens)
-
-    def count_tokens(self, text: str) -> int:
-        """Estimate token count (~4 chars per token)."""
-        return len(text) // 4
-
 
 MODEL_MAP = {
     "q06":    "qwen3:0.6b",
@@ -414,7 +350,7 @@ async def main():
     model_id = MODEL_MAP.get(nickname, nickname)  # fallback: use raw name
 
     server = Server(port=4040)
-    ollama = OllamaClient(model=model_id)
+    ollama = OllamaClient()
     log = Log()
     print(f"Model: {nickname} -> {model_id}")
 
@@ -586,7 +522,12 @@ async def main():
         think_count = 0
         t_start = time.monotonic()
         t_resp_start = None
-        async for text, is_thinking in ollama.generate_stream(prompt, system=system, think=use_think):
+        options = {"think": use_think} if use_think else None
+        async for chunk in ollama.generate_stream(model_id, prompt, system=system, options=options):
+            if chunk.get("done"):
+                break
+            is_thinking = chunk.get("thinking", False)
+            text = chunk["token"]
             if is_thinking:
                 think_count += 1
                 if not was_thinking:
