@@ -698,9 +698,6 @@
       <a href="#scenarios" data-view="scenarios">
         <span class="nav-icon">&#9881;</span> Scenarios
       </a>
-      <a href="#templates" data-view="templates">
-        <span class="nav-icon">&#9998;</span> Templates
-      </a>
     </div>
     <div class="conversation-list" id="conversationList">
       <div class="conv-list-header">
@@ -835,36 +832,6 @@
         <div class="scenario-list" id="scenarioList"></div>
       </div>
     </div>
-    <!-- Templates View -->
-    <div class="view" id="viewTemplates" data-view="templates">
-      <div class="view-header">
-        <h2>Prompt Templates</h2>
-        <button class="new-chat-btn" id="newTemplateBtn">+ New Template</button>
-      </div>
-      <div class="view-body">
-        <div class="template-editor" id="templateEditor" style="display:none">
-          <h3 id="templateEditorTitle">New Template</h3>
-          <div class="form-group">
-            <label for="templateName">Name</label>
-            <input type="text" id="templateName">
-          </div>
-          <div class="form-group">
-            <label for="templateContent">Content</label>
-            <textarea id="templateContent" rows="12" style="font-family:monospace;font-size:0.8em" placeholder="{{#scenario}}Scenario: {{scenario}}&#10;&#10;{{/scenario}}{{#description}}Character: {{description}}&#10;&#10;{{/description}}{{#personality}}Personality: {{personality}}&#10;&#10;{{/personality}}{{#mes_example}}Example dialogue:&#10;{{mes_example}}{{/mes_example}}"></textarea>
-          </div>
-          <div class="form-group" style="font-size:0.72em;color:#8b949e;line-height:1.5">
-            <b>Placeholders:</b> <code>{{scenario}}</code> <code>{{description}}</code> <code>{{personality}}</code> <code>{{mes_example}}</code> <code>{{char}}</code> <code>{{user}}</code><br>
-            <b>Conditional sections:</b> <code>{{#var}}...shown if var is set...{{/var}}</code>
-          </div>
-          <div class="form-actions">
-            <button class="btn-secondary" id="templateEditorCancel">Cancel</button>
-            <button class="btn-primary" id="templateEditorSave">Save</button>
-          </div>
-        </div>
-        <div class="scenario-list" id="templateList"></div>
-      </div>
-    </div>
-
   </div>
 
   <!-- New Chat Modal -->

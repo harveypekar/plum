@@ -16,8 +16,6 @@
   let availableModels = [];
   let allCards = [];
   let allScenarios = [];
-  let allTemplates = [];
-  let editingTemplateId = null;
 
   // ---------------------------------------------------------------------------
   // Helpers
@@ -140,7 +138,6 @@
 
     if (view === "cards") loadCards();
     else if (view === "scenarios") loadScenarios();
-    else if (view === "templates") loadTemplates();
   }
 
   document.querySelectorAll(".sidebar-nav a").forEach((a) => {
@@ -656,14 +653,12 @@
   // ---------------------------------------------------------------------------
   async function refreshCardsAndScenarios() {
     try {
-      const [cards, scenarios, templates] = await Promise.all([
+      const [cards, scenarios] = await Promise.all([
         api("GET", "/rp/cards"),
         api("GET", "/rp/scenarios"),
-        api("GET", "/rp/templates"),
       ]);
       allCards = cards;
       allScenarios = scenarios;
-      allTemplates = templates;
     } catch (e) {
       // silently fail
     }
@@ -952,124 +947,6 @@
       loadScenarios();
     } catch (e) {
       alert("Error saving scenario: " + e.message);
-    }
-  });
-
-  // ---------------------------------------------------------------------------
-  // Templates
-  // ---------------------------------------------------------------------------
-  async function loadTemplates() {
-    try {
-      allTemplates = await api("GET", "/rp/templates");
-      renderTemplates();
-    } catch (e) {
-      // silently fail
-    }
-  }
-
-  function renderTemplates() {
-    var list = $("templateList");
-    list.textContent = "";
-
-    // Show which template is active (or default)
-    var anyActive = allTemplates.some(function (t) { return t.active; });
-    if (!anyActive) {
-      var notice = el("div", {
-        className: "scenario-desc",
-        style: { padding: "8px 0", marginBottom: "8px" },
-        textContent: "No template active \u2014 using built-in default.",
-      });
-      list.appendChild(notice);
-    }
-
-    for (var t of allTemplates) {
-      var item = el("div", { className: "scenario-item" });
-      if (t.active) item.style.borderColor = "#58a6ff";
-
-      var info = el("div", { style: { flex: "1" } });
-      var nameText = t.name + (t.active ? " (active)" : "");
-      var name = el("div", { className: "scenario-name", textContent: nameText });
-      if (t.active) name.style.color = "#58a6ff";
-      info.appendChild(name);
-      var preview = t.content.substring(0, 80) + (t.content.length > 80 ? "..." : "");
-      var desc = el("div", { className: "scenario-desc", textContent: preview });
-      info.appendChild(desc);
-      item.appendChild(info);
-
-      var actions = el("div", { className: "scenario-item-actions" });
-      (function (tmpl) {
-        var activateBtn = el("button", {
-          textContent: tmpl.active ? "Deactivate" : "Activate",
-          onClick: async function (e) {
-            e.stopPropagation();
-            if (tmpl.active) {
-              await api("POST", "/rp/templates/deactivate");
-            } else {
-              await api("POST", "/rp/templates/" + tmpl.id + "/activate");
-            }
-            loadTemplates();
-          },
-        });
-        var editBtn = el("button", {
-          textContent: "Edit",
-          onClick: function (e) { e.stopPropagation(); editTemplate(tmpl); },
-        });
-        var delBtn = el("button", {
-          className: "delete",
-          textContent: "Del",
-          onClick: async function (e) {
-            e.stopPropagation();
-            if (!confirm('Delete template "' + tmpl.name + '"?')) return;
-            await api("DELETE", "/rp/templates/" + tmpl.id);
-            loadTemplates();
-          },
-        });
-        actions.appendChild(activateBtn);
-        actions.appendChild(editBtn);
-        actions.appendChild(delBtn);
-        item.addEventListener("click", function () { editTemplate(tmpl); });
-      })(t);
-      item.appendChild(actions);
-
-      list.appendChild(item);
-    }
-  }
-
-  function editTemplate(t) {
-    editingTemplateId = t ? t.id : null;
-    $("templateEditorTitle").textContent = t ? "Edit Template" : "New Template";
-    $("templateName").value = t ? t.name : "";
-    $("templateContent").value = t ? t.content : "";
-    $("templateEditor").style.display = "block";
-  }
-
-  $("newTemplateBtn").addEventListener("click", function () { editTemplate(null); });
-
-  $("templateEditorCancel").addEventListener("click", function () {
-    $("templateEditor").style.display = "none";
-    editingTemplateId = null;
-  });
-
-  $("templateEditorSave").addEventListener("click", async function () {
-    var name = $("templateName").value.trim();
-    if (!name) { alert("Name is required."); return; }
-
-    var data = {
-      name: name,
-      content: $("templateContent").value,
-    };
-
-    try {
-      if (editingTemplateId) {
-        await api("PUT", "/rp/templates/" + editingTemplateId, data);
-      } else {
-        await api("POST", "/rp/templates", data);
-      }
-      $("templateEditor").style.display = "none";
-      editingTemplateId = null;
-      loadTemplates();
-    } catch (e) {
-      alert("Error saving template: " + e.message);
     }
   });
 

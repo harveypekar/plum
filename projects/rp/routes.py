@@ -8,7 +8,6 @@ from . import db
 from .cards import parse_card_png, export_card_png, extract_name
 from .models import (
     CardCreate, CardResponse, ScenarioCreate, ScenarioResponse,
-    TemplateCreate, TemplateResponse,
     ConversationCreate, ConversationResponse, ConversationDetailResponse,
     MessageResponse, SendMessageRequest, EditMessageRequest,
 )
@@ -85,48 +84,6 @@ def setup(app: FastAPI, ollama, resolve_model=None):
             content=png, media_type="image/png",
             headers={"Content-Disposition": f'attachment; filename="{card["name"]}.png"'},
         )
-
-    # -- Prompt Templates --
-
-    @app.get("/rp/templates", response_model=list[TemplateResponse])
-    async def list_templates():
-        return await db.list_templates()
-
-    @app.post("/rp/templates", response_model=TemplateResponse)
-    async def create_template(t: TemplateCreate):
-        return await db.create_template(t.name, t.content)
-
-    @app.get("/rp/templates/{template_id}", response_model=TemplateResponse)
-    async def get_template(template_id: int):
-        t = await db.get_template(template_id)
-        if not t:
-            raise HTTPException(404, "Template not found")
-        return t
-
-    @app.put("/rp/templates/{template_id}", response_model=TemplateResponse)
-    async def update_template(template_id: int, t: TemplateCreate):
-        result = await db.update_template(template_id, t.name, t.content)
-        if not result:
-            raise HTTPException(404, "Template not found")
-        return result
-
-    @app.delete("/rp/templates/{template_id}")
-    async def delete_template(template_id: int):
-        if not await db.delete_template(template_id):
-            raise HTTPException(404, "Template not found")
-        return {"ok": True}
-
-    @app.post("/rp/templates/{template_id}/activate", response_model=TemplateResponse)
-    async def activate_template(template_id: int):
-        result = await db.activate_template(template_id)
-        if not result:
-            raise HTTPException(404, "Template not found")
-        return result
-
-    @app.post("/rp/templates/deactivate")
-    async def deactivate_templates():
-        await db.deactivate_all_templates()
-        return {"ok": True}
 
     # -- Scenarios --
 
@@ -211,18 +168,19 @@ def setup(app: FastAPI, ollama, resolve_model=None):
 
     # -- Chat --
 
+    _template_path = Path(__file__).parent / "prompt.txt"
+
     async def _build_pipeline_ctx(conv, messages):
-        """Load cards, scenario, active template and run pipeline pre-hooks."""
+        """Load cards, scenario, template file and run pipeline pre-hooks."""
         user_card = await db.get_card(conv["user_card_id"])
         ai_card = await db.get_card(conv["ai_card_id"])
         scenario = await db.get_scenario(conv["scenario_id"]) if conv["scenario_id"] else {}
         scenario = scenario or {}
 
-        # Load the globally active prompt template
+        # Read prompt template from file (re-read each time so edits take effect)
         prompt_template = ""
-        active = await db.get_active_template()
-        if active:
-            prompt_template = active["content"]
+        if _template_path.exists():
+            prompt_template = _template_path.read_text()
 
         ctx = {
             "user_card": user_card,
