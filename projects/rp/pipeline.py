@@ -48,9 +48,6 @@ def expand_variables(ctx: dict) -> dict:
         return text
 
     ctx["system_prompt"] = replace(ctx.get("system_prompt", ""))
-    ctx["messages"] = [
-        {**m, "content": replace(m["content"])} for m in ctx.get("messages", [])
-    ]
     return ctx
 
 

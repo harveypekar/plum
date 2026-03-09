@@ -171,9 +171,11 @@ def load_plugins(app: FastAPI, ollama: OllamaClient):
         name = plugin_cfg["name"]
         path = (Path(__file__).parent / plugin_cfg["path"]).resolve()
         sys.path.insert(0, str(path.parent))
-        mod = importlib.import_module(name)
-        mod.register(app, ollama)
-        sys.path.pop(0)
+        try:
+            mod = importlib.import_module(name)
+            mod.register(app, ollama)
+        finally:
+            sys.path.pop(0)
 
 
 load_plugins(app, ollama)

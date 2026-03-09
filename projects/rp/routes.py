@@ -35,6 +35,8 @@ def setup(app: FastAPI, ollama):
     @app.post("/rp/cards/import", response_model=CardResponse)
     async def import_card(file: UploadFile = File(...)):
         png_data = await file.read()
+        if len(png_data) > 10 * 1024 * 1024:
+            raise HTTPException(413, "File too large (max 10 MB)")
         try:
             card_data, avatar = parse_card_png(png_data)
         except ValueError as e:
@@ -147,6 +149,8 @@ def setup(app: FastAPI, ollama):
             raise HTTPException(404, "Conversation not found")
         user_card = await db.get_card(conv["user_card_id"])
         ai_card = await db.get_card(conv["ai_card_id"])
+        if not user_card or not ai_card:
+            raise HTTPException(404, "Card referenced by conversation no longer exists")
         scenario = await db.get_scenario(conv["scenario_id"]) if conv["scenario_id"] else None
         messages = await db.get_messages(conv_id)
         return ConversationDetailResponse(
@@ -259,7 +263,9 @@ def setup(app: FastAPI, ollama):
             "system_prompt": "",
         }
         ctx = await _pipeline.run_pre(ctx)
-        prompt = ctx["messages"][-1]["content"] if ctx["messages"] else ""
+        # Find last user message for the prompt
+        user_msgs = [m for m in ctx["messages"] if m["role"] == "user"]
+        prompt = user_msgs[-1]["content"] if user_msgs else ""
         system = ctx["system_prompt"]
         model = conv["model"]
 
