@@ -1,0 +1,20 @@
+{
+  "ollama_url": "http://localhost:11434",
+  "host": "0.0.0.0",
+  "port": 8080,
+  "default_model": "q8",
+  "aliases": {
+    "q06": "qwen3:0.6b",
+    "q17": "qwen3:1.7b",
+    "q4": "qwen3:4b",
+    "q8": "qwen3:8b",
+    "q25": "qwen2.5:7b-instruct-q3_K_M"
+  },
+  "default_options": {
+    "temperature": 0.7,
+    "num_predict": 1024,
+    "top_p": 0.9,
+    "top_k": 40,
+    "think": false
+  }
+}
