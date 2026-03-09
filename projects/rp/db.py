@@ -201,16 +201,14 @@ async def get_messages(conv_id: int) -> list[dict]:
 async def add_message(conv_id: int, role: str, content: str,
                       raw_response: dict | None = None) -> dict:
     pool = await get_pool()
-    seq = await pool.fetchval(
-        "SELECT COALESCE(MAX(sequence), 0) + 1 FROM rp_messages WHERE conversation_id = $1",
-        conv_id,
-    )
     row = await pool.fetchrow(
         "INSERT INTO rp_messages (conversation_id, role, content, raw_response, sequence) "
-        "VALUES ($1, $2, $3, $4::jsonb, $5) RETURNING id, conversation_id, role, content, "
+        "VALUES ($1, $2, $3, $4::jsonb, "
+        "(SELECT COALESCE(MAX(sequence), 0) + 1 FROM rp_messages WHERE conversation_id = $1)) "
+        "RETURNING id, conversation_id, role, content, "
         "raw_response, sequence, created_at::text",
         conv_id, role, content,
-        json.dumps(raw_response) if raw_response else None, seq,
+        json.dumps(raw_response) if raw_response else None,
     )
     await pool.execute(
         "UPDATE rp_conversations SET updated_at = NOW() WHERE id = $1", conv_id
