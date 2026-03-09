@@ -24,6 +24,7 @@ class TemplateResponse(BaseModel):
     id: int
     name: str
     content: str
+    active: bool
     created_at: str
     updated_at: str
 

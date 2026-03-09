@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS rp_prompt_templates (
     id              SERIAL PRIMARY KEY,
     name            TEXT NOT NULL,
     content         TEXT NOT NULL DEFAULT '',
+    active          BOOLEAN NOT NULL DEFAULT FALSE,
     created_at      TIMESTAMPTZ DEFAULT NOW(),
     updated_at      TIMESTAMPTZ DEFAULT NOW()
 );
