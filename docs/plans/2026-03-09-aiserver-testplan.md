@@ -8,14 +8,11 @@
 
 ---
 
-### Step 0: Switch to the correct branch
+### Step 0: Switch to the worktree
 
 ```bash
-cd /mnt/d/prg/plum-aiserver-design
-git checkout aiserver-design
+cd "$(git worktree list | grep aiserver-design | awk '{print $1}')"
 ```
-
-This is a worktree at `/mnt/d/prg/plum-aiserver-design` on branch `aiserver-design`.
 
 ---
 
