@@ -168,7 +168,7 @@ def setup(app: FastAPI, ollama, resolve_model=None):
 
     # -- Chat --
 
-    _template_path = Path(__file__).parent / "prompt.txt"
+    _template_path = Path(__file__).parent / "prompt.md"
 
     async def _build_pipeline_ctx(conv, messages):
         """Load cards, scenario, template file and run pipeline pre-hooks."""
