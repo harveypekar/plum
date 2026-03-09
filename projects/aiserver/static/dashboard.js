@@ -57,7 +57,12 @@
           data.available_models.forEach((m) => {
             const span = document.createElement("span");
             span.className = "model-tag";
-            span.textContent = m;
+            let label = m.alias ? m.alias + " " + m.name : m.name;
+            let parts = [];
+            if (m.parameter_size) parts.push(m.parameter_size);
+            if (m.quantization_level) parts.push(m.quantization_level);
+            if (parts.length > 0) label += " (" + parts.join(", ") + ")";
+            span.textContent = label;
             list.appendChild(span);
           });
         }

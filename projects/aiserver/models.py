@@ -22,10 +22,18 @@ class DefaultsResponse(BaseModel):
     default_options: GenerateOptions
 
 
+class ModelInfo(BaseModel):
+    name: str
+    alias: str | None = None
+    parameter_size: str | None = None
+    quantization_level: str | None = None
+    size_bytes: int | None = None
+
+
 class HealthResponse(BaseModel):
     status: str
     ollama_connected: bool
-    available_models: list[str]
+    available_models: list[ModelInfo]
 
 
 class StatsResponse(BaseModel):

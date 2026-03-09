@@ -2,23 +2,55 @@
   const $ = (id) => document.getElementById(id);
   let abortController = null;
 
+  function formatSize(bytes) {
+    if (!bytes) return "";
+    var gb = bytes / (1024 * 1024 * 1024);
+    return gb.toFixed(1) + "GB";
+  }
+
+  function modelLabel(m) {
+    var label = m.alias ? m.alias + " (" + m.name + ")" : m.name;
+    var parts = [];
+    if (m.parameter_size) parts.push(m.parameter_size);
+    if (m.quantization_level) parts.push(m.quantization_level);
+    if (!m.parameter_size && m.size_bytes) parts.push(formatSize(m.size_bytes));
+    if (parts.length > 0) label += " — " + parts.join(", ");
+    return label;
+  }
+
   async function loadDefaults() {
     try {
-      const resp = await fetch("/defaults");
-      const data = await resp.json();
+      var [defaultsResp, healthResp] = await Promise.all([
+        fetch("/defaults"),
+        fetch("/health"),
+      ]);
+      var defaults = await defaultsResp.json();
+      var health = await healthResp.json();
 
-      const select = $("model");
-      // Add aliases
-      Object.entries(data.aliases).forEach(([alias, full]) => {
-        const opt = document.createElement("option");
-        opt.value = alias;
-        opt.textContent = alias + " (" + full + ")";
-        if (alias === data.default_model) opt.selected = true;
-        select.appendChild(opt);
-      });
+      var select = $("model");
+
+      // Populate from available Ollama models (with size/performance info)
+      if (health.available_models && health.available_models.length > 0) {
+        health.available_models.forEach(function (m) {
+          var opt = document.createElement("option");
+          opt.value = m.alias || m.name;
+          opt.textContent = modelLabel(m);
+          if (opt.value === defaults.default_model) opt.selected = true;
+          select.appendChild(opt);
+        });
+      } else {
+        // Fallback: show aliases from config (may not all be available)
+        Object.entries(defaults.aliases).forEach(function ([alias, full]) {
+          var opt = document.createElement("option");
+          opt.value = alias;
+          opt.textContent = alias + " (" + full + ")";
+          if (alias === defaults.default_model) opt.selected = true;
+          select.appendChild(opt);
+        });
+      }
 
       // Set parameter defaults
-      const opts = data.default_options;
+      var opts = defaults.default_options;
       if (opts.temperature != null) $("temperature").value = opts.temperature;
       if (opts.num_predict != null) $("numPredict").value = opts.num_predict;
       if (opts.top_p != null) $("topP").value = opts.top_p;

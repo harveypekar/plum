@@ -15,6 +15,7 @@ from models import (
     GenerateOptions,
     GenerateRequest,
     HealthResponse,
+    ModelInfo,
     StatsResponse,
 )
 from ollama import OllamaClient, OllamaError
@@ -96,7 +97,15 @@ async def defaults():
 @app.get("/health", response_model=HealthResponse)
 async def health():
     available = await ollama.is_available()
-    models = await ollama.list_models() if available else []
+    models = []
+    if available:
+        # Build reverse alias map: full_name -> alias
+        reverse_aliases = {v: k for k, v in config.aliases.items()}
+        for m in await ollama.list_models_detail():
+            models.append(ModelInfo(
+                alias=reverse_aliases.get(m["name"]),
+                **m,
+            ))
     return HealthResponse(
         status="ok" if available else "ollama_unavailable",
         ollama_connected=available,
