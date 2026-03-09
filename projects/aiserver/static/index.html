@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>aiserver — Dashboard</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Consolas', 'Monaco', monospace;
+    background: #0d1117;
+    color: #c9d1d9;
+    padding: 20px;
+  }
+  h1 { color: #58a6ff; margin-bottom: 8px; font-size: 1.4em; }
+  .subtitle { color: #8b949e; margin-bottom: 24px; font-size: 0.9em; }
+  nav { margin-bottom: 24px; }
+  nav a {
+    color: #58a6ff;
+    text-decoration: none;
+    margin-right: 16px;
+    font-size: 0.9em;
+  }
+  nav a:hover { text-decoration: underline; }
+  nav a.active { color: #f0f6fc; border-bottom: 2px solid #58a6ff; padding-bottom: 2px; }
+
+  .status-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 24px;
+    padding: 10px 16px;
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+  }
+  .status-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: #f85149;
+  }
+  .status-dot.connected { background: #3fb950; }
+  .status-text { font-size: 0.85em; color: #8b949e; }
+
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .stat-card {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    padding: 16px;
+  }
+  .stat-label { font-size: 0.75em; color: #8b949e; text-transform: uppercase; }
+  .stat-value { font-size: 1.8em; color: #f0f6fc; margin-top: 4px; }
+
+  .models-section {
+    margin-bottom: 24px;
+    padding: 12px 16px;
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+  }
+  .models-section h3 { font-size: 0.85em; color: #8b949e; margin-bottom: 8px; }
+  .model-tag {
+    display: inline-block;
+    background: #1f2937;
+    border: 1px solid #30363d;
+    border-radius: 4px;
+    padding: 3px 8px;
+    margin: 2px 4px 2px 0;
+    font-size: 0.8em;
+    color: #79c0ff;
+  }
+
+  h2 { font-size: 1em; color: #8b949e; margin-bottom: 12px; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85em;
+  }
+  th {
+    text-align: left;
+    padding: 8px 12px;
+    border-bottom: 1px solid #30363d;
+    color: #8b949e;
+    font-weight: normal;
+    text-transform: uppercase;
+    font-size: 0.8em;
+  }
+  td {
+    padding: 8px 12px;
+    border-bottom: 1px solid #21262d;
+  }
+  tr:hover { background: #161b22; }
+  .prompt-cell {
+    max-width: 300px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+</style>
+</head>
+<body>
+  <h1>aiserver</h1>
+  <p class="subtitle">LLM inference dashboard</p>
+  <nav>
+    <a href="/static/index.html" class="active">Dashboard</a>
+    <a href="/static/playground.html">Playground</a>
+  </nav>
+
+  <div class="status-bar">
+    <div class="status-dot" id="statusDot"></div>
+    <span class="status-text" id="statusText">Connecting...</span>
+  </div>
+
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-label">Total Requests</div>
+      <div class="stat-value" id="totalRequests">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Requests / Hour</div>
+      <div class="stat-value" id="requestsHour">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Avg Tokens/sec</div>
+      <div class="stat-value" id="avgTps">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Active Streams</div>
+      <div class="stat-value" id="activeStreams">—</div>
+    </div>
+  </div>
+
+  <div class="models-section" id="modelsSection" style="display:none">
+    <h3>Available Models</h3>
+    <div id="modelsList"></div>
+  </div>
+
+  <h2>Request Log</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Time</th>
+        <th>Model</th>
+        <th>Prompt</th>
+        <th>Tokens</th>
+        <th>Latency</th>
+      </tr>
+    </thead>
+    <tbody id="logBody"></tbody>
+  </table>
+
+  <script src="dashboard.js"></script>
+</body>
+</html>

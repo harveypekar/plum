@@ -1,0 +1,4 @@
+datasets>=2.14
+kagglehub>=0.3
+requests>=2.31
+jsonschema>=4.20
