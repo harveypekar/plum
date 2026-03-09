@@ -173,7 +173,7 @@ def load_plugins(app: FastAPI, ollama: OllamaClient):
         sys.path.insert(0, str(path.parent))
         try:
             mod = importlib.import_module(name)
-            mod.register(app, ollama)
+            mod.register(app, ollama, resolve_model=config.resolve_model)
         finally:
             sys.path.pop(0)
 

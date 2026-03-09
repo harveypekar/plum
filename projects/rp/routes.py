@@ -15,12 +15,14 @@ from .pipeline import create_default_pipeline
 
 _ollama = None
 _pipeline = None
+_resolve_model = None
 
 
-def setup(app: FastAPI, ollama):
-    global _ollama, _pipeline
+def setup(app: FastAPI, ollama, resolve_model=None):
+    global _ollama, _pipeline, _resolve_model
     _ollama = ollama
     _pipeline = create_default_pipeline()
+    _resolve_model = resolve_model or (lambda m: m)
 
     # -- Cards --
 
@@ -196,7 +198,7 @@ def setup(app: FastAPI, ollama):
         system = ctx["system_prompt"]
 
         # Resolve model
-        model = conv["model"]
+        model = _resolve_model(conv["model"])
 
         # Stream from Ollama
         async def stream():
@@ -267,7 +269,7 @@ def setup(app: FastAPI, ollama):
         user_msgs = [m for m in ctx["messages"] if m["role"] == "user"]
         prompt = user_msgs[-1]["content"] if user_msgs else ""
         system = ctx["system_prompt"]
-        model = conv["model"]
+        model = _resolve_model(conv["model"])
 
         async def stream():
             tokens = []
