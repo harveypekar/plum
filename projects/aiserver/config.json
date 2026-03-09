@@ -1,6 +1,6 @@
 {
   "ollama_url": "http://localhost:11434",
-  "host": "0.0.0.0",
+  "host": "127.0.0.1",
   "port": 8080,
   "default_model": "q8",
   "aliases": {
