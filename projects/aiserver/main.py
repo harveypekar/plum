@@ -5,7 +5,7 @@ from collections import deque
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -31,7 +31,16 @@ dashboard_clients: list[asyncio.Queue] = []
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    async def stats_broadcaster():
+        while True:
+            await asyncio.sleep(5)
+            s = await stats()
+            event = {"type": "stats", **s.model_dump()}
+            await broadcast_event(event)
+
+    task = asyncio.create_task(stats_broadcaster())
     yield
+    task.cancel()
 
 
 app = FastAPI(title="aiserver", lifespan=lifespan)
@@ -119,6 +128,30 @@ async def broadcast_event(event: dict):
     """Send event to all connected dashboard WebSocket clients."""
     for q in dashboard_clients:
         await q.put(event)
+
+
+@app.websocket("/ws/dashboard")
+async def ws_dashboard(ws: WebSocket):
+    await ws.accept()
+    queue: asyncio.Queue = asyncio.Queue()
+    dashboard_clients.append(queue)
+    try:
+        # Send initial stats
+        s = await stats()
+        await ws.send_json({"type": "stats", **s.model_dump()})
+
+        # Send recent request log
+        for entry in list(request_log)[-50:]:
+            await ws.send_json({"type": "request_complete", **entry})
+
+        # Stream events
+        while True:
+            event = await queue.get()
+            await ws.send_json(event)
+    except WebSocketDisconnect:
+        pass
+    finally:
+        dashboard_clients.remove(queue)
 
 
 # Static files (web UI) — mounted last so API routes take priority
