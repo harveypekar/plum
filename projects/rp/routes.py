@@ -202,6 +202,12 @@ def setup(app: FastAPI, ollama, resolve_model=None):
 
         # Stream from Ollama
         async def stream():
+            # Emit debug info as first chunk
+            yield json.dumps({
+                "debug_prompt": system,
+                "debug_messages": [{"role": m["role"], "content": m["content"]} for m in ctx["messages"]],
+            }) + "\n"
+
             tokens = []
             raw = {}
             try:
@@ -272,6 +278,12 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         model = _resolve_model(conv["model"])
 
         async def stream():
+            # Emit debug info as first chunk
+            yield json.dumps({
+                "debug_prompt": system,
+                "debug_messages": [{"role": m["role"], "content": m["content"]} for m in ctx["messages"]],
+            }) + "\n"
+
             tokens = []
             raw = {}
             try:

@@ -623,6 +623,50 @@
   ::-webkit-scrollbar-thumb { background: #30363d; border-radius: 3px; }
   ::-webkit-scrollbar-thumb:hover { background: #484f58; }
 
+  /* Scenario banner at top of chat */
+  .scenario-banner {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    padding: 12px 16px;
+    font-size: 0.82em;
+    color: #8b949e;
+    font-style: italic;
+    line-height: 1.5;
+    white-space: pre-wrap;
+  }
+  .scenario-banner-label {
+    color: #58a6ff;
+    font-style: normal;
+    font-size: 0.85em;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 4px;
+  }
+
+  /* Colored dialogue in quotes */
+  .dialogue-quote-user { color: #84cc16; }
+  .dialogue-quote-assistant { color: #e879f9; }
+
+  /* Under the hood tabs */
+  .under-hood-tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid #30363d;
+  }
+  .under-hood-tab {
+    padding: 6px 14px;
+    font-size: 0.72em;
+    color: #8b949e;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    user-select: none;
+  }
+  .under-hood-tab:hover { color: #c9d1d9; }
+  .under-hood-tab.active { color: #58a6ff; border-bottom-color: #58a6ff; }
+  .under-hood-pane { display: none; }
+  .under-hood-pane.active { display: block; }
+
   /* Streaming cursor */
   .streaming-cursor::after {
     content: "\25AE";
@@ -684,7 +728,16 @@
       </div>
       <div class="under-hood-toggle" id="underHoodToggle" style="display:none">Under the Hood</div>
       <div class="under-hood" id="underHood">
-        <div class="under-hood-content" id="underHoodContent"></div>
+        <div class="under-hood-tabs">
+          <div class="under-hood-tab active" data-pane="prompt">System Prompt</div>
+          <div class="under-hood-tab" data-pane="raw">Raw Response</div>
+        </div>
+        <div class="under-hood-pane active" id="underHoodPrompt" data-pane="prompt">
+          <div class="under-hood-content" id="underHoodPromptContent">No data yet.</div>
+        </div>
+        <div class="under-hood-pane" id="underHoodRaw" data-pane="raw">
+          <div class="under-hood-content" id="underHoodContent">No data yet.</div>
+        </div>
       </div>
       <div class="chat-input-area" id="chatInputArea" style="display:none">
         <textarea id="chatInput" placeholder="Type a message..." rows="1"></textarea>
@@ -770,6 +823,10 @@
             <select id="scenarioContext">
               <option value="sliding_window">Sliding Window</option>
             </select>
+          </div>
+          <div class="form-group">
+            <label for="scenarioPromptTemplate">Prompt Template (leave empty for default)</label>
+            <textarea id="scenarioPromptTemplate" rows="6" placeholder="{{#scenario}}Scenario: {{scenario}}&#10;&#10;{{/scenario}}{{#description}}Character: {{description}}&#10;&#10;{{/description}}{{#personality}}Personality: {{personality}}{{/personality}}"></textarea>
           </div>
           <div class="form-actions">
             <button class="btn-secondary" id="scenarioEditorCancel">Cancel</button>

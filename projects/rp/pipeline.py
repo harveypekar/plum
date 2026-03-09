@@ -51,36 +51,52 @@ def expand_variables(ctx: dict) -> dict:
     return ctx
 
 
+DEFAULT_PROMPT_TEMPLATE = """{{#scenario}}Scenario: {{scenario}}
+
+{{/scenario}}{{#description}}Character: {{description}}
+
+{{/description}}{{#personality}}Personality: {{personality}}
+
+{{/personality}}{{#mes_example}}Example dialogue:
+{{mes_example}}{{/mes_example}}"""
+
+
 def assemble_prompt(ctx: dict) -> dict:
     """Build system prompt from scenario + character card data."""
     ai_card = ctx.get("ai_card", {})
     scenario = ctx.get("scenario", {})
     ai_data = ai_card.get("card_data", {}).get("data", ai_card.get("card_data", {}))
+    settings = scenario.get("settings", {})
 
-    parts = []
+    template = settings.get("prompt_template", "") or DEFAULT_PROMPT_TEMPLATE
 
-    # Scenario
-    scenario_text = scenario.get("description", "")
-    if scenario_text:
-        parts.append(f"Scenario: {scenario_text}")
+    values = {
+        "scenario": scenario.get("description", ""),
+        "description": ai_data.get("description", ""),
+        "personality": ai_data.get("personality", ""),
+        "mes_example": ai_data.get("mes_example", ""),
+        "char": ai_data.get("name", "Character"),
+    }
 
-    # Character description
-    desc = ai_data.get("description", "")
-    if desc:
-        parts.append(f"Character: {desc}")
-
-    # Personality
-    personality = ai_data.get("personality", "")
-    if personality:
-        parts.append(f"Personality: {personality}")
-
-    # Example messages
-    mes_example = ai_data.get("mes_example", "")
-    if mes_example:
-        parts.append(f"Example dialogue:\n{mes_example}")
-
-    ctx["system_prompt"] = "\n\n".join(parts)
+    ctx["system_prompt"] = render_template(template, values)
     return ctx
+
+
+def render_template(template: str, values: dict) -> str:
+    """Render a Mustache-lite template with {{var}} and {{#var}}...{{/var}} sections."""
+    import re
+    # Process conditional sections: {{#key}}...{{/key}}
+    def replace_section(m):
+        key = m.group(1)
+        body = m.group(2)
+        if values.get(key):
+            return body.replace("{{" + key + "}}", str(values[key]))
+        return ""
+    result = re.sub(r"\{\{#(\w+)\}\}(.*?)\{\{/\1\}\}", replace_section, template, flags=re.DOTALL)
+    # Replace remaining {{var}} placeholders
+    for key, val in values.items():
+        result = result.replace("{{" + key + "}}", str(val))
+    return result.strip()
 
 
 def apply_context_strategy(ctx: dict) -> dict:

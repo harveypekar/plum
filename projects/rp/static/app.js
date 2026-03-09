@@ -40,6 +40,29 @@
     return node;
   }
 
+  function renderDialogue(bubble, content, role) {
+    var quoteClass = role === "user" ? "dialogue-quote-user" : "dialogue-quote-assistant";
+    var regex = /"([^"]+)"/g;
+    var lastIndex = 0;
+    var match;
+    while ((match = regex.exec(content)) !== null) {
+      if (match.index > lastIndex) {
+        bubble.appendChild(document.createTextNode(content.slice(lastIndex, match.index)));
+      }
+      var span = document.createElement("span");
+      span.className = quoteClass;
+      span.textContent = "\u201C" + match[1] + "\u201D";
+      bubble.appendChild(span);
+      lastIndex = regex.lastIndex;
+    }
+    if (lastIndex < content.length) {
+      bubble.appendChild(document.createTextNode(content.slice(lastIndex)));
+    }
+    if (lastIndex === 0) {
+      bubble.textContent = content;
+    }
+  }
+
   function avatarUrl(cardId, hasAvatar) {
     if (hasAvatar) return "/rp/cards/" + cardId + "/avatar";
     return null;
@@ -229,6 +252,15 @@
     const container = $("chatMessages");
     container.textContent = "";
 
+    // Scenario banner at top
+    if (scenario && scenario.description) {
+      const banner = el("div", { className: "scenario-banner" });
+      const label = el("div", { className: "scenario-banner-label", textContent: "Scenario" });
+      banner.appendChild(label);
+      banner.appendChild(document.createTextNode(scenario.description));
+      container.appendChild(banner);
+    }
+
     for (const msg of messages) {
       appendMessageBubble(container, msg, user_card, ai_card);
     }
@@ -263,7 +295,7 @@
 
     const col = el("div");
     const bubble = el("div", { className: "message-bubble" });
-    bubble.textContent = msg.content;
+    renderDialogue(bubble, msg.content, msg.role);
     col.appendChild(bubble);
 
     // Actions
@@ -430,6 +462,11 @@
           if (!line.trim()) continue;
           const chunk = JSON.parse(line);
 
+          if (chunk.debug_prompt !== undefined) {
+            $("underHoodPromptContent").textContent = chunk.debug_prompt || "(empty)";
+            continue;
+          }
+
           if (chunk.error) {
             bubble.classList.remove("streaming-cursor");
             const errSpan = el("span", {
@@ -513,6 +550,17 @@
     $("underHoodToggle").textContent = $("underHood").classList.contains("open")
       ? "Hide Under the Hood"
       : "Under the Hood";
+  });
+
+  // Under the hood tab switching
+  document.querySelectorAll(".under-hood-tab").forEach((tab) => {
+    tab.addEventListener("click", () => {
+      document.querySelectorAll(".under-hood-tab").forEach((t) => t.classList.remove("active"));
+      document.querySelectorAll(".under-hood-pane").forEach((p) => p.classList.remove("active"));
+      tab.classList.add("active");
+      var pane = tab.getAttribute("data-pane");
+      document.querySelector('.under-hood-pane[data-pane="' + pane + '"]').classList.add("active");
+    });
   });
 
   // ---------------------------------------------------------------------------
@@ -859,6 +907,9 @@
       $("scenarioContext").value = "sliding_window";
     }
 
+    // Prompt template
+    $("scenarioPromptTemplate").value = (s && s.settings && s.settings.prompt_template) || "";
+
     $("scenarioEditor").classList.add("open");
   }
 
@@ -881,6 +932,8 @@
     };
     const modelOverride = $("scenarioModel").value;
     if (modelOverride) settings.model = modelOverride;
+    const promptTemplate = $("scenarioPromptTemplate").value.trim();
+    if (promptTemplate) settings.prompt_template = promptTemplate;
 
     const data = {
       name,
