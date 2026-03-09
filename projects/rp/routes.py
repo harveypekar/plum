@@ -116,6 +116,18 @@ def setup(app: FastAPI, ollama, resolve_model=None):
             raise HTTPException(404, "Template not found")
         return {"ok": True}
 
+    @app.post("/rp/templates/{template_id}/activate", response_model=TemplateResponse)
+    async def activate_template(template_id: int):
+        result = await db.activate_template(template_id)
+        if not result:
+            raise HTTPException(404, "Template not found")
+        return result
+
+    @app.post("/rp/templates/deactivate")
+    async def deactivate_templates():
+        await db.deactivate_all_templates()
+        return {"ok": True}
+
     # -- Scenarios --
 
     @app.get("/rp/scenarios", response_model=list[ScenarioResponse])
@@ -200,19 +212,17 @@ def setup(app: FastAPI, ollama, resolve_model=None):
     # -- Chat --
 
     async def _build_pipeline_ctx(conv, messages):
-        """Load cards, scenario, template and run pipeline pre-hooks."""
+        """Load cards, scenario, active template and run pipeline pre-hooks."""
         user_card = await db.get_card(conv["user_card_id"])
         ai_card = await db.get_card(conv["ai_card_id"])
         scenario = await db.get_scenario(conv["scenario_id"]) if conv["scenario_id"] else {}
         scenario = scenario or {}
 
-        # Load prompt template if referenced by scenario
-        template_id = scenario.get("settings", {}).get("template_id")
+        # Load the globally active prompt template
         prompt_template = ""
-        if template_id:
-            t = await db.get_template(template_id)
-            if t:
-                prompt_template = t["content"]
+        active = await db.get_active_template()
+        if active:
+            prompt_template = active["content"]
 
         ctx = {
             "user_card": user_card,
