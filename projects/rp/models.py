@@ -15,6 +15,19 @@ class CardResponse(BaseModel):
     updated_at: str
 
 
+class TemplateCreate(BaseModel):
+    name: str
+    content: str = ""
+
+
+class TemplateResponse(BaseModel):
+    id: int
+    name: str
+    content: str
+    created_at: str
+    updated_at: str
+
+
 class ScenarioCreate(BaseModel):
     name: str
     description: str = ""

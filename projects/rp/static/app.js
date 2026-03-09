@@ -16,6 +16,8 @@
   let availableModels = [];
   let allCards = [];
   let allScenarios = [];
+  let allTemplates = [];
+  let editingTemplateId = null;
 
   // ---------------------------------------------------------------------------
   // Helpers
@@ -138,6 +140,7 @@
 
     if (view === "cards") loadCards();
     else if (view === "scenarios") loadScenarios();
+    else if (view === "templates") loadTemplates();
   }
 
   document.querySelectorAll(".sidebar-nav a").forEach((a) => {
@@ -653,12 +656,14 @@
   // ---------------------------------------------------------------------------
   async function refreshCardsAndScenarios() {
     try {
-      const [cards, scenarios] = await Promise.all([
+      const [cards, scenarios, templates] = await Promise.all([
         api("GET", "/rp/cards"),
         api("GET", "/rp/scenarios"),
+        api("GET", "/rp/templates"),
       ]);
       allCards = cards;
       allScenarios = scenarios;
+      allTemplates = templates;
     } catch (e) {
       // silently fail
     }
@@ -885,7 +890,10 @@
     }
   }
 
-  function editScenario(s) {
+  async function editScenario(s) {
+    if (allTemplates.length === 0) {
+      try { allTemplates = await api("GET", "/rp/templates"); } catch (e) { /* ok */ }
+    }
     editingScenarioId = s ? s.id : null;
     $("scenarioEditorTitle").textContent = s ? "Edit Scenario" : "New Scenario";
     $("scenarioName").value = s ? s.name : "";
@@ -907,14 +915,26 @@
       $("scenarioContext").value = "sliding_window";
     }
 
-    // Prompt template
-    $("scenarioPromptTemplate").value = (s && s.settings && s.settings.prompt_template) || "";
+    // Prompt template dropdown
+    var templateSelect = $("scenarioTemplate");
+    templateSelect.textContent = "";
+    var defOpt = document.createElement("option");
+    defOpt.value = "";
+    defOpt.textContent = "Default";
+    templateSelect.appendChild(defOpt);
+    for (var tmpl of allTemplates) {
+      var tOpt = document.createElement("option");
+      tOpt.value = tmpl.id;
+      tOpt.textContent = tmpl.name;
+      if (s && s.settings && s.settings.template_id === tmpl.id) tOpt.selected = true;
+      templateSelect.appendChild(tOpt);
+    }
 
     $("scenarioEditor").classList.add("open");
   }
 
   $("newScenarioBtn").addEventListener("click", async () => {
-    await loadModels();
+    await Promise.all([loadModels(), loadTemplates()]);
     editScenario(null);
   });
 
@@ -932,8 +952,8 @@
     };
     const modelOverride = $("scenarioModel").value;
     if (modelOverride) settings.model = modelOverride;
-    const promptTemplate = $("scenarioPromptTemplate").value.trim();
-    if (promptTemplate) settings.prompt_template = promptTemplate;
+    const templateId = $("scenarioTemplate").value;
+    if (templateId) settings.template_id = parseInt(templateId);
 
     const data = {
       name,
@@ -952,6 +972,97 @@
       loadScenarios();
     } catch (e) {
       alert("Error saving scenario: " + e.message);
+    }
+  });
+
+  // ---------------------------------------------------------------------------
+  // Templates
+  // ---------------------------------------------------------------------------
+  async function loadTemplates() {
+    try {
+      allTemplates = await api("GET", "/rp/templates");
+      renderTemplates();
+    } catch (e) {
+      // silently fail
+    }
+  }
+
+  function renderTemplates() {
+    var list = $("templateList");
+    list.textContent = "";
+
+    for (var t of allTemplates) {
+      var item = el("div", { className: "scenario-item" });
+
+      var info = el("div");
+      var name = el("div", { className: "scenario-name", textContent: t.name });
+      info.appendChild(name);
+      var preview = t.content.substring(0, 80) + (t.content.length > 80 ? "..." : "");
+      var desc = el("div", { className: "scenario-desc", textContent: preview });
+      info.appendChild(desc);
+      item.appendChild(info);
+
+      var actions = el("div", { className: "scenario-item-actions" });
+      (function (tmpl) {
+        var editBtn = el("button", {
+          textContent: "Edit",
+          onClick: function (e) { e.stopPropagation(); editTemplate(tmpl); },
+        });
+        var delBtn = el("button", {
+          className: "delete",
+          textContent: "Del",
+          onClick: async function (e) {
+            e.stopPropagation();
+            if (!confirm('Delete template "' + tmpl.name + '"?')) return;
+            await api("DELETE", "/rp/templates/" + tmpl.id);
+            loadTemplates();
+          },
+        });
+        actions.appendChild(editBtn);
+        actions.appendChild(delBtn);
+        item.addEventListener("click", function () { editTemplate(tmpl); });
+      })(t);
+      item.appendChild(actions);
+
+      list.appendChild(item);
+    }
+  }
+
+  function editTemplate(t) {
+    editingTemplateId = t ? t.id : null;
+    $("templateEditorTitle").textContent = t ? "Edit Template" : "New Template";
+    $("templateName").value = t ? t.name : "";
+    $("templateContent").value = t ? t.content : "";
+    $("templateEditor").style.display = "block";
+  }
+
+  $("newTemplateBtn").addEventListener("click", function () { editTemplate(null); });
+
+  $("templateEditorCancel").addEventListener("click", function () {
+    $("templateEditor").style.display = "none";
+    editingTemplateId = null;
+  });
+
+  $("templateEditorSave").addEventListener("click", async function () {
+    var name = $("templateName").value.trim();
+    if (!name) { alert("Name is required."); return; }
+
+    var data = {
+      name: name,
+      content: $("templateContent").value,
+    };
+
+    try {
+      if (editingTemplateId) {
+        await api("PUT", "/rp/templates/" + editingTemplateId, data);
+      } else {
+        await api("POST", "/rp/templates", data);
+      }
+      $("templateEditor").style.display = "none";
+      editingTemplateId = null;
+      loadTemplates();
+    } catch (e) {
+      alert("Error saving template: " + e.message);
     }
   });
 

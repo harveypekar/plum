@@ -8,6 +8,7 @@ from . import db
 from .cards import parse_card_png, export_card_png, extract_name
 from .models import (
     CardCreate, CardResponse, ScenarioCreate, ScenarioResponse,
+    TemplateCreate, TemplateResponse,
     ConversationCreate, ConversationResponse, ConversationDetailResponse,
     MessageResponse, SendMessageRequest, EditMessageRequest,
 )
@@ -84,6 +85,36 @@ def setup(app: FastAPI, ollama, resolve_model=None):
             content=png, media_type="image/png",
             headers={"Content-Disposition": f'attachment; filename="{card["name"]}.png"'},
         )
+
+    # -- Prompt Templates --
+
+    @app.get("/rp/templates", response_model=list[TemplateResponse])
+    async def list_templates():
+        return await db.list_templates()
+
+    @app.post("/rp/templates", response_model=TemplateResponse)
+    async def create_template(t: TemplateCreate):
+        return await db.create_template(t.name, t.content)
+
+    @app.get("/rp/templates/{template_id}", response_model=TemplateResponse)
+    async def get_template(template_id: int):
+        t = await db.get_template(template_id)
+        if not t:
+            raise HTTPException(404, "Template not found")
+        return t
+
+    @app.put("/rp/templates/{template_id}", response_model=TemplateResponse)
+    async def update_template(template_id: int, t: TemplateCreate):
+        result = await db.update_template(template_id, t.name, t.content)
+        if not result:
+            raise HTTPException(404, "Template not found")
+        return result
+
+    @app.delete("/rp/templates/{template_id}")
+    async def delete_template(template_id: int):
+        if not await db.delete_template(template_id):
+            raise HTTPException(404, "Template not found")
+        return {"ok": True}
 
     # -- Scenarios --
 
@@ -168,6 +199,31 @@ def setup(app: FastAPI, ollama, resolve_model=None):
 
     # -- Chat --
 
+    async def _build_pipeline_ctx(conv, messages):
+        """Load cards, scenario, template and run pipeline pre-hooks."""
+        user_card = await db.get_card(conv["user_card_id"])
+        ai_card = await db.get_card(conv["ai_card_id"])
+        scenario = await db.get_scenario(conv["scenario_id"]) if conv["scenario_id"] else {}
+        scenario = scenario or {}
+
+        # Load prompt template if referenced by scenario
+        template_id = scenario.get("settings", {}).get("template_id")
+        prompt_template = ""
+        if template_id:
+            t = await db.get_template(template_id)
+            if t:
+                prompt_template = t["content"]
+
+        ctx = {
+            "user_card": user_card,
+            "ai_card": ai_card,
+            "scenario": scenario,
+            "messages": [{"role": m["role"], "content": m["content"]} for m in messages],
+            "system_prompt": "",
+            "prompt_template": prompt_template,
+        }
+        return await _pipeline.run_pre(ctx)
+
     @app.post("/rp/conversations/{conv_id}/message")
     async def send_message(conv_id: int, req: SendMessageRequest):
         conv = await db.get_conversation(conv_id)
@@ -177,21 +233,8 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         # Save user message
         await db.add_message(conv_id, "user", req.content)
 
-        # Load context
-        user_card = await db.get_card(conv["user_card_id"])
-        ai_card = await db.get_card(conv["ai_card_id"])
-        scenario = await db.get_scenario(conv["scenario_id"]) if conv["scenario_id"] else {}
         messages = await db.get_messages(conv_id)
-
-        # Build pipeline context
-        ctx = {
-            "user_card": user_card,
-            "ai_card": ai_card,
-            "scenario": scenario or {},
-            "messages": [{"role": m["role"], "content": m["content"]} for m in messages],
-            "system_prompt": "",
-        }
-        ctx = await _pipeline.run_pre(ctx)
+        ctx = await _build_pipeline_ctx(conv, messages)
 
         # Build prompt from last user message
         prompt = ctx["messages"][-1]["content"] if ctx["messages"] else req.content
@@ -258,19 +301,8 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         await db.delete_message(last["id"])
         # Re-run as if user just sent their last message
         conv = await db.get_conversation(conv_id)
-        user_card = await db.get_card(conv["user_card_id"])
-        ai_card = await db.get_card(conv["ai_card_id"])
-        scenario = await db.get_scenario(conv["scenario_id"]) if conv["scenario_id"] else {}
         messages = await db.get_messages(conv_id)
-
-        ctx = {
-            "user_card": user_card,
-            "ai_card": ai_card,
-            "scenario": scenario or {},
-            "messages": [{"role": m["role"], "content": m["content"]} for m in messages],
-            "system_prompt": "",
-        }
-        ctx = await _pipeline.run_pre(ctx)
+        ctx = await _build_pipeline_ctx(conv, messages)
         # Find last user message for the prompt
         user_msgs = [m for m in ctx["messages"] if m["role"] == "user"]
         prompt = user_msgs[-1]["content"] if user_msgs else ""

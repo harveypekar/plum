@@ -65,10 +65,12 @@ def assemble_prompt(ctx: dict) -> dict:
     """Build system prompt from scenario + character card data."""
     ai_card = ctx.get("ai_card", {})
     scenario = ctx.get("scenario", {})
+    user_card = ctx.get("user_card", {})
     ai_data = ai_card.get("card_data", {}).get("data", ai_card.get("card_data", {}))
-    settings = scenario.get("settings", {})
+    user_data = user_card.get("card_data", {}).get("data", user_card.get("card_data", {}))
 
-    template = settings.get("prompt_template", "") or DEFAULT_PROMPT_TEMPLATE
+    # Use template from context (loaded by routes), fall back to default
+    template = ctx.get("prompt_template", "") or DEFAULT_PROMPT_TEMPLATE
 
     values = {
         "scenario": scenario.get("description", ""),
@@ -76,6 +78,7 @@ def assemble_prompt(ctx: dict) -> dict:
         "personality": ai_data.get("personality", ""),
         "mes_example": ai_data.get("mes_example", ""),
         "char": ai_data.get("name", "Character"),
+        "user": user_data.get("name", "User"),
     }
 
     ctx["system_prompt"] = render_template(template, values)
