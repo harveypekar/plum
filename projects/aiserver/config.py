@@ -16,6 +16,7 @@ class Config:
         self.default_model: str = raw["default_model"]
         self.aliases: dict[str, str] = raw["aliases"]
         self.default_options = GenerateOptions(**raw["default_options"])
+        self.plugins: list[dict] = raw.get("plugins", [])
 
     def resolve_model(self, model: str | None) -> str:
         """Resolve alias to Ollama model name, or pass through raw name."""
