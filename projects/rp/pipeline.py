@@ -48,28 +48,54 @@ def expand_variables(ctx: dict) -> dict:
         return text
 
     ctx["system_prompt"] = replace(ctx.get("system_prompt", ""))
+    if ctx.get("post_prompt"):
+        ctx["post_prompt"] = replace(ctx["post_prompt"])
     return ctx
 
 
-DEFAULT_PROMPT_TEMPLATE = """{{#scenario}}Scenario: {{scenario}}
+DEFAULT_PROMPT_TEMPLATE = """## system
+{{#scenario}}Scenario: {{scenario}}
 
 {{/scenario}}{{#description}}Character: {{description}}
 
 {{/description}}{{#personality}}Personality: {{personality}}
 
 {{/personality}}{{#mes_example}}Example dialogue:
-{{mes_example}}{{/mes_example}}"""
+{{mes_example}}{{/mes_example}}
+
+## post
+Write only {{char}}'s next response. Stay in character. Do not narrate {{user}}'s actions."""
+
+
+def _split_template(template: str) -> tuple[str, str]:
+    """Split a template into system and post sections."""
+    import re
+    sections = re.split(r'^## +(system|post)\s*$', template, flags=re.MULTILINE)
+    system_part = ""
+    post_part = ""
+    i = 0
+    while i < len(sections):
+        if sections[i].strip() == "system" and i + 1 < len(sections):
+            system_part = sections[i + 1]
+            i += 2
+        elif sections[i].strip() == "post" and i + 1 < len(sections):
+            post_part = sections[i + 1]
+            i += 2
+        else:
+            if not system_part and not post_part:
+                system_part = sections[i]
+            i += 1
+    return system_part, post_part
 
 
 def assemble_prompt(ctx: dict) -> dict:
-    """Build system prompt from scenario + character card data."""
+    """Build system_prompt and post_prompt from template + character card data."""
     ai_card = ctx.get("ai_card", {})
     scenario = ctx.get("scenario", {})
     user_card = ctx.get("user_card", {})
     ai_data = ai_card.get("card_data", {}).get("data", ai_card.get("card_data", {}))
     user_data = user_card.get("card_data", {}).get("data", user_card.get("card_data", {}))
 
-    # Use template from context (loaded by routes), fall back to default
     template = ctx.get("prompt_template", "") or DEFAULT_PROMPT_TEMPLATE
 
     values = {
@@ -81,7 +107,9 @@ def assemble_prompt(ctx: dict) -> dict:
         "user": user_data.get("name", "User"),
     }
 
-    ctx["system_prompt"] = render_template(template, values)
+    system_part, post_part = _split_template(template)
+    ctx["system_prompt"] = render_template(system_part, values)
+    ctx["post_prompt"] = render_template(post_part, values) if post_part else ""
     return ctx
 
 
