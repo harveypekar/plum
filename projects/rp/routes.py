@@ -188,9 +188,23 @@ def setup(app: FastAPI, ollama, resolve_model=None):
             "scenario": scenario,
             "messages": [{"role": m["role"], "content": m["content"]} for m in messages],
             "system_prompt": "",
+            "post_prompt": "",
             "prompt_template": prompt_template,
         }
         return await _pipeline.run_pre(ctx)
+
+    def _build_chat_messages(ctx):
+        """Assemble the messages array for chat_stream()."""
+        chat_messages = [{"role": "system", "content": ctx["system_prompt"]}]
+        chat_messages.extend(ctx["messages"])
+        if ctx.get("post_prompt"):
+            chat_messages.append({"role": "system", "content": ctx["post_prompt"]})
+        return chat_messages
+
+    def _get_user_name(ctx):
+        """Extract user character name for stop sequences."""
+        user_data = ctx.get("user_card", {}).get("card_data", {}).get("data", ctx.get("user_card", {}).get("card_data", {}))
+        return user_data.get("name", "User")
 
     @app.post("/rp/conversations/{conv_id}/message")
     async def send_message(conv_id: int, req: SendMessageRequest):
@@ -198,32 +212,32 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         if not conv:
             raise HTTPException(404, "Conversation not found")
 
-        # Save user message
         await db.add_message(conv_id, "user", req.content)
 
         messages = await db.get_messages(conv_id)
         ctx = await _build_pipeline_ctx(conv, messages)
 
-        # Build prompt from last user message
-        prompt = ctx["messages"][-1]["content"] if ctx["messages"] else req.content
-        system = ctx["system_prompt"]
-
-        # Resolve model
         model = _resolve_model(conv["model"])
+        scenario = ctx.get("scenario") or {}
+        settings = scenario.get("settings", {})
+        ollama_options = {k: v for k, v in settings.items() if k not in ("context_strategy", "max_context_tokens", "model")}
 
-        # Stream from Ollama
+        chat_messages = _build_chat_messages(ctx)
+        user_name = _get_user_name(ctx)
+
         async def stream():
-            # Emit debug info as first chunk
             yield json.dumps({
-                "debug_prompt": system,
-                "debug_messages": [{"role": m["role"], "content": m["content"]} for m in ctx["messages"]],
+                "debug_prompt": ctx["system_prompt"],
+                "debug_user_prompt": ctx.get("post_prompt", ""),
+                "debug_messages": ctx["messages"],
             }) + "\n"
 
             tokens = []
             raw = {}
             try:
-                async for chunk in _ollama.generate_stream(
-                    model=model, prompt=prompt, system=system,
+                async for chunk in _ollama.chat_stream(
+                    model=model, messages=chat_messages,
+                    options=ollama_options, stop=[f"{user_name}:"],
                 ):
                     yield json.dumps(chunk) + "\n"
                     if chunk.get("done"):
@@ -234,7 +248,6 @@ def setup(app: FastAPI, ollama, resolve_model=None):
                 yield json.dumps({"error": str(e), "done": True}) + "\n"
                 return
 
-            # Save AI response
             try:
                 response_text = "".join(tokens)
                 post_ctx = {"response": response_text}
@@ -267,28 +280,32 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         if last["role"] != "assistant":
             raise HTTPException(400, "Last message is not from assistant")
         await db.delete_message(last["id"])
-        # Re-run as if user just sent their last message
+
         conv = await db.get_conversation(conv_id)
         messages = await db.get_messages(conv_id)
         ctx = await _build_pipeline_ctx(conv, messages)
-        # Find last user message for the prompt
-        user_msgs = [m for m in ctx["messages"] if m["role"] == "user"]
-        prompt = user_msgs[-1]["content"] if user_msgs else ""
-        system = ctx["system_prompt"]
+
         model = _resolve_model(conv["model"])
+        scenario = ctx.get("scenario") or {}
+        settings = scenario.get("settings", {})
+        ollama_options = {k: v for k, v in settings.items() if k not in ("context_strategy", "max_context_tokens", "model")}
+
+        chat_messages = _build_chat_messages(ctx)
+        user_name = _get_user_name(ctx)
 
         async def stream():
-            # Emit debug info as first chunk
             yield json.dumps({
-                "debug_prompt": system,
-                "debug_messages": [{"role": m["role"], "content": m["content"]} for m in ctx["messages"]],
+                "debug_prompt": ctx["system_prompt"],
+                "debug_user_prompt": ctx.get("post_prompt", ""),
+                "debug_messages": ctx["messages"],
             }) + "\n"
 
             tokens = []
             raw = {}
             try:
-                async for chunk in _ollama.generate_stream(
-                    model=model, prompt=prompt, system=system,
+                async for chunk in _ollama.chat_stream(
+                    model=model, messages=chat_messages,
+                    options=ollama_options, stop=[f"{user_name}:"],
                 ):
                     yield json.dumps(chunk) + "\n"
                     if chunk.get("done"):
