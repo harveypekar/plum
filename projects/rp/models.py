@@ -18,6 +18,7 @@ class CardResponse(BaseModel):
 class ScenarioCreate(BaseModel):
     name: str
     description: str = ""
+    first_message: str = ""
     settings: dict = {}
 
 
@@ -25,6 +26,7 @@ class ScenarioResponse(BaseModel):
     id: int
     name: str
     description: str
+    first_message: str = ""
     settings: dict
     created_at: str
     updated_at: str
