@@ -1,4 +1,6 @@
+import asyncio
 import json
+import logging
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.responses import Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -9,7 +11,7 @@ from .cards import parse_card_png, export_card_png, extract_name
 from .models import (
     CardCreate, CardResponse, ScenarioCreate, ScenarioResponse,
     ConversationCreate, ConversationResponse, ConversationDetailResponse,
-    MessageResponse, SendMessageRequest, EditMessageRequest,
+    MessageResponse, SendMessageRequest, EditMessageRequest, SceneStateRequest,
 )
 from .pipeline import create_default_pipeline
 
@@ -192,6 +194,47 @@ def setup(app: FastAPI, ollama, resolve_model=None):
             raise HTTPException(404, "Conversation not found")
         return {"ok": True}
 
+    @app.put("/rp/conversations/{conv_id}/scene-state")
+    async def update_scene_state(conv_id: int, req: SceneStateRequest):
+        if not await db.update_scene_state(conv_id, req.scene_state):
+            raise HTTPException(404, "Conversation not found")
+        return {"ok": True}
+
+    @app.post("/rp/conversations/{conv_id}/refresh-scene-state")
+    async def refresh_scene_state(conv_id: int):
+        conv = await db.get_conversation(conv_id)
+        if not conv:
+            raise HTTPException(404, "Conversation not found")
+        messages = await db.get_messages(conv_id)
+        model = _resolve_model(conv["model"])
+        msg_list = [{"role": m["role"], "content": m["content"]} for m in messages]
+        # Run synchronously so errors propagate to caller
+        summary_model = _resolve_model(_scene_state_model) if _resolve_model else model
+        recent = msg_list[-20:] if len(msg_list) > 20 else msg_list
+        history = "\n".join(f"{m['role']}: {m['content']}" for m in recent)
+        prompt = (
+            "Read this roleplay conversation and describe the CURRENT state of the scene "
+            "as it stands at the end. Only describe what is true RIGHT NOW, not what happened earlier.\n\n"
+            "Format — one short line per category:\n"
+            "Location: (where are they right now)\n"
+            "Clothing: (what each character is currently wearing, or naked)\n"
+            "Position: (posture, who is where, physical contact)\n"
+            "Props: (objects currently in play)\n"
+            "Mood: (emotional atmosphere right now)\n\n"
+            "No narration, no story, no explanation. Just the current facts.\n\n"
+            f"Conversation:\n{history}"
+        )
+        result = await _ollama.generate(
+            model=summary_model, prompt=prompt,
+            system="Output only the scene state summary. No thinking, no preamble.",
+            options={"temperature": 0.2, "num_predict": 150},
+        )
+        clean = result.strip()
+        if "<think>" in clean:
+            clean = clean.split("</think>")[-1].strip()
+        await db.update_scene_state(conv_id, clean)
+        return {"scene_state": clean}
+
     # -- Chat --
 
     _template_path = Path(__file__).parent / "prompt.md"
@@ -215,6 +258,7 @@ def setup(app: FastAPI, ollama, resolve_model=None):
             "messages": [{"role": m["role"], "content": m["content"]} for m in messages],
             "system_prompt": "",
             "post_prompt": "",
+            "scene_state": conv.get("scene_state", ""),
             "prompt_template": prompt_template,
         }
         return await _pipeline.run_pre(ctx)
@@ -231,6 +275,41 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         """Extract user character name for stop sequences."""
         user_data = ctx.get("user_card", {}).get("card_data", {}).get("data", ctx.get("user_card", {}).get("card_data", {}))
         return user_data.get("name", "User")
+
+    _log = logging.getLogger("rp.routes")
+
+    _scene_state_model = "q25"
+
+    async def _auto_update_scene_state(conv_id: int, model: str, messages: list[dict]):
+        """Background task: ask LLM to summarize current scene state."""
+        try:
+            recent = messages[-20:] if len(messages) > 20 else messages
+            history = "\n".join(f"{m['role']}: {m['content']}" for m in recent)
+            prompt = (
+                "Read this roleplay conversation and describe the CURRENT state of the scene "
+                "as it stands at the end. Only describe what is true RIGHT NOW, not what happened earlier.\n\n"
+                "Format — one short line per category:\n"
+                "Location: (where are they right now)\n"
+                "Clothing: (what each character is currently wearing, or naked)\n"
+                "Position: (posture, who is where, physical contact)\n"
+                "Props: (objects currently in play)\n"
+                "Mood: (emotional atmosphere right now)\n\n"
+                "No narration, no story, no explanation. Just the current facts.\n\n"
+                f"Conversation:\n{history}"
+            )
+            summary_model = _resolve_model(_scene_state_model) if _resolve_model else model
+            result = await _ollama.generate(
+                model=summary_model, prompt=prompt,
+                system="Output only the scene state summary. No thinking, no preamble.",
+                options={"temperature": 0.2, "num_predict": 150, "think": False},
+            )
+            # Strip any thinking tags that might leak through
+            clean = result.strip()
+            if "<think>" in clean:
+                clean = clean.split("</think>")[-1].strip()
+            await db.update_scene_state(conv_id, clean)
+        except Exception as e:
+            _log.warning("Scene state auto-update failed: %s", e)
 
     @app.post("/rp/conversations/{conv_id}/message")
     async def send_message(conv_id: int, req: SendMessageRequest):
@@ -279,6 +358,9 @@ def setup(app: FastAPI, ollama, resolve_model=None):
                 post_ctx = {"response": response_text}
                 post_ctx = await _pipeline.run_post(post_ctx)
                 await db.add_message(conv_id, "assistant", post_ctx["response"], raw_response=raw)
+                # Update scene state in background
+                updated_msgs = ctx["messages"] + [{"role": "assistant", "content": post_ctx["response"]}]
+                asyncio.create_task(_auto_update_scene_state(conv_id, model, updated_msgs))
             except Exception as e:
                 yield json.dumps({"error": f"Failed to save response: {e}", "done": True}) + "\n"
 
@@ -346,6 +428,61 @@ def setup(app: FastAPI, ollama, resolve_model=None):
                 post_ctx = {"response": response_text}
                 post_ctx = await _pipeline.run_post(post_ctx)
                 await db.add_message(conv_id, "assistant", post_ctx["response"], raw_response=raw)
+                # Update scene state in background
+                updated_msgs = ctx["messages"] + [{"role": "assistant", "content": post_ctx["response"]}]
+                asyncio.create_task(_auto_update_scene_state(conv_id, model, updated_msgs))
+            except Exception as e:
+                yield json.dumps({"error": f"Failed to save response: {e}", "done": True}) + "\n"
+
+        return StreamingResponse(stream(), media_type="application/x-ndjson")
+
+    @app.post("/rp/conversations/{conv_id}/continue")
+    async def continue_conversation(conv_id: int):
+        conv = await db.get_conversation(conv_id)
+        if not conv:
+            raise HTTPException(404, "Conversation not found")
+
+        messages = await db.get_messages(conv_id)
+        ctx = await _build_pipeline_ctx(conv, messages)
+
+        model = _resolve_model(conv["model"])
+        scenario = ctx.get("scenario") or {}
+        settings = scenario.get("settings", {})
+        ollama_options = {k: v for k, v in settings.items() if k not in ("context_strategy", "max_context_tokens", "model")}
+
+        chat_messages = _build_chat_messages(ctx)
+        user_name = _get_user_name(ctx)
+
+        async def stream():
+            yield json.dumps({
+                "debug_prompt": ctx["system_prompt"],
+                "debug_user_prompt": ctx.get("post_prompt", ""),
+                "debug_messages": ctx["messages"],
+            }) + "\n"
+
+            tokens = []
+            raw = {}
+            try:
+                async for chunk in _ollama.chat_stream(
+                    model=model, messages=chat_messages,
+                    options=ollama_options, stop=[f"{user_name}:"],
+                ):
+                    yield json.dumps(chunk) + "\n"
+                    if chunk.get("done"):
+                        raw = chunk
+                    elif not chunk.get("thinking"):
+                        tokens.append(chunk["token"])
+            except Exception as e:
+                yield json.dumps({"error": str(e), "done": True}) + "\n"
+                return
+            try:
+                response_text = "".join(tokens)
+                post_ctx = {"response": response_text}
+                post_ctx = await _pipeline.run_post(post_ctx)
+                await db.add_message(conv_id, "assistant", post_ctx["response"], raw_response=raw)
+                # Update scene state in background
+                updated_msgs = ctx["messages"] + [{"role": "assistant", "content": post_ctx["response"]}]
+                asyncio.create_task(_auto_update_scene_state(conv_id, model, updated_msgs))
             except Exception as e:
                 yield json.dumps({"error": f"Failed to save response: {e}", "done": True}) + "\n"
 
