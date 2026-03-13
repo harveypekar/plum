@@ -101,6 +101,15 @@ async def get_card_avatar(card_id: int) -> bytes | None:
     return await pool.fetchval("SELECT avatar FROM rp_character_cards WHERE id = $1", card_id)
 
 
+async def set_card_avatar(card_id: int, avatar: bytes) -> bool:
+    pool = await get_pool()
+    result = await pool.execute(
+        "UPDATE rp_character_cards SET avatar=$2, updated_at=NOW() WHERE id=$1",
+        card_id, avatar,
+    )
+    return result == "UPDATE 1"
+
+
 # -- Scenarios --
 
 async def list_scenarios() -> list[dict]:
