@@ -1,4 +1,6 @@
 import json
+import os
+import subprocess
 from pathlib import Path
 from models import GenerateOptions
 
@@ -6,11 +8,38 @@ from models import GenerateOptions
 CONFIG_PATH = Path(__file__).parent / "config.json"
 
 
+def _wsl_gateway_ip() -> str | None:
+    """Get the Windows host IP from WSL2's default gateway."""
+    try:
+        result = subprocess.run(
+            ["ip", "route", "show", "default"],
+            capture_output=True, text=True, timeout=2,
+        )
+        for part in result.stdout.split():
+            if part.count(".") == 3:
+                return part
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        pass
+    return None
+
+
+def _resolve_ollama_url(raw_url: str) -> str:
+    """Resolve ollama URL, replacing 'wsl-gateway' with actual WSL2 gateway IP."""
+    env_url = os.environ.get("OLLAMA_URL")
+    if env_url:
+        return env_url
+    if "wsl-gateway" in raw_url:
+        gateway = _wsl_gateway_ip()
+        if gateway:
+            return raw_url.replace("wsl-gateway", gateway)
+    return raw_url
+
+
 class Config:
     def __init__(self, path: Path = CONFIG_PATH):
         with open(path) as f:
             raw = json.load(f)
-        self.ollama_url: str = raw["ollama_url"]
+        self.ollama_url: str = _resolve_ollama_url(raw["ollama_url"])
         self.host: str = raw["host"]
         self.port: int = raw["port"]
         self.default_model: str = raw["default_model"]
