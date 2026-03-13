@@ -180,7 +180,7 @@ async def create_conversation(user_card_id: int, ai_card_id: int,
     row = await pool.fetchrow(
         "INSERT INTO rp_conversations (user_card_id, ai_card_id, scenario_id, model) "
         "VALUES ($1, $2, $3, $4) RETURNING id, user_card_id, ai_card_id, scenario_id, "
-        "model, created_at::text, updated_at::text",
+        "model, scene_state, created_at::text, updated_at::text",
         user_card_id, ai_card_id, scenario_id, model,
     )
     return dict(row)
@@ -189,11 +189,20 @@ async def create_conversation(user_card_id: int, ai_card_id: int,
 async def get_conversation(conv_id: int) -> dict | None:
     pool = await get_pool()
     row = await pool.fetchrow(
-        "SELECT id, user_card_id, ai_card_id, scenario_id, model, "
+        "SELECT id, user_card_id, ai_card_id, scenario_id, model, scene_state, "
         "created_at::text, updated_at::text FROM rp_conversations WHERE id = $1",
         conv_id,
     )
     return dict(row) if row else None
+
+
+async def update_scene_state(conv_id: int, scene_state: str) -> bool:
+    pool = await get_pool()
+    result = await pool.execute(
+        "UPDATE rp_conversations SET scene_state=$2, updated_at=NOW() WHERE id=$1",
+        conv_id, scene_state,
+    )
+    return result == "UPDATE 1"
 
 
 async def delete_conversation(conv_id: int) -> bool:

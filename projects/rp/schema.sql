@@ -27,9 +27,16 @@ CREATE TABLE IF NOT EXISTS rp_conversations (
     ai_card_id      INTEGER NOT NULL REFERENCES rp_character_cards(id) ON DELETE CASCADE,
     scenario_id     INTEGER REFERENCES rp_scenarios(id) ON DELETE SET NULL,
     model           TEXT NOT NULL,
+    scene_state     TEXT NOT NULL DEFAULT '',
     created_at      TIMESTAMPTZ DEFAULT NOW(),
     updated_at      TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Migration: add scene_state if missing
+DO $$ BEGIN
+    ALTER TABLE rp_conversations ADD COLUMN scene_state TEXT NOT NULL DEFAULT '';
+EXCEPTION WHEN duplicate_column THEN NULL;
+END $$;
 
 CREATE TABLE IF NOT EXISTS rp_messages (
     id              SERIAL PRIMARY KEY,
