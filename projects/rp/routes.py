@@ -151,7 +151,7 @@ def setup(app: FastAPI, ollama, resolve_model=None):
             model=model,
             prompt="\n".join(f"{m['role']}: {m['content']}" for m in llm_messages),
             system=system,
-            options={"temperature": 0.7, "num_predict": 1024, "think": False},
+            options={"temperature": 0.7, "num_predict": 2048, "think": False},
         )
 
         clean = result.strip()
@@ -168,6 +168,10 @@ def setup(app: FastAPI, ollama, resolve_model=None):
             card_data = json.loads(clean)
         except json.JSONDecodeError:
             return {"error": "LLM returned invalid JSON", "raw": clean}
+
+        # Normalize mes_example: array -> joined string
+        if isinstance(card_data.get("mes_example"), list):
+            card_data["mes_example"] = "\n\n".join(card_data["mes_example"])
 
         return {"card": card_data}
 
