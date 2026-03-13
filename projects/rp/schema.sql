@@ -16,10 +16,17 @@ CREATE TABLE IF NOT EXISTS rp_scenarios (
     id              SERIAL PRIMARY KEY,
     name            TEXT NOT NULL,
     description     TEXT NOT NULL DEFAULT '',
+    first_message   TEXT NOT NULL DEFAULT '',
     settings        JSONB NOT NULL DEFAULT '{}',
     created_at      TIMESTAMPTZ DEFAULT NOW(),
     updated_at      TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Migration: add first_message if missing
+DO $$ BEGIN
+    ALTER TABLE rp_scenarios ADD COLUMN first_message TEXT NOT NULL DEFAULT '';
+EXCEPTION WHEN duplicate_column THEN NULL;
+END $$;
 
 CREATE TABLE IF NOT EXISTS rp_conversations (
     id              SERIAL PRIMARY KEY,
