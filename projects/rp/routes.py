@@ -117,59 +117,107 @@ def setup(app: FastAPI, ollama, resolve_model=None):
 
     _card_gen_model = "q25"
 
+    _card_fields = {
+        "name": "A unique, memorable character name",
+        "description": "Physical appearance, background, key traits (2-3 paragraphs, vivid detail)",
+        "personality": "Personality traits, mannerisms, speech patterns (1-2 paragraphs)",
+        "first_mes": "Character's opening message in a scene, third person with dialogue (1-2 paragraphs)",
+        "mes_example": "2-3 example exchanges showing how the character speaks and acts",
+        "scenario": "A default scenario/setting for this character (1 paragraph)",
+        "tags": "Comma-separated genre/trait tags",
+    }
+
     @app.post("/rp/cards/generate")
     async def generate_card(request: Request):
-        """Generate or refine a character card via LLM conversation."""
+        """Generate a full character card from a description."""
         req = await request.json()
-        messages = req.get("messages", [])
-        if not messages:
-            raise HTTPException(400, "No messages provided")
+        description = req.get("description", "")
+        if not description:
+            raise HTTPException(400, "No description provided")
 
         system = (
-            "You are a character card designer for roleplay. "
-            "The user will describe a character and you will create a detailed character card.\n\n"
-            "Always respond with a JSON object containing these fields:\n"
-            "- name: character's name\n"
+            "You are a character card designer for roleplay.\n"
+            "Given a character concept, create a detailed card as a JSON object with these fields:\n"
+            "- name: character name\n"
             "- description: physical appearance, background, key traits (2-3 paragraphs)\n"
             "- personality: personality traits, mannerisms, speech patterns (1-2 paragraphs)\n"
-            "- first_mes: the character's opening message in a scene, written in third person with dialogue (1-2 paragraphs)\n"
-            "- mes_example: 2-3 example exchanges showing how the character speaks and acts\n"
-            "- scenario: a default scenario/setting for the character (1 paragraph)\n"
-            "- tags: array of genre/trait tags\n\n"
-            "Write vivid, specific descriptions. Give the character depth and quirks.\n"
-            "If the user asks for changes, return the COMPLETE updated card, not just the changes.\n\n"
-            "Respond with ONLY the JSON object, no markdown fences, no explanation."
+            "- first_mes: opening message in third person with dialogue (1-2 paragraphs)\n"
+            "- mes_example: 2-3 example exchanges as a single string\n"
+            "- scenario: default scenario (1 paragraph)\n"
+            "- tags: array of string tags\n\n"
+            "Write vivid, specific descriptions with depth and quirks.\n"
+            "Respond with ONLY the JSON object. No markdown fences, no explanation."
         )
-
-        # Build conversation for the LLM
-        llm_messages = [{"role": "system", "content": system}]
-        for m in messages:
-            llm_messages.append({"role": m["role"], "content": m["content"]})
 
         model = _resolve_model(_card_gen_model) if _resolve_model else _card_gen_model
         result = await _ollama.generate(
-            model=model,
-            prompt="\n".join(f"{m['role']}: {m['content']}" for m in llm_messages),
-            system=system,
-            options={"temperature": 0.7, "num_predict": 1024, "think": False},
+            model=model, prompt=description, system=system,
+            options={"temperature": 0.7, "num_predict": 2048, "think": False},
         )
+        card_data = _parse_card_json(result)
+        if card_data is None:
+            return {"error": "LLM returned invalid JSON", "raw": result.strip()}
+        return {"card": card_data}
 
+    @app.post("/rp/cards/generate-field")
+    async def generate_field(request: Request):
+        """Regenerate a single field of a character card."""
+        req = await request.json()
+        card = req.get("card", {})
+        field = req.get("field", "")
+        instructions = req.get("instructions", "")
+
+        if field not in _card_fields:
+            raise HTTPException(400, f"Unknown field: {field}")
+
+        field_desc = _card_fields[field]
+        prompt = (
+            f"Here is a character card:\n{json.dumps(card, indent=2)}\n\n"
+            f"Regenerate ONLY the '{field}' field.\n"
+            f"Field description: {field_desc}\n"
+        )
+        if instructions:
+            prompt += f"User instructions: {instructions}\n"
+        prompt += f"\nRespond with ONLY the new value for '{field}'. No JSON, no field name, just the content."
+
+        model = _resolve_model(_card_gen_model) if _resolve_model else _card_gen_model
+        result = await _ollama.generate(
+            model=model, prompt=prompt,
+            system="Output only the requested field content. No thinking, no preamble, no quotes around the value.",
+            options={"temperature": 0.7, "num_predict": 512, "think": False},
+        )
         clean = result.strip()
         if "<think>" in clean:
             clean = clean.split("</think>")[-1].strip()
-        # Strip markdown fences if present
+        # For tags field, try to parse as array
+        if field == "tags":
+            clean = [t.strip().strip('"') for t in clean.split(",")]
+        return {"field": field, "value": clean}
+
+    def _parse_card_json(raw: str):
+        """Parse LLM output as card JSON, handling common issues."""
+        clean = raw.strip()
+        if "<think>" in clean:
+            clean = clean.split("</think>")[-1].strip()
         if clean.startswith("```"):
             clean = clean.split("\n", 1)[1] if "\n" in clean else clean[3:]
         if clean.endswith("```"):
             clean = clean[:-3]
         clean = clean.strip()
-
         try:
-            card_data = json.loads(clean)
+            data = json.loads(clean)
         except json.JSONDecodeError:
-            return {"error": "LLM returned invalid JSON", "raw": clean}
-
-        return {"card": card_data}
+            return None
+        # Unwrap {card: ...} wrapper if present
+        if "card" in data and isinstance(data["card"], dict):
+            data = data["card"]
+        # Normalize mes_example: array -> joined string
+        if isinstance(data.get("mes_example"), list):
+            data["mes_example"] = "\n\n".join(data["mes_example"])
+        # Normalize tags: string -> array
+        if isinstance(data.get("tags"), str):
+            data["tags"] = [t.strip() for t in data["tags"].split(",")]
+        return data
 
     # -- Scenarios --
 
