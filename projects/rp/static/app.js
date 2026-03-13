@@ -949,85 +949,197 @@
   });
 
   // ---------------------------------------------------------------------------
-  // Card Generator (AI-assisted)
+  // Card Generator (AI-assisted, functional approach)
   // ---------------------------------------------------------------------------
-  var cardGenMessages = [];
   var cardGenCard = null;
 
+  var cardGenFieldDefs = [
+    { key: "name", label: "Name", rows: 1 },
+    { key: "description", label: "Description", rows: 4 },
+    { key: "personality", label: "Personality", rows: 3 },
+    { key: "first_mes", label: "First Message", rows: 3 },
+    { key: "mes_example", label: "Example Messages", rows: 3 },
+    { key: "scenario", label: "Scenario", rows: 2 },
+    { key: "tags", label: "Tags", rows: 1 },
+  ];
+
   $("generateCardBtn").addEventListener("click", () => {
-    cardGenMessages = [];
     cardGenCard = null;
-    $("cardGenChat").textContent = "";
-    $("cardGenInput").value = "";
-    $("cardGenPreview").style.display = "none";
+    $("cardGenDescription").value = "";
+    $("cardGenStatus").textContent = "";
+    $("cardGenStep1").style.display = "";
+    $("cardGenStep2").style.display = "none";
     $("cardGenerator").classList.add("open");
     $("cardEditor").classList.remove("open");
-    $("cardGenInput").focus();
+    $("cardGenDescription").focus();
   });
 
   $("cardGenCancel").addEventListener("click", () => {
     $("cardGenerator").classList.remove("open");
   });
+  $("cardGenCancelPreview").addEventListener("click", () => {
+    $("cardGenerator").classList.remove("open");
+  });
+  $("cardGenBack").addEventListener("click", () => {
+    $("cardGenStep1").style.display = "";
+    $("cardGenStep2").style.display = "none";
+  });
 
-  $("cardGenSend").addEventListener("click", cardGenSendMessage);
-  $("cardGenInput").addEventListener("keydown", (e) => {
+  $("cardGenGenerate").addEventListener("click", cardGenFullGenerate);
+  $("cardGenDescription").addEventListener("keydown", (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      cardGenSendMessage();
+      cardGenFullGenerate();
     }
   });
 
-  async function cardGenSendMessage() {
-    var input = $("cardGenInput").value.trim();
-    if (!input) return;
+  async function cardGenFullGenerate() {
+    var desc = $("cardGenDescription").value.trim();
+    if (!desc) return;
 
-    cardGenMessages.push({ role: "user", content: input });
-    cardGenAppendMsg("user", input);
-    $("cardGenInput").value = "";
-    $("cardGenSend").disabled = true;
-    $("cardGenSend").textContent = "Thinking...";
+    $("cardGenGenerate").disabled = true;
+    $("cardGenStatus").textContent = "Generating...";
 
     try {
-      var resp = await api("POST", "/rp/cards/generate", { messages: cardGenMessages });
+      var resp = await api("POST", "/rp/cards/generate", { description: desc });
       if (resp.error) {
-        cardGenAppendMsg("assistant", "Error: " + resp.error + "\n\nRaw:\n" + (resp.raw || ""));
+        $("cardGenStatus").textContent = "Error: " + resp.error;
       } else {
         cardGenCard = resp.card;
-        cardGenMessages.push({ role: "assistant", content: JSON.stringify(cardGenCard) });
-        cardGenAppendMsg("assistant", "Card generated! See preview below. Send feedback to refine.");
-        cardGenShowPreview(cardGenCard);
+        cardGenRenderFields();
+        $("cardGenStep1").style.display = "none";
+        $("cardGenStep2").style.display = "";
+        $("cardGenStatus").textContent = "";
       }
     } catch (e) {
-      cardGenAppendMsg("assistant", "Request failed: " + e.message);
+      $("cardGenStatus").textContent = "Failed: " + e.message;
     }
 
-    $("cardGenSend").disabled = false;
-    $("cardGenSend").textContent = "Send";
+    $("cardGenGenerate").disabled = false;
   }
 
-  function cardGenAppendMsg(role, text) {
-    var div = document.createElement("div");
-    div.className = "gen-msg " + role;
-    div.textContent = text;
-    $("cardGenChat").appendChild(div);
-    $("cardGenChat").scrollTop = $("cardGenChat").scrollHeight;
+  function cardGenRenderFields() {
+    var container = $("cardGenFields");
+    container.innerHTML = "";
+    for (var def of cardGenFieldDefs) {
+      var val = cardGenCard[def.key] || "";
+      if (def.key === "tags" && Array.isArray(val)) val = val.join(", ");
+
+      var fieldDiv = document.createElement("div");
+      fieldDiv.className = "card-gen-field";
+
+      var header = document.createElement("div");
+      header.className = "card-gen-field-header";
+      var label = document.createElement("label");
+      label.textContent = def.label;
+      var regenBtn = document.createElement("button");
+      regenBtn.textContent = "Regenerate";
+      regenBtn.dataset.field = def.key;
+      regenBtn.addEventListener("click", cardGenToggleInstructions);
+      header.appendChild(label);
+      header.appendChild(regenBtn);
+
+      var textarea = document.createElement("textarea");
+      textarea.id = "cardGen_" + def.key;
+      textarea.rows = def.rows;
+      textarea.value = val;
+      textarea.addEventListener("input", cardGenFieldEdited);
+      textarea.dataset.field = def.key;
+
+      var instrDiv = document.createElement("div");
+      instrDiv.className = "card-gen-field-instructions";
+      instrDiv.id = "cardGenInstr_" + def.key;
+      var instrInput = document.createElement("input");
+      instrInput.type = "text";
+      instrInput.placeholder = "Instructions (optional)";
+      instrInput.id = "cardGenInstrInput_" + def.key;
+      var instrGo = document.createElement("button");
+      instrGo.textContent = "Go";
+      instrGo.dataset.field = def.key;
+      instrGo.addEventListener("click", cardGenRegenField);
+      instrDiv.appendChild(instrInput);
+      instrDiv.appendChild(instrGo);
+
+      fieldDiv.appendChild(header);
+      fieldDiv.appendChild(textarea);
+      fieldDiv.appendChild(instrDiv);
+      container.appendChild(fieldDiv);
+    }
   }
 
-  function cardGenShowPreview(card) {
-    var lines = [];
-    lines.push("Name: " + (card.name || ""));
-    lines.push("\nDescription:\n" + (card.description || ""));
-    lines.push("\nPersonality:\n" + (card.personality || ""));
-    lines.push("\nFirst Message:\n" + (card.first_mes || ""));
-    lines.push("\nScenario:\n" + (card.scenario || ""));
-    lines.push("\nExample Messages:\n" + (card.mes_example || ""));
-    lines.push("\nTags: " + (card.tags || []).join(", "));
-    $("cardGenPreviewContent").textContent = lines.join("\n");
-    $("cardGenPreview").style.display = "";
+  function cardGenToggleInstructions(e) {
+    var field = e.target.dataset.field;
+    var instrDiv = $("cardGenInstr_" + field);
+    instrDiv.classList.toggle("open");
+    if (instrDiv.classList.contains("open")) {
+      $("cardGenInstrInput_" + field).focus();
+    }
+  }
+
+  function cardGenFieldEdited(e) {
+    var field = e.target.dataset.field;
+    var val = e.target.value;
+    if (field === "tags") {
+      cardGenCard[field] = val.split(",").map(function(t) { return t.trim(); });
+    } else {
+      cardGenCard[field] = val;
+    }
+  }
+
+  async function cardGenRegenField(e) {
+    var field = e.target.dataset.field;
+    var instructions = $("cardGenInstrInput_" + field).value.trim();
+    var btn = e.target;
+    var regenBtn = btn.closest(".card-gen-field").querySelector(".card-gen-field-header button");
+
+    btn.disabled = true;
+    regenBtn.disabled = true;
+    regenBtn.textContent = "...";
+
+    // Sync current field values into cardGenCard before sending
+    for (var def of cardGenFieldDefs) {
+      var ta = $("cardGen_" + def.key);
+      if (ta) {
+        if (def.key === "tags") {
+          cardGenCard[def.key] = ta.value.split(",").map(function(t) { return t.trim(); });
+        } else {
+          cardGenCard[def.key] = ta.value;
+        }
+      }
+    }
+
+    try {
+      var resp = await api("POST", "/rp/cards/generate-field", {
+        card: cardGenCard,
+        field: field,
+        instructions: instructions,
+      });
+      cardGenCard[field] = resp.value;
+      var ta = $("cardGen_" + field);
+      ta.value = Array.isArray(resp.value) ? resp.value.join(", ") : resp.value;
+    } catch (err) {
+      regenBtn.textContent = "Failed";
+      regenBtn.style.color = "#f85149";
+      setTimeout(function() { regenBtn.style.color = ""; regenBtn.textContent = "Regenerate"; }, 2000);
+    }
+
+    btn.disabled = false;
+    regenBtn.disabled = false;
   }
 
   $("cardGenCreate").addEventListener("click", async () => {
     if (!cardGenCard) return;
+    // Sync final field values
+    for (var def of cardGenFieldDefs) {
+      var ta = $("cardGen_" + def.key);
+      if (ta) {
+        if (def.key === "tags") {
+          cardGenCard[def.key] = ta.value.split(",").map(function(t) { return t.trim(); });
+        } else {
+          cardGenCard[def.key] = ta.value;
+        }
+      }
+    }
     var card = cardGenCard;
     var data = {
       name: card.name || "Untitled",
