@@ -988,13 +988,17 @@
     $("cardGenSend").textContent = "Thinking...";
 
     try {
-      var resp = await api("POST", "/rp/cards/generate", { messages: cardGenMessages });
+      var resp = await api("POST", "/rp/cards/generate", {
+        messages: cardGenMessages,
+        current_card: cardGenCard,
+      });
       if (resp.error) {
         cardGenAppendMsg("assistant", "Error: " + resp.error + "\n\nRaw:\n" + (resp.raw || ""));
       } else {
         cardGenCard = resp.card;
-        cardGenMessages.push({ role: "assistant", content: JSON.stringify(cardGenCard) });
-        cardGenAppendMsg("assistant", "Card generated! See preview below. Send feedback to refine.");
+        var reply = resp.reply || "Card updated. Send more feedback to refine.";
+        cardGenMessages.push({ role: "assistant", content: reply });
+        cardGenAppendMsg("assistant", reply);
         cardGenShowPreview(cardGenCard);
       }
     } catch (e) {

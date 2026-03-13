@@ -125,31 +125,39 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         if not messages:
             raise HTTPException(400, "No messages provided")
 
+        current_card = req.get("current_card")
+
         system = (
-            "You are a character card designer for roleplay. "
-            "The user will describe a character and you will create a detailed character card.\n\n"
-            "Always respond with a JSON object containing these fields:\n"
+            "You are a collaborative character designer for roleplay. "
+            "You work WITH the user to iteratively build a character card.\n\n"
+            "Your response MUST be valid JSON with exactly two fields:\n"
+            '{"reply": "your conversational response", "card": {card object}}\n\n'
+            "The card object has these fields:\n"
             "- name: character's name\n"
             "- description: physical appearance, background, key traits (2-3 paragraphs)\n"
             "- personality: personality traits, mannerisms, speech patterns (1-2 paragraphs)\n"
             "- first_mes: the character's opening message in a scene, written in third person with dialogue (1-2 paragraphs)\n"
-            "- mes_example: 2-3 example exchanges showing how the character speaks and acts\n"
+            "- mes_example: 2-3 example exchanges showing how the character speaks and acts (as a single string)\n"
             "- scenario: a default scenario/setting for the character (1 paragraph)\n"
             "- tags: array of genre/trait tags\n\n"
-            "Write vivid, specific descriptions. Give the character depth and quirks.\n"
-            "If the user asks for changes, return the COMPLETE updated card, not just the changes.\n\n"
-            "Respond with ONLY the JSON object, no markdown fences, no explanation."
+            "In your reply field, be conversational: explain your choices, ask follow-up questions, "
+            "suggest ideas. For example: 'I gave her a limp from a motorcycle accident — want me to "
+            "weave that into her backstory? Also, what setting do you see her in?'\n\n"
+            "Always return the COMPLETE updated card in the card field, even if only one thing changed.\n"
+            "Respond with ONLY the JSON object. No markdown fences."
         )
 
-        # Build conversation for the LLM
-        llm_messages = [{"role": "system", "content": system}]
+        # Build prompt with conversation history and current card state
+        prompt_parts = []
+        if current_card:
+            prompt_parts.append(f"Current card state:\n{json.dumps(current_card, indent=2)}\n")
         for m in messages:
-            llm_messages.append({"role": m["role"], "content": m["content"]})
+            prompt_parts.append(f"{m['role']}: {m['content']}")
 
         model = _resolve_model(_card_gen_model) if _resolve_model else _card_gen_model
         result = await _ollama.generate(
             model=model,
-            prompt="\n".join(f"{m['role']}: {m['content']}" for m in llm_messages),
+            prompt="\n".join(prompt_parts),
             system=system,
             options={"temperature": 0.7, "num_predict": 2048, "think": False},
         )
@@ -157,7 +165,6 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         clean = result.strip()
         if "<think>" in clean:
             clean = clean.split("</think>")[-1].strip()
-        # Strip markdown fences if present
         if clean.startswith("```"):
             clean = clean.split("\n", 1)[1] if "\n" in clean else clean[3:]
         if clean.endswith("```"):
@@ -165,15 +172,23 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         clean = clean.strip()
 
         try:
-            card_data = json.loads(clean)
+            data = json.loads(clean)
         except json.JSONDecodeError:
             return {"error": "LLM returned invalid JSON", "raw": clean}
+
+        # Handle both formats: {reply, card} or flat card object
+        if "card" in data and "reply" in data:
+            card_data = data["card"]
+            reply = data["reply"]
+        else:
+            card_data = data
+            reply = ""
 
         # Normalize mes_example: array -> joined string
         if isinstance(card_data.get("mes_example"), list):
             card_data["mes_example"] = "\n\n".join(card_data["mes_example"])
 
-        return {"card": card_data}
+        return {"card": card_data, "reply": reply}
 
     # -- Scenarios --
 
