@@ -263,6 +263,8 @@
   function renderChatEmpty() {
     $("chatHeader").style.display = "none";
     $("chatInputArea").style.display = "none";
+    $("sceneStateToggle").style.display = "none";
+    $("sceneStatePanel").style.display = "none";
     $("underHoodToggle").style.display = "none";
     $("underHood").classList.remove("open");
     const msgs = $("chatMessages");
@@ -304,7 +306,11 @@
 
     // Input area
     $("chatInputArea").style.display = "";
+    $("sceneStateToggle").style.display = "";
     $("underHoodToggle").style.display = "";
+
+    // Scene state
+    $("sceneStateEditor").value = conversation.scene_state || "";
 
     // Chat input avatars
     setAvatarSrc($("chatInputAvatarUser"), user_card.id, user_card.has_avatar);
@@ -366,17 +372,25 @@
         background: "#0d1117",
         border: "1px solid #58a6ff",
         width: "100%",
-        minHeight: "60px",
+        minHeight: "120px",
         resize: "vertical",
         fontFamily: "inherit",
         fontSize: "0.88em",
         color: "#c9d1d9",
         padding: "10px 14px",
         borderRadius: "12px",
+        overflow: "hidden",
       },
     });
     ta.value = msg.content;
     bubble.replaceWith(ta);
+    // Auto-size to content
+    ta.style.height = "auto";
+    ta.style.height = ta.scrollHeight + "px";
+    ta.addEventListener("input", () => {
+      ta.style.height = "auto";
+      ta.style.height = ta.scrollHeight + "px";
+    });
     ta.focus();
 
     const save = async () => {
@@ -411,7 +425,8 @@
     input.value = "";
     autoResizeInput();
     isStreaming = true;
-    $("sendBtn").disabled = true;
+    $("sendBtn").style.display = "none";
+    $("stopBtn").style.display = "";
 
     // Append user bubble immediately
     const container = $("chatMessages");
@@ -427,16 +442,34 @@
     const hadError = await streamResponse("/rp/conversations/" + currentConvId + "/message", { content }, container);
 
     isStreaming = false;
-    $("sendBtn").disabled = false;
+    $("sendBtn").style.display = "";
+    $("stopBtn").style.display = "none";
 
     // Reload to sync state (skip on error so the error message stays visible)
+    if (!hadError) openConversation(currentConvId);
+  }
+
+  async function continueConversation() {
+    if (!currentConvId || isStreaming) return;
+    isStreaming = true;
+    $("sendBtn").style.display = "none";
+    $("stopBtn").style.display = "";
+
+    const container = $("chatMessages");
+    const hadError = await streamResponse("/rp/conversations/" + currentConvId + "/continue", undefined, container);
+
+    isStreaming = false;
+    $("sendBtn").style.display = "";
+    $("stopBtn").style.display = "none";
+
     if (!hadError) openConversation(currentConvId);
   }
 
   async function regenerateResponse() {
     if (!currentConvId || isStreaming) return;
     isStreaming = true;
-    $("sendBtn").disabled = true;
+    $("sendBtn").style.display = "none";
+    $("stopBtn").style.display = "";
 
     // Remove last AI message bubble from DOM
     const container = $("chatMessages");
@@ -448,7 +481,8 @@
     const hadError = await streamResponse("/rp/conversations/" + currentConvId + "/regenerate", undefined, container);
 
     isStreaming = false;
-    $("sendBtn").disabled = false;
+    $("sendBtn").style.display = "";
+    $("stopBtn").style.display = "none";
 
     if (!hadError) openConversation(currentConvId);
   }
@@ -541,6 +575,10 @@
             thinkingContent.textContent += chunk.token;
           } else if (chunk.done) {
             bubble.classList.remove("streaming-cursor");
+            // Re-render with dialogue coloring
+            var fullText = bubble.textContent;
+            bubble.textContent = "";
+            renderDialogue(bubble, fullText, "assistant");
             if (thinkingContent) {
               const toggle = thinkingSection.querySelector(".msg-thinking-toggle");
               toggle.textContent = "Hide thinking";
@@ -571,6 +609,9 @@
   // Chat input
   // ---------------------------------------------------------------------------
   $("sendBtn").addEventListener("click", sendMessage);
+  $("stopBtn").addEventListener("click", () => {
+    if (abortController) abortController.abort();
+  });
   $("chatInput").addEventListener("keydown", (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -585,7 +626,36 @@
     ta.style.height = Math.min(ta.scrollHeight, 150) + "px";
   }
 
+  $("continueBtn").addEventListener("click", continueConversation);
   $("regenerateBtn").addEventListener("click", regenerateResponse);
+
+  // Scene state toggle
+  $("sceneStateToggle").addEventListener("click", () => {
+    var panel = $("sceneStatePanel");
+    var isOpen = panel.style.display !== "none";
+    panel.style.display = isOpen ? "none" : "";
+    $("sceneStateToggle").textContent = isOpen ? "Scene State" : "Hide Scene State";
+  });
+  $("sceneStateSave").addEventListener("click", async () => {
+    if (!currentConvId) return;
+    await api("PUT", "/rp/conversations/" + currentConvId + "/scene-state", {
+      scene_state: $("sceneStateEditor").value,
+    });
+  });
+  $("sceneStateRefresh").addEventListener("click", async () => {
+    if (!currentConvId) return;
+    $("sceneStateRefresh").disabled = true;
+    $("sceneStateRefresh").textContent = "Generating...";
+    // Trigger a refresh by sending current messages to generate scene state
+    await api("POST", "/rp/conversations/" + currentConvId + "/refresh-scene-state");
+    // Reload conversation to get updated state
+    await openConversation(currentConvId);
+    $("sceneStateRefresh").disabled = false;
+    $("sceneStateRefresh").textContent = "Auto-generate";
+    // Re-open the panel
+    $("sceneStatePanel").style.display = "";
+    $("sceneStateToggle").textContent = "Hide Scene State";
+  });
 
   // Under the hood toggle
   $("underHoodToggle").addEventListener("click", () => {

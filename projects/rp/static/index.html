@@ -284,6 +284,22 @@
     transition: max-height 0.3s ease;
   }
   .under-hood.open { max-height: 300px; overflow-y: auto; }
+  .scene-state-toggle {
+    padding: 6px 20px;
+    font-size: 0.7em;
+    color: #8b949e;
+    cursor: pointer;
+    user-select: none;
+    border-top: 1px solid #30363d;
+    background: #161b22;
+    text-align: center;
+  }
+  .scene-state-toggle:hover { color: #58a6ff; }
+  .scene-state-panel {
+    padding: 10px 20px;
+    background: #161b22;
+    border-top: 1px solid #30363d;
+  }
   .under-hood-toggle {
     padding: 6px 20px;
     font-size: 0.7em;
@@ -735,11 +751,20 @@
           <div class="chat-header-model" id="chatHeaderModel"></div>
         </div>
         <div class="chat-header-actions">
+          <button id="continueBtn" title="Prompt AI to write">Continue</button>
           <button id="regenerateBtn" title="Regenerate last response">Regenerate</button>
         </div>
       </div>
       <div class="chat-messages" id="chatMessages">
         <div class="chat-empty" id="chatEmpty">Select or start a conversation</div>
+      </div>
+      <div class="scene-state-toggle" id="sceneStateToggle" style="display:none">Scene State</div>
+      <div class="scene-state-panel" id="sceneStatePanel" style="display:none">
+        <textarea id="sceneStateEditor" placeholder="Location, clothing, physical state, props, mood..." rows="5" style="width:100%;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;border-radius:8px;padding:8px;font-family:inherit;font-size:0.85em;resize:vertical"></textarea>
+        <div style="display:flex;gap:8px;margin-top:6px">
+          <button id="sceneStateSave" style="font-size:0.8em">Save</button>
+          <button id="sceneStateRefresh" style="font-size:0.8em;background:#238636">Auto-generate</button>
+        </div>
       </div>
       <div class="under-hood-toggle" id="underHoodToggle" style="display:none">Under the Hood</div>
       <div class="under-hood" id="underHood">
@@ -761,6 +786,7 @@
       <div class="chat-input-area" id="chatInputArea" style="display:none">
         <textarea id="chatInput" placeholder="Type a message..." rows="1"></textarea>
         <button id="sendBtn">Send</button>
+        <button id="stopBtn" style="display:none;background:#f85149">Stop</button>
         <div class="chat-input-avatars" id="chatInputAvatars">
           <img class="chat-input-avatar" id="chatInputAvatarUser" alt="">
           <img class="chat-input-avatar" id="chatInputAvatarAi" alt="">

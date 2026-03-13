@@ -50,6 +50,12 @@ def expand_variables(ctx: dict) -> dict:
     ctx["system_prompt"] = replace(ctx.get("system_prompt", ""))
     if ctx.get("post_prompt"):
         ctx["post_prompt"] = replace(ctx["post_prompt"])
+
+    # Inject scene state into system prompt if present
+    scene_state = ctx.get("scene_state", "")
+    if scene_state.strip():
+        ctx["system_prompt"] += "\n\n[Current Scene State]\n" + scene_state.strip()
+
     return ctx
 
 
@@ -134,7 +140,7 @@ def apply_context_strategy(ctx: dict) -> dict:
     """Fit messages within token budget using the active strategy."""
     settings = ctx.get("scenario", {}).get("settings", {})
     strategy_name = settings.get("context_strategy", "sliding_window")
-    max_tokens = settings.get("max_context_tokens", 2048)
+    max_tokens = settings.get("max_context_tokens", 6144)
 
     strategy = get_strategy(strategy_name)
     ctx["messages"] = strategy.fit(ctx["messages"], max_tokens)
