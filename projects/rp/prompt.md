@@ -23,8 +23,7 @@ Continue the story, prefer "yes, and" and "no, but"
 
 ## post
 
-Write only {{char}}'s next response in this collaborative story.
-Keep writing in character. Stay in the current scene.
-Do not narrate {{user}}'s actions or dialogue.
-Write 2-3 paragraphs per response.
-Leave space for {{user}} to respond.
+Write only {{char}}'s next response. Stay in character.
+NEVER write {{user}}'s actions, speech, thoughts, or decisions. You do not control {{user}}.
+Stop before {{user}} would act or speak. End on {{char}}'s action, thought, or dialogue.
+Write 2-3 paragraphs. Leave space for {{user}} to respond.
