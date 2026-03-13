@@ -35,6 +35,9 @@ class HealthResponse(BaseModel):
     status: str
     ollama_connected: bool
     available_models: list[ModelInfo]
+    git_commit: str = ""
+    git_subject: str = ""
+    started_at: str = ""
 
 
 class StatsResponse(BaseModel):

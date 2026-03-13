@@ -1,10 +1,14 @@
 import asyncio
 import importlib
 import json
+import os
+import signal
+import subprocess
 import sys
 import time
 from collections import deque
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -25,6 +29,20 @@ from ollama import OllamaClient, OllamaError
 
 config = Config()
 ollama = OllamaClient(base_url=config.ollama_url)
+
+# Server identity
+_started_at = datetime.now(timezone.utc).isoformat()
+try:
+    _repo_root = Path(__file__).resolve().parent.parent
+    _git_commit = subprocess.check_output(
+        ["git", "log", "-1", "--format=%h"], cwd=_repo_root, text=True
+    ).strip()
+    _git_subject = subprocess.check_output(
+        ["git", "log", "-1", "--format=%s"], cwd=_repo_root, text=True
+    ).strip()
+except Exception:
+    _git_commit = ""
+    _git_subject = ""
 
 # Stats tracking
 request_log: deque[dict] = deque(maxlen=10000)
@@ -112,7 +130,38 @@ async def health():
         status="ok" if available else "ollama_unavailable",
         ollama_connected=available,
         available_models=models,
+        git_commit=_git_commit,
+        git_subject=_git_subject,
+        started_at=_started_at,
     )
+
+
+@app.get("/.git-head")
+async def git_head():
+    """Return current repo HEAD commit hash (for staleness detection)."""
+    try:
+        head = subprocess.check_output(
+            ["git", "log", "-1", "--format=%h"], cwd=_repo_root, text=True
+        ).strip()
+    except Exception:
+        head = ""
+    return {"commit": head}
+
+
+@app.post("/restart")
+async def restart():
+    """Restart the server using restart.sh (kills this process, starts fresh)."""
+    script = Path(__file__).parent / "restart.sh"
+    if not script.exists():
+        return {"ok": False, "message": "restart.sh not found"}
+    # Launch restart.sh detached — it will kill us and start a new process
+    subprocess.Popen(
+        ["bash", str(script)],
+        start_new_session=True,
+        stdout=open("/tmp/aiserver-restart.log", "w"),
+        stderr=subprocess.STDOUT,
+    )
+    return {"ok": True, "message": "Restarting..."}
 
 
 @app.get("/stats", response_model=StatsResponse)
