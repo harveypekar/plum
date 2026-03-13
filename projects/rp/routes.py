@@ -44,7 +44,13 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         except ValueError as e:
             raise HTTPException(400, str(e))
         name = extract_name(card_data)
-        return await db.create_card(name, card_data, avatar=avatar)
+        card = await db.create_card(name, card_data, avatar=avatar)
+        # Auto-extract scenario from card if present
+        data = card_data.get("data", card_data)
+        scenario_text = data.get("scenario", "")
+        if scenario_text.strip():
+            await db.create_scenario(name + " — Scenario", scenario_text, {})
+        return card
 
     @app.get("/rp/cards/{card_id}", response_model=CardResponse)
     async def get_card(card_id: int):
@@ -66,6 +72,15 @@ def setup(app: FastAPI, ollama, resolve_model=None):
             raise HTTPException(404, "Card not found")
         return {"ok": True}
 
+    @app.put("/rp/cards/{card_id}/avatar")
+    async def upload_avatar(card_id: int, file: UploadFile = File(...)):
+        data = await file.read()
+        if len(data) > 5 * 1024 * 1024:
+            raise HTTPException(413, "File too large (max 5 MB)")
+        if not await db.set_card_avatar(card_id, data):
+            raise HTTPException(404, "Card not found")
+        return {"ok": True}
+
     @app.get("/rp/cards/{card_id}/avatar")
     async def get_avatar(card_id: int):
         avatar = await db.get_card_avatar(card_id)
@@ -84,6 +99,17 @@ def setup(app: FastAPI, ollama, resolve_model=None):
             content=png, media_type="image/png",
             headers={"Content-Disposition": f'attachment; filename="{card["name"]}.png"'},
         )
+
+    @app.post("/rp/cards/{card_id}/extract-scenario", response_model=ScenarioResponse)
+    async def extract_scenario(card_id: int):
+        card = await db.get_card(card_id)
+        if not card:
+            raise HTTPException(404, "Card not found")
+        data = card["card_data"].get("data", card["card_data"])
+        scenario_text = data.get("scenario", "")
+        if not scenario_text.strip():
+            raise HTTPException(400, "Card has no scenario text")
+        return await db.create_scenario(card["name"] + " — Scenario", scenario_text, {})
 
     # -- Scenarios --
 
