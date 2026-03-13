@@ -99,7 +99,12 @@ All routes are under `/rp/`.
 
 ## Prompt Templates
 
-Templates define how the system prompt is assembled from card data and scenario. They are stored in the `rp_prompt_templates` table and selected per scenario via `settings.template_id`.
+Templates define how the system prompt and post-prompt are assembled from card data and scenario. They are stored in the `rp_prompt_templates` table and selected per scenario via `settings.template_id`.
+
+A template has two sections separated by markdown headers:
+
+- **`## system`** — The main system prompt (character description, personality, scenario context)
+- **`## post`** — Behavioral directives injected as the final system message after chat history
 
 ### Template Syntax (Mustache-lite)
 
@@ -128,7 +133,7 @@ Character: {{description}}
 
 ### Variable Expansion (Post-Template)
 
-After the template is rendered, a second pass replaces these variables in the assembled system prompt:
+After the template is rendered, a second pass replaces these variables in both the system prompt and post prompt:
 
 | Variable | Replacement |
 |----------|-------------|
@@ -136,13 +141,12 @@ After the template is rendered, a second pass replaces these variables in the as
 | `${char}` | AI card name |
 | `${scenario}` | Scenario description |
 
-These work in the system prompt only (not in user messages).
-
 ### Default Template
 
 When no template is selected, this built-in default is used:
 
 ```
+## system
 {{#scenario}}Scenario: {{scenario}}
 
 {{/scenario}}{{#description}}Character: {{description}}
@@ -151,16 +155,23 @@ When no template is selected, this built-in default is used:
 
 {{/personality}}{{#mes_example}}Example dialogue:
 {{mes_example}}{{/mes_example}}
+
+## post
+Write only {{char}}'s next response. Stay in character. Do not narrate {{user}}'s actions.
 ```
 
-### Where Templates Are Used
+### How It Works
 
 ```
-Scenario settings.template_id → db.get_template() → pipeline ctx["prompt_template"]
-    → assemble_prompt() renders template with card/scenario values
-    → expand_variables() replaces ${user}/${char}/${scenario}
+prompt.md (re-read each request)
+    → _split_template() splits by ## system / ## post headers
+    → assemble_prompt() renders each section with card/scenario values
+    → expand_variables() replaces ${user}/${char}/${scenario} in both sections
     → apply_context_strategy() trims messages to fit token budget
-    → system prompt + last user message sent to Ollama
+    → system section → first message in chat messages array
+    → conversation messages → structured [{role, content}] array
+    → post section → final system message in chat messages array
+    → Sent to Ollama /api/chat with stop sequences
 ```
 
 ## Pipeline
@@ -168,8 +179,8 @@ Scenario settings.template_id → db.get_template() → pipeline ctx["prompt_tem
 The processing pipeline runs hooks before sending to the LLM (pre) and after receiving the response (post).
 
 **Pre-hooks (in order):**
-1. `assemble_prompt` — Render prompt template into system prompt
-2. `expand_variables` — Replace `${user}`, `${char}`, `${scenario}` in system prompt
+1. `assemble_prompt` — Render prompt template into `system_prompt` + `post_prompt`
+2. `expand_variables` — Replace `${user}`, `${char}`, `${scenario}` in system and post prompts
 3. `apply_context_strategy` — Fit messages within token budget (default: sliding window, 2048 tokens)
 
 **Post-hooks:**
@@ -185,7 +196,7 @@ Configured via `scenario.settings.context_strategy`. Token counting uses `len(te
 
 ## Streaming Protocol
 
-Chat responses stream as NDJSON (`application/x-ndjson`). Each line is a JSON object:
+The backend sends requests to Ollama via `/api/chat`. Chat responses stream to the frontend as NDJSON (`application/x-ndjson`). Each line is a JSON object:
 
 ```jsonl
 {"debug_prompt": "...", "debug_messages": [...]}   # First chunk: assembled prompt (for Under the Hood)
@@ -194,6 +205,8 @@ Chat responses stream as NDJSON (`application/x-ndjson`). Each line is a JSON ob
 {"done": true, "total_duration": ..., ...}          # Final chunk with Ollama stats
 {"error": "...", "done": true}                      # Error (if any)
 ```
+
+The NDJSON streaming format to the frontend is unchanged from prior versions.
 
 ## UI Features
 
@@ -213,6 +226,8 @@ Stored as JSONB in `rp_scenarios.settings`:
 | `max_context_tokens` | int | `2048` | Token budget for message history |
 | `model` | string | — | Model override (bypasses conversation model) |
 | `template_id` | int | — | Prompt template ID (null = use default) |
+
+Ollama options (temperature, repeat_penalty, etc.) from scenario settings are passed through to the `/api/chat` request.
 
 ## SillyTavern Card Format
 
