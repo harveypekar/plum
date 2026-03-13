@@ -115,8 +115,8 @@ async def set_card_avatar(card_id: int, avatar: bytes) -> bool:
 async def list_scenarios() -> list[dict]:
     pool = await get_pool()
     rows = await pool.fetch(
-        "SELECT id, name, description, settings, created_at::text, updated_at::text "
-        "FROM rp_scenarios ORDER BY name"
+        "SELECT id, name, description, first_message, settings, "
+        "created_at::text, updated_at::text FROM rp_scenarios ORDER BY name"
     )
     return [dict(r) for r in rows]
 
@@ -124,30 +124,33 @@ async def list_scenarios() -> list[dict]:
 async def get_scenario(scenario_id: int) -> dict | None:
     pool = await get_pool()
     row = await pool.fetchrow(
-        "SELECT id, name, description, settings, created_at::text, updated_at::text "
-        "FROM rp_scenarios WHERE id = $1", scenario_id,
+        "SELECT id, name, description, first_message, settings, "
+        "created_at::text, updated_at::text FROM rp_scenarios WHERE id = $1",
+        scenario_id,
     )
     return dict(row) if row else None
 
 
-async def create_scenario(name: str, description: str, settings: dict) -> dict:
+async def create_scenario(name: str, description: str, settings: dict,
+                           first_message: str = "") -> dict:
     pool = await get_pool()
     row = await pool.fetchrow(
-        "INSERT INTO rp_scenarios (name, description, settings) "
-        "VALUES ($1, $2, $3) RETURNING id, name, description, settings, "
-        "created_at::text, updated_at::text",
-        name, description, settings,
+        "INSERT INTO rp_scenarios (name, description, first_message, settings) "
+        "VALUES ($1, $2, $3, $4) RETURNING id, name, description, first_message, "
+        "settings, created_at::text, updated_at::text",
+        name, description, first_message, settings,
     )
     return dict(row)
 
 
-async def update_scenario(scenario_id: int, name: str, description: str, settings: dict) -> dict | None:
+async def update_scenario(scenario_id: int, name: str, description: str,
+                            settings: dict, first_message: str = "") -> dict | None:
     pool = await get_pool()
     row = await pool.fetchrow(
-        "UPDATE rp_scenarios SET name=$2, description=$3, settings=$4, "
-        "updated_at=NOW() WHERE id=$1 RETURNING id, name, description, settings, "
-        "created_at::text, updated_at::text",
-        scenario_id, name, description, settings,
+        "UPDATE rp_scenarios SET name=$2, description=$3, first_message=$4, "
+        "settings=$5, updated_at=NOW() WHERE id=$1 RETURNING id, name, description, "
+        "first_message, settings, created_at::text, updated_at::text",
+        scenario_id, name, description, first_message, settings,
     )
     return dict(row) if row else None
 

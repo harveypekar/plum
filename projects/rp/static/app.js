@@ -948,6 +948,110 @@
     }
   });
 
+  // ---------------------------------------------------------------------------
+  // Card Generator (AI-assisted)
+  // ---------------------------------------------------------------------------
+  var cardGenMessages = [];
+  var cardGenCard = null;
+
+  $("generateCardBtn").addEventListener("click", () => {
+    cardGenMessages = [];
+    cardGenCard = null;
+    $("cardGenChat").textContent = "";
+    $("cardGenInput").value = "";
+    $("cardGenPreview").style.display = "none";
+    $("cardGenerator").classList.add("open");
+    $("cardEditor").classList.remove("open");
+    $("cardGenInput").focus();
+  });
+
+  $("cardGenCancel").addEventListener("click", () => {
+    $("cardGenerator").classList.remove("open");
+  });
+
+  $("cardGenSend").addEventListener("click", cardGenSendMessage);
+  $("cardGenInput").addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      cardGenSendMessage();
+    }
+  });
+
+  async function cardGenSendMessage() {
+    var input = $("cardGenInput").value.trim();
+    if (!input) return;
+
+    cardGenMessages.push({ role: "user", content: input });
+    cardGenAppendMsg("user", input);
+    $("cardGenInput").value = "";
+    $("cardGenSend").disabled = true;
+    $("cardGenSend").textContent = "Thinking...";
+
+    try {
+      var resp = await api("POST", "/rp/cards/generate", { messages: cardGenMessages });
+      if (resp.error) {
+        cardGenAppendMsg("assistant", "Error: " + resp.error + "\n\nRaw:\n" + (resp.raw || ""));
+      } else {
+        cardGenCard = resp.card;
+        cardGenMessages.push({ role: "assistant", content: JSON.stringify(cardGenCard) });
+        cardGenAppendMsg("assistant", "Card generated! See preview below. Send feedback to refine.");
+        cardGenShowPreview(cardGenCard);
+      }
+    } catch (e) {
+      cardGenAppendMsg("assistant", "Request failed: " + e.message);
+    }
+
+    $("cardGenSend").disabled = false;
+    $("cardGenSend").textContent = "Send";
+  }
+
+  function cardGenAppendMsg(role, text) {
+    var div = document.createElement("div");
+    div.className = "gen-msg " + role;
+    div.textContent = text;
+    $("cardGenChat").appendChild(div);
+    $("cardGenChat").scrollTop = $("cardGenChat").scrollHeight;
+  }
+
+  function cardGenShowPreview(card) {
+    var lines = [];
+    lines.push("Name: " + (card.name || ""));
+    lines.push("\nDescription:\n" + (card.description || ""));
+    lines.push("\nPersonality:\n" + (card.personality || ""));
+    lines.push("\nFirst Message:\n" + (card.first_mes || ""));
+    lines.push("\nScenario:\n" + (card.scenario || ""));
+    lines.push("\nExample Messages:\n" + (card.mes_example || ""));
+    lines.push("\nTags: " + (card.tags || []).join(", "));
+    $("cardGenPreviewContent").textContent = lines.join("\n");
+    $("cardGenPreview").style.display = "";
+  }
+
+  $("cardGenCreate").addEventListener("click", async () => {
+    if (!cardGenCard) return;
+    var card = cardGenCard;
+    var data = {
+      name: card.name || "Untitled",
+      card_data: {
+        data: {
+          name: card.name || "Untitled",
+          description: card.description || "",
+          personality: card.personality || "",
+          first_mes: card.first_mes || "",
+          mes_example: card.mes_example || "",
+          scenario: card.scenario || "",
+          tags: card.tags || [],
+        }
+      }
+    };
+    try {
+      await api("POST", "/rp/cards", data);
+      $("cardGenerator").classList.remove("open");
+      loadCards();
+    } catch (e) {
+      alert("Failed to create card: " + e.message);
+    }
+  });
+
   // Drag and drop / file picker for SillyTavern PNG import
   const dropZone = $("cardDropZone");
   const filePicker = $("cardFilePicker");
@@ -1054,6 +1158,7 @@
     $("scenarioEditorTitle").textContent = s ? "Edit Scenario" : "New Scenario";
     $("scenarioName").value = s ? s.name : "";
     $("scenarioDescription").value = s ? s.description : "";
+    $("scenarioFirstMessage").value = s ? (s.first_message || "") : "";
 
     // Model override
     populateModelSelect($("scenarioModel"), s && s.settings ? s.settings.model : "");
@@ -1123,6 +1228,7 @@
     const data = {
       name,
       description: $("scenarioDescription").value,
+      first_message: $("scenarioFirstMessage").value,
       settings,
     };
 
@@ -1138,6 +1244,70 @@
     } catch (e) {
       alert("Error saving scenario: " + e.message);
     }
+  });
+
+  // ---------------------------------------------------------------------------
+  // Server status indicator
+  // ---------------------------------------------------------------------------
+  var _serverCommit = "";
+  async function checkServerStatus() {
+    var dot = $("serverStatus");
+    var info = $("serverInfo");
+    try {
+      var res = await fetch("/health");
+      if (res.ok) {
+        var data = await res.json();
+        _serverCommit = data.git_commit || "";
+        dot.style.background = "#3fb950";
+        dot.title = "Server online — click for details";
+        info.textContent = _serverCommit + " " + (data.git_subject || "");
+        info.style.color = "#8b949e";
+        // Check current git HEAD to detect staleness
+        try {
+          var gitRes = await fetch("/.git-head");
+          if (gitRes.ok) {
+            var gitData = await gitRes.json();
+            var head = gitData.commit || "";
+            if (head && _serverCommit && head !== _serverCommit) {
+              info.textContent = _serverCommit + " " + (data.git_subject || "") + " (outdated)";
+              info.style.color = "#d29922";
+            }
+          }
+        } catch {}
+      } else {
+        dot.style.background = "#f85149";
+        dot.title = "Server error";
+        info.textContent = "Server error";
+        info.style.color = "#f85149";
+      }
+    } catch {
+      dot.style.background = "#f85149";
+      dot.title = "Server offline";
+      info.textContent = "Server offline";
+      info.style.color = "#f85149";
+    }
+  }
+  checkServerStatus();
+  setInterval(checkServerStatus, 30000);
+
+  $("serverRestartBtn").addEventListener("click", async () => {
+    $("serverRestartBtn").disabled = true;
+    $("serverRestartBtn").textContent = "Restarting...";
+    try {
+      await fetch("/restart", { method: "POST" });
+    } catch {}
+    // Wait for server to come back
+    await new Promise(r => setTimeout(r, 2000));
+    for (var i = 0; i < 15; i++) {
+      try {
+        var res = await fetch("/health");
+        if (res.ok) break;
+      } catch {}
+      await new Promise(r => setTimeout(r, 1000));
+    }
+    $("serverRestartBtn").disabled = false;
+    $("serverRestartBtn").textContent = "Restart";
+    await checkServerStatus();
   });
 
   // ---------------------------------------------------------------------------
