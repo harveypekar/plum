@@ -496,19 +496,76 @@
   }
   .card-generator.open { display: block; }
   .card-generator h3 { font-size: 0.95em; color: #f0f6fc; margin-bottom: 12px; }
-  .card-gen-chat {
-    max-height: 200px;
-    overflow-y: auto;
-    font-size: 0.82em;
-    color: #c9d1d9;
-  }
-  .card-gen-chat .gen-msg {
-    margin-bottom: 8px;
-    padding: 6px 10px;
+  .card-gen-field {
+    margin-bottom: 10px;
+    border: 1px solid #30363d;
     border-radius: 6px;
+    padding: 10px;
+    background: #0d1117;
   }
-  .card-gen-chat .gen-msg.user { background: #1c2333; color: #58a6ff; }
-  .card-gen-chat .gen-msg.assistant { background: #1c2d1c; color: #8b949e; }
+  .card-gen-field-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 4px;
+  }
+  .card-gen-field-header label {
+    font-size: 0.7em;
+    color: #8b949e;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+  .card-gen-field-header button {
+    font-size: 0.7em;
+    background: #21262d;
+    border: 1px solid #30363d;
+    color: #8b949e;
+    border-radius: 4px;
+    padding: 2px 8px;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .card-gen-field-header button:hover { color: #8957e5; border-color: #8957e5; }
+  .card-gen-field-header button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .card-gen-field textarea {
+    width: 100%;
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 4px;
+    color: #c9d1d9;
+    padding: 6px 8px;
+    font-family: inherit;
+    font-size: 0.82em;
+    resize: vertical;
+    min-height: 40px;
+  }
+  .card-gen-field textarea:focus { outline: none; border-color: #58a6ff; }
+  .card-gen-field-instructions {
+    display: none;
+    margin-top: 4px;
+  }
+  .card-gen-field-instructions.open { display: flex; gap: 4px; }
+  .card-gen-field-instructions input {
+    flex: 1;
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 4px;
+    color: #c9d1d9;
+    padding: 4px 6px;
+    font-family: inherit;
+    font-size: 0.78em;
+  }
+  .card-gen-field-instructions input:focus { outline: none; border-color: #8957e5; }
+  .card-gen-field-instructions button {
+    font-size: 0.75em;
+    background: #8957e5;
+    border: none;
+    color: #fff;
+    border-radius: 4px;
+    padding: 4px 10px;
+    cursor: pointer;
+    font-family: inherit;
+  }
   .card-editor h3 {
     font-size: 0.95em;
     color: #f0f6fc;
@@ -876,17 +933,23 @@
         </div>
         <div class="card-generator" id="cardGenerator">
           <h3>Generate Character Card</h3>
-          <div class="card-gen-chat" id="cardGenChat"></div>
-          <div style="display:flex;gap:8px;margin-top:8px">
-            <textarea id="cardGenInput" rows="2" placeholder="Describe a character... or request changes" style="flex:1"></textarea>
-            <button id="cardGenSend" style="align-self:flex-end">Send</button>
-          </div>
-          <div id="cardGenPreview" style="display:none;margin-top:12px">
-            <h4 style="color:#f0f6fc;font-size:0.85em;margin-bottom:8px">Preview</h4>
-            <div id="cardGenPreviewContent" style="background:#0d1117;border:1px solid #30363d;border-radius:8px;padding:12px;font-size:0.82em;color:#c9d1d9;max-height:300px;overflow-y:auto;white-space:pre-wrap"></div>
-            <div style="display:flex;gap:8px;margin-top:8px">
-              <button id="cardGenCreate" style="background:#238636">Create Card</button>
+          <div id="cardGenStep1">
+            <div class="form-group">
+              <label for="cardGenDescription">Describe your character</label>
+              <textarea id="cardGenDescription" rows="3" placeholder="A cheerful elven bard who travels from town to town..."></textarea>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center">
+              <button id="cardGenGenerate" class="btn-primary" style="background:#8957e5">Generate</button>
               <button id="cardGenCancel" class="btn-secondary">Cancel</button>
+              <span id="cardGenStatus" style="font-size:0.8em;color:#8b949e"></span>
+            </div>
+          </div>
+          <div id="cardGenStep2" style="display:none">
+            <div id="cardGenFields"></div>
+            <div style="display:flex;gap:8px;margin-top:12px">
+              <button id="cardGenCreate" class="btn-primary">Create Card</button>
+              <button id="cardGenBack" class="btn-secondary">Back</button>
+              <button id="cardGenCancelPreview" class="btn-secondary">Cancel</button>
             </div>
           </div>
         </div>
