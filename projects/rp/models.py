@@ -43,6 +43,7 @@ class ConversationResponse(BaseModel):
     ai_card_id: int
     scenario_id: int | None
     model: str
+    scene_state: str = ""
     created_at: str
     updated_at: str
 
@@ -71,3 +72,7 @@ class SendMessageRequest(BaseModel):
 
 class EditMessageRequest(BaseModel):
     content: str
+
+
+class SceneStateRequest(BaseModel):
+    scene_state: str
