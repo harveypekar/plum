@@ -9,7 +9,7 @@ class OllamaError(Exception):
 
 
 class OllamaClient:
-    """Async client for Ollama's /api/generate endpoint."""
+    """Async client for Ollama's /api/generate and /api/chat endpoints."""
 
     def __init__(self, base_url: str = "http://localhost:11434"):
         self.base_url = base_url
@@ -62,6 +62,78 @@ class OllamaClient:
 
                         thinking_text = data.get("thinking", "")
                         token_text = data.get("response", "")
+
+                        if thinking_text:
+                            total_tokens += 1
+                            yield {"token": thinking_text, "thinking": True, "done": False}
+                        if token_text:
+                            total_tokens += 1
+                            yield {"token": token_text, "thinking": False, "done": False}
+
+                        if data.get("done"):
+                            eval_count = data.get("eval_count", total_tokens)
+                            eval_duration = data.get("eval_duration", 1)
+                            tps = eval_count / (eval_duration / 1e9) if eval_duration else 0
+                            yield {
+                                "token": "",
+                                "done": True,
+                                "total_tokens": eval_count,
+                                "tokens_per_second": round(tps, 1),
+                            }
+                            return
+        except httpx.ConnectError:
+            raise OllamaError(f"Cannot connect to Ollama at {self.base_url}")
+        except httpx.HTTPError as e:
+            raise OllamaError(f"HTTP error communicating with Ollama: {e}") from e
+
+    async def chat_stream(
+        self,
+        model: str,
+        messages: list[dict],
+        options: dict | None = None,
+        stop: list[str] | None = None,
+    ) -> AsyncGenerator[dict, None]:
+        """Stream tokens from Ollama /api/chat. Yields dicts with token/thinking/done keys.
+
+        Each yielded dict:
+          {"token": "...", "thinking": bool, "done": False}
+          {"token": "", "done": True, "total_tokens": N, "tokens_per_second": F}
+        """
+        think = False
+        ollama_options = {}
+        if options:
+            options = dict(options)
+            think = options.pop("think", False)
+            ollama_options = {k: v for k, v in options.items() if v is not None}
+
+        body: dict = {
+            "model": model,
+            "messages": messages,
+            "stream": True,
+        }
+        if ollama_options:
+            body["options"] = ollama_options
+        if think:
+            body["think"] = True
+        if stop:
+            body["stop"] = stop
+
+        total_tokens = 0
+        try:
+            async with httpx.AsyncClient(timeout=120.0) as client:
+                async with client.stream(
+                    "POST", f"{self.base_url}/api/chat", json=body
+                ) as resp:
+                    if resp.status_code != 200:
+                        text = await resp.aread()
+                        raise OllamaError(f"Ollama returned {resp.status_code}: {text.decode()}")
+                    async for line in resp.aiter_lines():
+                        if not line:
+                            continue
+                        data = json.loads(line)
+
+                        thinking_text = data.get("message", {}).get("thinking", "") or data.get("thinking", "")
+                        token_text = data.get("message", {}).get("content", "")
 
                         if thinking_text:
                             total_tokens += 1
