@@ -16,6 +16,7 @@
   let availableModels = [];
   let allCards = [];
   let allScenarios = [];
+  let allConversations = [];
 
   // ---------------------------------------------------------------------------
   // Helpers
@@ -84,6 +85,36 @@
     if (m.quantization_level) parts.push(m.quantization_level);
     if (parts.length > 0) label += " — " + parts.join(", ");
     return label;
+  }
+
+  function modelSupportsThink(modelValue) {
+    const m = availableModels.find(function (x) {
+      return (x.alias || x.name) === modelValue;
+    });
+    return m ? !!m.supports_think : false;
+  }
+
+  function updateThinkHint(selectEl) {
+    var hint = $("scenarioThinkHint");
+    var checkbox = $("scenarioThink");
+    if (!hint) return;
+    var modelVal = selectEl.value;
+    if (!modelVal) {
+      hint.textContent = "";
+      hint.style.color = "#8b949e";
+      checkbox.disabled = false;
+      return;
+    }
+    if (modelSupportsThink(modelVal)) {
+      hint.textContent = "supported by this model";
+      hint.style.color = "#3fb950";
+      checkbox.disabled = false;
+    } else {
+      hint.textContent = "not supported by this model";
+      hint.style.color = "#8b949e";
+      checkbox.disabled = true;
+      checkbox.checked = false;
+    }
   }
 
   function populateModelSelect(selectEl, selectedValue) {
@@ -165,6 +196,7 @@
   async function loadConversations() {
     try {
       const convs = await api("GET", "/rp/conversations");
+      allConversations = convs;
       renderConversationList(convs);
     } catch (e) {
       // silently fail
@@ -257,7 +289,9 @@
       const banner = el("div", { className: "scenario-banner" });
       const label = el("div", { className: "scenario-banner-label", textContent: "Scenario" });
       banner.appendChild(label);
-      banner.appendChild(document.createTextNode(scenario.description));
+      const bannerText = el("span");
+      renderDialogue(bannerText, scenario.description, "assistant");
+      banner.appendChild(bannerText);
       container.appendChild(banner);
     }
 
@@ -271,6 +305,10 @@
     // Input area
     $("chatInputArea").style.display = "";
     $("underHoodToggle").style.display = "";
+
+    // Chat input avatars
+    setAvatarSrc($("chatInputAvatarUser"), user_card.id, user_card.has_avatar);
+    setAvatarSrc($("chatInputAvatarAi"), ai_card.id, ai_card.has_avatar);
 
     // Show last raw_response in under-the-hood
     const lastAi = [...messages].reverse().find((m) => m.role === "assistant");
@@ -386,13 +424,13 @@
     container.scrollTop = container.scrollHeight;
 
     // Stream AI response
-    await streamResponse("/rp/conversations/" + currentConvId + "/message", { content }, container);
+    const hadError = await streamResponse("/rp/conversations/" + currentConvId + "/message", { content }, container);
 
     isStreaming = false;
     $("sendBtn").disabled = false;
 
-    // Reload to sync state
-    openConversation(currentConvId);
+    // Reload to sync state (skip on error so the error message stays visible)
+    if (!hadError) openConversation(currentConvId);
   }
 
   async function regenerateResponse() {
@@ -407,12 +445,12 @@
       allMsgs[allMsgs.length - 1].remove();
     }
 
-    await streamResponse("/rp/conversations/" + currentConvId + "/regenerate", undefined, container);
+    const hadError = await streamResponse("/rp/conversations/" + currentConvId + "/regenerate", undefined, container);
 
     isStreaming = false;
     $("sendBtn").disabled = false;
 
-    openConversation(currentConvId);
+    if (!hadError) openConversation(currentConvId);
   }
 
   async function streamResponse(url, body, container) {
@@ -438,6 +476,7 @@
     let thinkingSection = null;
     let thinkingContent = null;
     let hasThinking = false;
+    let hadError = false;
 
     const bubble = el("div", { className: "message-bubble streaming-cursor" });
     col.appendChild(bubble);
@@ -464,10 +503,12 @@
 
           if (chunk.debug_prompt !== undefined) {
             $("underHoodPromptContent").textContent = chunk.debug_prompt || "(empty)";
+            $("underHoodUserPromptContent").textContent = chunk.debug_user_prompt || "(empty)";
             continue;
           }
 
           if (chunk.error) {
+            hadError = true;
             bubble.classList.remove("streaming-cursor");
             const errSpan = el("span", {
               style: { color: "#f85149" },
@@ -515,6 +556,7 @@
       }
     } catch (e) {
       if (e.name !== "AbortError") {
+        hadError = true;
         bubble.classList.remove("streaming-cursor");
         bubble.textContent += "\n[Stream error: " + e.message + "]";
       }
@@ -522,6 +564,7 @@
       bubble.classList.remove("streaming-cursor");
       abortController = null;
     }
+    return hadError;
   }
 
   // ---------------------------------------------------------------------------
@@ -572,6 +615,9 @@
     // Refresh data
     await Promise.all([loadModels(), refreshCardsAndScenarios()]);
 
+    // Defaults from most recent conversation
+    const last = allConversations.length > 0 ? allConversations[0] : null;
+
     // Populate selects
     const userSelect = $("modalUserCard");
     const aiSelect = $("modalAiCard");
@@ -588,11 +634,13 @@
       const opt1 = document.createElement("option");
       opt1.value = card.id;
       opt1.textContent = label;
+      if (last && card.id === last.user_card_id) opt1.selected = true;
       userSelect.appendChild(opt1);
 
       const opt2 = document.createElement("option");
       opt2.value = card.id;
       opt2.textContent = label;
+      if (last && card.id === last.ai_card_id) opt2.selected = true;
       aiSelect.appendChild(opt2);
     }
 
@@ -606,10 +654,11 @@
       const opt = document.createElement("option");
       opt.value = s.id;
       opt.textContent = s.name;
+      if (last && s.id === last.scenario_id) opt.selected = true;
       scenarioSelect.appendChild(opt);
     }
 
-    populateModelSelect(modelSelect);
+    populateModelSelect(modelSelect, last ? last.model : undefined);
 
     $("newChatModal").classList.add("open");
   }
@@ -741,8 +790,53 @@
     $("cardScenario").value = cardData.scenario || "";
     $("cardTags").value = (cardData.tags || []).join(", ");
 
+    // Show extract button if card has scenario text
+    const extractBtn = $("cardExtractScenario");
+    extractBtn.style.display = (card && cardData.scenario) ? "" : "none";
+
+    // Avatar preview (only for existing cards)
+    const avatarGroup = $("cardAvatarGroup");
+    const avatarPreview = $("cardAvatarPreview");
+    if (card) {
+      avatarGroup.style.display = "";
+      if (card.has_avatar) {
+        avatarPreview.src = "/rp/cards/" + card.id + "/avatar?" + Date.now();
+      } else {
+        avatarPreview.removeAttribute("src");
+        avatarPreview.style.background = "#30363d";
+      }
+    } else {
+      avatarGroup.style.display = "none";
+    }
+
     $("cardEditor").classList.add("open");
   }
+
+  $("cardExtractScenario").addEventListener("click", async () => {
+    if (!editingCardId) return;
+    try {
+      const scenario = await api("POST", "/rp/cards/" + editingCardId + "/extract-scenario");
+      alert("Created scenario: " + scenario.name);
+    } catch (e) {
+      alert("Error: " + e.message);
+    }
+  });
+
+  $("cardAvatarPreview").addEventListener("click", () => $("cardAvatarPicker").click());
+  $("cardAvatarPicker").addEventListener("change", async () => {
+    const file = $("cardAvatarPicker").files[0];
+    if (!file || !editingCardId) return;
+    const formData = new FormData();
+    formData.append("file", file);
+    try {
+      await fetch("/rp/cards/" + editingCardId + "/avatar", { method: "PUT", body: formData });
+      $("cardAvatarPreview").src = "/rp/cards/" + editingCardId + "/avatar?" + Date.now();
+      loadCards();
+    } catch (e) {
+      alert("Upload failed: " + e.message);
+    }
+    $("cardAvatarPicker").value = "";
+  });
 
   $("newCardBtn").addEventListener("click", () => editCard(null));
 
@@ -907,6 +1001,21 @@
       $("scenarioContext").value = "sliding_window";
     }
 
+    // Think toggle
+    $("scenarioThink").checked = !!(s && s.settings && s.settings.think);
+    updateThinkHint($("scenarioModel"));
+    $("scenarioModel").addEventListener("change", function () {
+      updateThinkHint(this);
+    });
+
+    // Ollama options
+    var st = (s && s.settings) || {};
+    $("scenarioRepeatPenalty").value = st.repeat_penalty || "";
+    $("scenarioTemperature").value = st.temperature || "";
+    $("scenarioMinP").value = st.min_p || "";
+    $("scenarioTopK").value = (st.top_k !== undefined && st.top_k !== null) ? st.top_k : "";
+    $("scenarioRepeatLastN").value = st.repeat_last_n || "";
+
     $("scenarioEditor").classList.add("open");
   }
 
@@ -927,8 +1036,19 @@
     const settings = {
       context_strategy: $("scenarioContext").value,
     };
+    if ($("scenarioThink").checked) settings.think = true;
     const modelOverride = $("scenarioModel").value;
     if (modelOverride) settings.model = modelOverride;
+    const repeatPenalty = parseFloat($("scenarioRepeatPenalty").value);
+    if (!isNaN(repeatPenalty)) settings.repeat_penalty = repeatPenalty;
+    const temperature = parseFloat($("scenarioTemperature").value);
+    if (!isNaN(temperature)) settings.temperature = temperature;
+    const minP = parseFloat($("scenarioMinP").value);
+    if (!isNaN(minP)) settings.min_p = minP;
+    const topK = parseInt($("scenarioTopK").value);
+    if (!isNaN(topK)) settings.top_k = topK;
+    const repeatLastN = parseInt($("scenarioRepeatLastN").value);
+    if (!isNaN(repeatLastN)) settings.repeat_last_n = repeatLastN;
 
     const data = {
       name,
