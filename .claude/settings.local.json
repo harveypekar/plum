@@ -68,7 +68,10 @@
       "WebFetch(domain:proton.me)",
       "WebFetch(domain:docs.mxroute.com)",
       "Bash(GDRIVE_LOCAL_PATH= GDRIVE_RCLONE_REMOTE= bash:*)",
-      "Bash(command:*)"
+      "Bash(command:*)",
+      "Bash(ss:*)",
+      "Bash(kill 69105:*)",
+      "Bash(kill:*)"
     ]
   },
   "hooks": {
