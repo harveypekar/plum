@@ -186,6 +186,17 @@ class OllamaClient:
         details = await self.list_models_detail()
         return [m["name"] for m in details]
 
+    async def _check_think_support(self, client: httpx.AsyncClient, model: str) -> bool:
+        """Check if a model supports thinking by inspecting its template."""
+        try:
+            resp = await client.post(f"{self.base_url}/api/show", json={"model": model})
+            if resp.status_code == 200:
+                template = resp.json().get("template", "")
+                return ".Think" in template
+        except httpx.HTTPError:
+            pass
+        return False
+
     async def list_models_detail(self) -> list[dict]:
         """Return list of models with name and size info from Ollama."""
         try:
@@ -203,6 +214,7 @@ class OllamaClient:
                             info["quantization_level"] = details["quantization_level"]
                         if m.get("size"):
                             info["size_bytes"] = m["size"]
+                        info["supports_think"] = await self._check_think_support(client, m["name"])
                         result.append(info)
                     return result
         except httpx.HTTPError:

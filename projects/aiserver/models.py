@@ -28,6 +28,7 @@ class ModelInfo(BaseModel):
     parameter_size: str | None = None
     quantization_level: str | None = None
     size_bytes: int | None = None
+    supports_think: bool = False
 
 
 class HealthResponse(BaseModel):
