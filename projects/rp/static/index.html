@@ -486,6 +486,29 @@
     margin-bottom: 20px;
   }
   .card-editor.open { display: block; }
+  .card-generator {
+    display: none;
+    background: #161b22;
+    border: 1px solid #8957e5;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+  .card-generator.open { display: block; }
+  .card-generator h3 { font-size: 0.95em; color: #f0f6fc; margin-bottom: 12px; }
+  .card-gen-chat {
+    max-height: 200px;
+    overflow-y: auto;
+    font-size: 0.82em;
+    color: #c9d1d9;
+  }
+  .card-gen-chat .gen-msg {
+    margin-bottom: 8px;
+    padding: 6px 10px;
+    border-radius: 6px;
+  }
+  .card-gen-chat .gen-msg.user { background: #1c2333; color: #58a6ff; }
+  .card-gen-chat .gen-msg.assistant { background: #1c2d1c; color: #8b949e; }
   .card-editor h3 {
     font-size: 0.95em;
     color: #f0f6fc;
@@ -716,8 +739,12 @@
   <!-- Sidebar -->
   <div class="sidebar">
     <div class="sidebar-header">
-      <h1>RP Chat</h1>
+      <h1>RP Chat <span id="serverStatus" title="Checking..." style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#484f58;vertical-align:middle;margin-left:4px"></span></h1>
       <div class="subtitle">Roleplay conversations</div>
+      <div style="font-size:0.65em;color:#8b949e;margin-top:2px;display:flex;align-items:center;gap:6px">
+        <span id="serverInfo" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1"></span>
+        <button id="serverRestartBtn" style="font-size:0.9em;padding:1px 6px;background:#30363d;border:1px solid #484f58;color:#8b949e;border-radius:4px;cursor:pointer">Restart</button>
+      </div>
     </div>
     <div class="sidebar-nav">
       <a href="#chat" class="active" data-view="chat">
@@ -798,6 +825,7 @@
     <div class="view" id="viewCards" data-view="cards">
       <div class="view-header">
         <h2>Character Cards</h2>
+        <button class="new-chat-btn" id="generateCardBtn" style="margin-right:6px;background:#8957e5">Generate</button>
         <button class="new-chat-btn" id="newCardBtn">+ New Card</button>
       </div>
       <div class="view-body">
@@ -846,6 +874,22 @@
             <button class="btn-primary" id="cardEditorSave">Save</button>
           </div>
         </div>
+        <div class="card-generator" id="cardGenerator">
+          <h3>Generate Character Card</h3>
+          <div class="card-gen-chat" id="cardGenChat"></div>
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <textarea id="cardGenInput" rows="2" placeholder="Describe a character... or request changes" style="flex:1"></textarea>
+            <button id="cardGenSend" style="align-self:flex-end">Send</button>
+          </div>
+          <div id="cardGenPreview" style="display:none;margin-top:12px">
+            <h4 style="color:#f0f6fc;font-size:0.85em;margin-bottom:8px">Preview</h4>
+            <div id="cardGenPreviewContent" style="background:#0d1117;border:1px solid #30363d;border-radius:8px;padding:12px;font-size:0.82em;color:#c9d1d9;max-height:300px;overflow-y:auto;white-space:pre-wrap"></div>
+            <div style="display:flex;gap:8px;margin-top:8px">
+              <button id="cardGenCreate" style="background:#238636">Create Card</button>
+              <button id="cardGenCancel" class="btn-secondary">Cancel</button>
+            </div>
+          </div>
+        </div>
         <div class="cards-grid" id="cardsGrid"></div>
       </div>
     </div>
@@ -866,6 +910,10 @@
           <div class="form-group">
             <label for="scenarioDescription">Description (use ${user} and ${char} for variables)</label>
             <textarea id="scenarioDescription" rows="4"></textarea>
+          </div>
+          <div class="form-group">
+            <label for="scenarioFirstMessage">First Message (AI's opening line for this scenario)</label>
+            <textarea id="scenarioFirstMessage" rows="3" placeholder="Leave empty to use the card's default first message"></textarea>
           </div>
           <div class="form-group">
             <label for="scenarioModel">Model Override (optional)</label>

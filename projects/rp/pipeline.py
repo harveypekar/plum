@@ -111,6 +111,7 @@ def assemble_prompt(ctx: dict) -> dict:
         "mes_example": ai_data.get("mes_example", ""),
         "char": ai_data.get("name", "Character"),
         "user": user_data.get("name", "User"),
+        "user_description": user_data.get("description", ""),
     }
 
     system_part, post_part = _split_template(template)
@@ -152,7 +153,14 @@ def apply_context_strategy(ctx: dict) -> dict:
 def clean_response(ctx: dict) -> dict:
     """Strip common LLM artifacts from response."""
     response = ctx.get("response", "")
-    ctx["response"] = response.strip()
+    response = response.strip()
+    # Strip AI name prefix if model echoes it (e.g. "Jessica: ..." or "Jessica Klein: ...")
+    ai_name = ctx.get("ai_name", "")
+    if ai_name and response.startswith(ai_name):
+        after = response[len(ai_name):]
+        if after.startswith(": ") or after.startswith(" "):
+            response = after.lstrip(": ")
+    ctx["response"] = response
     return ctx
 
 
