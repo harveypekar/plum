@@ -9,7 +9,7 @@ A single ComfyUI workflow (`character-portrait.json`) that generates a character
 - **Text-only mode:** Character description drives the full generation. No reference photos.
 - **Reference mode:** Reference photos drive character appearance via IP-Adapter FaceID Plus V2. Text prompt controls style/setting only.
 
-Switching between modes: mute/unmute the IP-Adapter node group in ComfyUI. When no reference photos are loaded, the group is muted.
+Switching between modes: the workflow ships wired for reference mode. For text-only mode, the user manually reconnects the checkpoint MODEL output directly to the KSampler, bypassing the IP-Adapter chain (single drag operation). ComfyUI group muting does not auto-reroute connections, so manual rewiring is required.
 
 ## Prerequisites
 
@@ -49,23 +49,23 @@ All model paths are relative to `/mnt/c/Users/daan/Documents/ComfyUI/models/`.
 - **KSampler:** Euler a, 25 steps, CFG 7, 1024x1024 resolution
 - **VAE Decode:** Built-in VAE from JuggernautXL
 
-### 2. IP-Adapter Branch (muted when no reference photos)
+### 2. IP-Adapter Branch (disconnect for text-only mode)
 
-- **Load Image node(s):** 0 to N reference photos
-- **IPAdapter Unified Loader FaceID** (from `ComfyUI_IPAdapter_plus`): Loads the FaceID Plus V2 model, CLIP vision model, and companion LoRA. Returns an already-patched MODEL. The LoRA is loaded internally via the `lora_strength` parameter — do **not** add a separate LoRA Loader node (that would apply the LoRA twice, causing distorted output).
+- **Load Image node(s):** 1 to N reference photos
+- **IPAdapter Unified Loader FaceID** (from `ComfyUI_IPAdapter_plus`): Loads the FaceID Plus V2 model, auto-detects CLIP vision model from `clip_vision/` directory, and applies companion LoRA internally via `lora_strength` parameter. Returns an already-patched MODEL. Do **not** add a separate LoRA Loader node (that would apply the LoRA twice, causing distorted output).
   - `lora_strength`: ~0.7
-- **IPAdapter InsightFace Loader** (from `ComfyUI_IPAdapter_plus`): Loads `antelopev2` face analysis model (provider: CPU or CUDA)
+- **IPAdapter InsightFace Loader** (from `ComfyUI_IPAdapter_plus`): Loads `antelopev2` face analysis model. This is a separate node — the unified loader does NOT load InsightFace internally.
+  - Provider: CPU or CUDA
 - **IPAdapter FaceID node:** Applies face embeddings to the model
   - Weight: ~0.7 (strong likeness, allows style prompt influence)
 - **Multiple references:** IP-Adapter batch input averages multiple photos for stronger likeness
-- **Bypass:** ComfyUI native "Mute" grouping — muted when no photos loaded
+- **Mode switching:** User manually reconnects checkpoint MODEL → KSampler for text-only mode, or routes through the IP-Adapter chain for reference mode
 
 ### 3. Post-Processing
 
-- **InsightFace face detection** (reuses the already-loaded `antelopev2` model): Detects face bounding box in the generated image.
-- **Crop and resize** (using `comfyui-kjnodes` crop utilities or built-in ComfyUI ImageCrop): Square crop centered on detected face bounding box, resized to 256x256.
-- **Save Image (portrait):** `portrait_[seed]` prefix — full 1024x1024 (ComfyUI appends counter automatically)
-- **Save Image (avatar):** `avatar_[seed]` prefix — 256x256 face crop
+- **Center crop and resize** (using `comfyui-kjnodes` `ImageResizeKJv2`): Center crop of the generated portrait, resized to 256x256. A center crop is reliable for single-face portraits where the subject is naturally centered by the prompt. No separate face detection pass is needed — `ComfyUI_IPAdapter_plus` does not expose a standalone "detect face bbox in image" node.
+- **Save Image (portrait):** `portrait` prefix — full 1024x1024 (ComfyUI appends counter `_00001`, `_00002`, etc. Seed is stored in PNG metadata.)
+- **Save Image (avatar):** `avatar` prefix — 256x256 center crop
 
 ## Inputs
 
@@ -79,10 +79,10 @@ All model paths are relative to `/mnt/c/Users/daan/Documents/ComfyUI/models/`.
 
 | Output | Resolution | Filename |
 |---|---|---|
-| Full portrait | 1024x1024 | `portrait_[seed]_00001.png` |
-| Avatar crop | 256x256 | `avatar_[seed]_00001.png` |
+| Full portrait | 1024x1024 | `portrait_00001.png` |
+| Avatar crop | 256x256 | `avatar_00001.png` |
 
-Output directory: ComfyUI default output folder. Filenames use ComfyUI's built-in prefix + counter pattern.
+Output directory: ComfyUI default output folder. Filenames use ComfyUI's built-in prefix + counter pattern. Seed is stored in PNG metadata, not filename.
 
 ## Scope Boundaries
 
