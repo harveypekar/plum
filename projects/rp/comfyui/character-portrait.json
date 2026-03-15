@@ -621,8 +621,8 @@
         256,
         "lanczos",
         "crop",
-        "center",
         "0, 0, 0",
+        "center",
         2
       ]
     },
