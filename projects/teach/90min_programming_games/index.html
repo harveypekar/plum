@@ -632,9 +632,7 @@ function buildTweaks(vars) {
     var row = document.createElement('div');
     row.className = 'tweak-row';
     var lbl = document.createElement('label');
-    // Extract label from comment (strip range specs)
-    var labelText = v.comment.replace(/\s*min:\S+/g,'').replace(/\s*max:\S+/g,'').replace(/\s*step:\S+/g,'').trim();
-    lbl.textContent = labelText || v.name.replace(/_ui$/, '');
+    lbl.textContent = v.name;
     row.appendChild(lbl);
 
     var val = v.defaultValue.trim();
