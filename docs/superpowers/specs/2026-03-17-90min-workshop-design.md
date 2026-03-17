@@ -224,7 +224,7 @@ velocityY += 0.5;
 
 - `_ui` variable labels use the Dutch comment when available
 
-## Gallery Snippets (~30 total)
+## Gallery Snippets (~32 total)
 
 ### `> MOVEMENT`
 1. Arrow key movement (4-direction)
@@ -256,21 +256,23 @@ velocityY += 0.5;
 19. Screen shake
 20. Flashing / blinking
 21. GPU shader — post-processing filter effect (color-cycling or distortion, applied via p5 `filter(SHADER)` in 2D mode so it doesn't break other snippets)
+22. GPU particle effect — thousands of particles rendered via WebGL shader (sparks, fire, snow — shows what GPU parallelism can do vs. CPU)
+23. GPU rectangle flood — hundreds of rotating/scaling rectangles rendered via WebGL instancing (visually impressive, demonstrates GPU batch rendering)
 
 ### `> INPUT`
-22. Webcam feed as background or player avatar (`createCapture`, with graceful fallback if permission denied)
+24. Webcam feed as background or player avatar (`createCapture`, with graceful fallback if permission denied)
 
 ### `> GAME TEMPLATES` (replace editor contents)
-23. Flappy Bird (pipe gaps, gravity, tap to flap)
-24. Mario-style platformer (platforms, run, jump)
-25. Micromachines (top-down car, rotation steering, track)
-26. Space Invaders (grid of enemies, shoot upward, march down)
+25. Flappy Bird (pipe gaps, gravity, tap to flap)
+26. Mario-style platformer (platforms, run, jump)
+27. Micromachines (top-down car, rotation steering, track)
+28. Space Invaders (grid of enemies, shoot upward, march down)
 
 ### `> GAME LOGIC`
-27. Score counter
-28. Lives / health bar
-29. Game over screen
-30. Timer countdown
+29. Score counter
+30. Lives / health bar
+31. Game over screen
+32. Timer countdown
 
 Each snippet follows the composability convention: two sections (logic + draw), all identifiers prefixed with the snippet name, Dutch-first concept comments, `_ui` suffix on tweakable variables.
 
