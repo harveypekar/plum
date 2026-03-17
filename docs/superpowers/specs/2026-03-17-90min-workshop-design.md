@@ -4,6 +4,7 @@
 **Location:** `projects/teach/90min_programming_games/`
 **Audience:** 16-year-olds, little or no coding experience
 **Goals (priority order):** "I made a game!" → "I understand how code works!" → "I can keep going on my own!"
+**Requirements:** Desktop browser (Chrome/Edge/Firefox 2024+), reliable internet
 
 ## Overview
 
@@ -27,23 +28,24 @@ Three-panel layout, all visible simultaneously, no tabs or navigation:
 ### Left Panel: Gallery
 
 - Scrollable grid of snippet cards
-- Each card: retro-bordered box with title, tiny live p5 canvas preview, `[COPY]` button
+- Each card: retro-bordered box with title, tiny live p5 canvas preview (lazy-loaded on scroll, ~80×80, paused when off-screen), `[COPY]` button
 - Clicking a card expands it to show full source code
 - Categories as section headers (e.g., `> MOVEMENT`, `> PHYSICS`)
-- Regular snippets: `[COPY]` appends code to the editor
+- Regular snippets: `[COPY]` inserts code into the correct sections of the editor (see Snippet Composability)
 - Game templates: `[COPY]` shows confirm prompt `> TEMPLATE WILL REPLACE YOUR CODE. CONTINUE? [Y] [N]`, pushes current code to undo stack first, then replaces
 
 ### Center Panel: Editor + Console
 
 **Editor (top):**
-- CodeMirror 6 with terminal-themed skin (green on black, blinking cursor)
+- CodeMirror 5 with terminal-themed skin (green on black, blinking cursor)
 - Starts with minimal starter template (see below)
 - Auto-runs on edit with 1-second debounce
 
 **Buttons (middle row):**
 - `[▶ RUN]` — manual re-run (resets sketch state)
 - `[↺ RESET]` — restores starter template (with confirm prompt)
-- `[◄ UNDO]` / `[► REDO]` — global snapshot undo/redo
+- `[◄ UNDO]` / `[► REDO]` — global snapshot undo/redo (see Global Undo/Redo)
+- `[⬇ DOWNLOAD]` — exports current code as a standalone HTML file with p5.js CDN link
 
 **Console (bottom):**
 - Terminal-style output log
@@ -52,23 +54,104 @@ Three-panel layout, all visible simultaneously, no tabs or navigation:
 - Error format: `> ERROR [ln 12, col 5]: x is not defined` — where `ln 12, col 5` is a clickable link that jumps editor cursor to that position and briefly highlights the line
 - Scrollable, with `[CLEAR]` button
 
-### Right Panel: Game Canvas
+### Right Panel: Game Canvas + Tweaks
 
+**Canvas (top):**
 - p5.js sketch output, 400×400
 - CRT scanline overlay
 - Framed like an old monitor bezel
+
+**Tweaks panel (below canvas, collapsible):**
+- Auto-generated UI controls for `_ui` variables (see Auto-Generated UI Controls)
+
+## Snippet Composability
+
+Snippets are designed to be combined without conflicts. Each snippet has two sections and uses a name prefix on all its variables and functions.
+
+### Starter template structure
+
+```javascript
+// JOUW GAME / YOUR GAME
+
+// === LOGIC ===
+let x = 200;
+let y = 200;
+
+// === SETUP ===
+function setup() {
+  createCanvas(400, 400);
+}
+
+// === DRAW ===
+function draw() {
+  background(0);
+  fill(0, 255, 65);
+  circle(x, y, 30);
+}
+```
+
+### Snippet structure
+
+Each snippet contains two clearly marked sections:
+
+- **Logic section** — variable declarations, helper functions. All identifiers prefixed with the snippet name (e.g., `gravity_velocityY`, `gravity_apply()`).
+- **Draw section** — code to run inside `draw()`. Uses the same prefixed identifiers.
+
+Example — "gravity" snippet:
+
+```javascript
+// --- LOGIC: gravity ---
+// Zwaartekracht: snelheid (velocity) en versnelling (acceleration)
+let gravity_velocityY = 0;
+let gravity_acceleration_ui = 0.5; // min:0 max:2 step:0.1
+let gravity_ground = 380;
+
+function gravity_apply() {
+  gravity_velocityY += gravity_acceleration_ui;
+  y += gravity_velocityY;
+  if (y >= gravity_ground) {
+    y = gravity_ground;
+    gravity_velocityY = 0;
+  }
+}
+
+// --- DRAW: gravity ---
+gravity_apply();
+```
+
+### Insertion behavior
+
+When `[COPY]` is clicked on a regular snippet:
+
+1. **Logic section** → inserted before the `// === SETUP ===` marker
+2. **Draw section** → inserted before the closing `}` of `draw()`
+
+**Failsafe:** If the marker comments are missing (participant deleted them):
+- Logic section → inserted at the top of the file
+- Draw section → inserted before the last `}` in the file (assumed to be `draw()`'s closing brace)
+
+### Namespace convention
+
+All snippet variables and functions are prefixed with `snippetname_` to avoid collisions. E.g.:
+- `gravity_velocityY`, `gravity_apply()`
+- `bounce_speed`, `bounce_check()`
+- `score_points`, `score_display()`
 
 ## Starter Template
 
 ```javascript
 // JOUW GAME / YOUR GAME
+
+// === LOGIC ===
 let x = 200;
 let y = 200;
 
+// === SETUP ===
 function setup() {
   createCanvas(400, 400);
 }
 
+// === DRAW ===
 function draw() {
   background(0);
   fill(0, 255, 65);
@@ -82,12 +165,30 @@ A green dot on black. Does nothing — participants bring it to life with galler
 
 - Saves a full-code snapshot to the history stack every time the code auto-runs (after debounced edit or paste)
 - Pasting a large template is one undo step (not 200 character-level undos)
-- Ctrl+Z / Ctrl+Y mapped to this snapshot history (separate from CodeMirror's internal undo)
+- CodeMirror keeps Ctrl+Z / Ctrl+Y for character-level undo (normal editing)
+- `[◄ UNDO]` / `[► REDO]` buttons operate on the snapshot stack (full-code level)
 - Game template replacement pushes current code to stack before replacing
+
+## Persistence
+
+- **Auto-save:** editor contents saved to `localStorage` on every debounced edit. Restored on page load.
+- **Download:** `[⬇ DOWNLOAD]` exports current code as a standalone `.html` file with p5.js CDN link, so participants take their game home.
+
+## Infinite Loop Protection
+
+User code is instrumented before execution: a counter is injected into `while` and `for` loops. If any loop exceeds 100,000 iterations, it throws an error displayed in the console:
+
+```
+> ERROR: Oneindige lus gestopt / Infinite loop stopped
+```
+
+This prevents a frozen browser tab.
+
+**Note on code execution:** User code is evaluated dynamically (this is the core purpose of the tool — an in-browser code editor). All code runs client-side only, in the participant's own browser, with no server communication. This is the same execution model used by p5.js Web Editor, CodePen, and JSFiddle.
 
 ## Auto-Generated UI Controls (`_ui` suffix)
 
-Any top-level `let` or `const` variable whose name ends in `_ui` gets an auto-generated control in a tweaks panel (between editor and canvas, or collapsible).
+Any top-level `let` or `const` variable whose name ends in `_ui` gets an auto-generated control in the tweaks panel (below the game canvas, collapsible).
 
 | Declaration | Detected type | Control |
 |---|---|---|
@@ -96,14 +197,15 @@ Any top-level `let` or `const` variable whose name ends in `_ui` gets an auto-ge
 | `let color_ui = [0, 255, 65];` | RGB array | Color picker |
 | `let gravity_ui = true;` | Boolean | Toggle switch |
 | `let name_ui = "PLAYER 1";` | String | Text input |
-| `let sprite_ui = "img:";` | Image (prefix `img:`) | Image file picker |
-| `let sound_ui = "snd:";` | Audio (prefix `snd:`) | Audio file picker |
+| `let sprite_ui = "img:";` | Image (prefix `img:`) | Image file picker (loaded via `URL.createObjectURL()`) |
+| `let sound_ui = "snd:";` | Audio (prefix `snd:`) | Audio file picker (loaded via `URL.createObjectURL()`) |
 
 **Behavior:**
-- Parsed on each run via regex scan of top-level declarations
+- Parsed on each run via regex scan of top-level declarations (lines starting with `let`/`const` at zero indentation)
 - Changing a control immediately updates the variable in the running sketch (live, no re-run)
+- When code auto-runs, current `_ui` control values are preserved and re-injected after the sketch restarts
 - Slider range configurable via comment: `let speed_ui = 5; // min:0 max:20 step:0.5`
-- Default slider range: 0 to 2× initial value
+- Default slider range: 0 to 2× initial value (minimum range [0, 10] if initial value is 0; absolute value used if negative)
 - Labels derived from comment: `let speed_ui = 5; // Snelheid (speed)` → label shows "Snelheid (speed)"
 - Controls styled in CRT theme
 
@@ -122,7 +224,7 @@ velocityY += 0.5;
 
 - `_ui` variable labels use the Dutch comment when available
 
-## Gallery Snippets (~25 total)
+## Gallery Snippets (~30 total)
 
 ### `> MOVEMENT`
 1. Arrow key movement (4-direction)
@@ -153,10 +255,10 @@ velocityY += 0.5;
 18. Aftertrails (fading ghost copies behind moving object)
 19. Screen shake
 20. Flashing / blinking
-21. GPU shader (WebGL — color-cycling or distortion effect)
+21. GPU shader — post-processing filter effect (color-cycling or distortion, applied via p5 `filter(SHADER)` in 2D mode so it doesn't break other snippets)
 
 ### `> INPUT`
-22. Webcam feed as background or player avatar (`createCapture`)
+22. Webcam feed as background or player avatar (`createCapture`, with graceful fallback if permission denied)
 
 ### `> GAME TEMPLATES` (replace editor contents)
 23. Flappy Bird (pipe gaps, gravity, tap to flap)
@@ -170,15 +272,17 @@ velocityY += 0.5;
 29. Game over screen
 30. Timer countdown
 
-Each snippet is self-contained: works when pasted into the starter template. Variables named clearly. Dutch-first concept comments. Uses `_ui` suffix where appropriate so participants immediately get sliders/pickers.
+Each snippet follows the composability convention: two sections (logic + draw), all identifiers prefixed with the snippet name, Dutch-first concept comments, `_ui` suffix on tweakable variables.
 
 ## Technical Stack
 
 - **Single HTML file** — everything inlined or CDN-loaded
 - **p5.js** — CDN
-- **CodeMirror 6** — CDN (bundled ESM)
+- **CodeMirror 5** — CDN (single file, no build step needed)
 - **CSS** — inlined (CRT theme, scanlines, glow effects)
-- **Gallery data** — embedded JSON structure (title NL/EN, description NL/EN, code)
-- **Gallery previews** — each runs its own p5 instance (instance mode) to avoid conflicts
-- **Error capture** — user code wrapped in try/catch, `console.log`/`console.error` overridden to pipe to in-page console. Syntax errors caught via parse check before execution.
+- **Gallery data** — embedded JSON structure (title NL/EN, description NL/EN, logic code, draw code)
+- **Gallery previews** — each runs its own p5 instance (instance mode), lazy-loaded on scroll into view, paused when off-screen, ~80×80 canvas
+- **Error capture** — user code evaluated dynamically (client-side only, same model as p5.js Web Editor/CodePen), `console.log`/`console.error` overridden to pipe to in-page console. Syntax errors caught via parse check before execution.
+- **Infinite loop protection** — loop counter injection before execution
+- **Persistence** — `localStorage` auto-save, standalone HTML download export
 - **No server required** — works from `file://`, USB stick, GitHub Pages, any static host
