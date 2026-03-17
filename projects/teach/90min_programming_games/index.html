@@ -4,68 +4,71 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>⌈ GAME LAB ⌉</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/codemirror.min.css">
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
   --green: #00ff41; --green-dim: #00ff4180; --green-dark: #00ff4130;
   --amber: #ffb000; --amber-dim: #ffb00080;
+  --cyan: #00ffff; --red: #ff4444; --orange: #ff8c00;
   --bg: #0a0a0a; --bg-panel: #0d0d0d; --bg-card: #111; --border: #00ff4140;
-  --font-ui: 'VT323', monospace; --font-code: 'Courier New', monospace;
+  --font: 'Courier New', 'Consolas', monospace;
 }
-html, body { height: 100%; background: var(--bg); color: var(--green); font-family: var(--font-ui); font-size: 16px; overflow: hidden; }
+html, body { height: 100%; background: var(--bg); color: var(--green); font-family: var(--font); font-size: 18px; overflow: hidden; }
 .glow { text-shadow: 0 0 5px var(--green-dim), 0 0 15px var(--green-dark); }
 .glow-amber { text-shadow: 0 0 5px var(--amber-dim); }
 
-#top-bar { display: flex; align-items: center; justify-content: space-between; padding: 6px 16px; border-bottom: 1px solid var(--border); background: var(--bg); height: 40px; flex-shrink: 0; }
-#top-bar h1 { font-family: var(--font-ui); font-size: 24px; font-weight: normal; letter-spacing: 4px; color: var(--green); }
+#top-bar { display: flex; align-items: center; justify-content: space-between; padding: 6px 16px; border-bottom: 1px solid var(--border); background: var(--bg); height: 44px; flex-shrink: 0; }
+#top-bar h1 { font-family: var(--font); font-size: 26px; font-weight: normal; letter-spacing: 4px; color: var(--green); }
 #lang-toggle { display: flex; gap: 4px; }
-#lang-toggle button { background: transparent; border: 1px solid var(--border); color: var(--green); font-family: var(--font-ui); font-size: 16px; padding: 2px 10px; cursor: pointer; transition: all 0.15s; }
+#lang-toggle button { background: transparent; border: 1px solid var(--border); color: var(--green); font-family: var(--font); font-size: 16px; padding: 2px 10px; cursor: pointer; transition: all 0.15s; }
 #lang-toggle button:hover, #lang-toggle button.active { background: var(--green-dark); box-shadow: 0 0 8px var(--green-dark); }
 
-#main { display: flex; height: calc(100% - 40px); }
+#main { display: flex; height: calc(100% - 44px); }
 
-#gallery { width: 280px; min-width: 200px; border-right: 1px solid var(--border); overflow-y: auto; padding: 8px; flex-shrink: 0; }
-.cat-header { font-family: var(--font-ui); font-size: 18px; color: var(--amber); padding: 12px 4px 4px; letter-spacing: 2px; }
-.snippet-card { border: 1px solid var(--border); margin: 4px 0; padding: 8px; cursor: pointer; transition: all 0.15s; background: var(--bg-card); }
-.snippet-card:hover { border-color: var(--green); box-shadow: 0 0 8px var(--green-dark); }
-.snippet-card .title { font-size: 16px; color: var(--green); margin-bottom: 4px; }
-.snippet-card .desc { font-size: 13px; color: var(--green-dim); margin-bottom: 6px; }
+/* Resize handles */
+.resize-handle { width: 5px; cursor: col-resize; background: var(--border); flex-shrink: 0; transition: background 0.15s; }
+.resize-handle:hover, .resize-handle.active { background: var(--green); }
+
+#gallery { width: 280px; min-width: 150px; overflow-y: auto; padding: 8px; flex-shrink: 0; }
+.cat-header { font-family: var(--font); font-size: 18px; color: var(--amber); padding: 12px 4px 4px; letter-spacing: 2px; }
+.snippet-card { border: none; margin: 2px 0; padding: 6px 8px; cursor: pointer; transition: all 0.15s; background: transparent; border-left: 2px solid transparent; }
+.snippet-card:hover { border-left-color: var(--green); background: #00ff4108; }
+.snippet-card .title { font-size: 16px; color: var(--green); margin-bottom: 2px; }
+.snippet-card .desc { font-size: 14px; color: var(--green-dim); margin-bottom: 4px; }
 .snippet-card .card-actions { display: flex; gap: 4px; }
-.snippet-card .code-preview { display: none; margin-top: 8px; padding: 8px; background: var(--bg); border: 1px solid var(--border); font-family: var(--font-code); font-size: 12px; white-space: pre-wrap; max-height: 200px; overflow-y: auto; color: var(--green-dim); }
+.snippet-card .code-preview { display: none; margin-top: 6px; padding: 6px; background: var(--bg); border: 1px solid var(--border); font-family: var(--font); font-size: 13px; white-space: pre-wrap; max-height: 200px; overflow-y: auto; color: var(--green-dim); }
 .snippet-card.expanded .code-preview { display: block; }
 
-#editor-panel { flex: 1; display: flex; flex-direction: column; min-width: 300px; border-right: 1px solid var(--border); }
+#editor-panel { flex: 1; display: flex; flex-direction: column; min-width: 300px; }
 #editor-container { flex: 1; overflow: hidden; }
-#editor-container .CodeMirror { height: 100%; background: var(--bg) !important; color: var(--green) !important; font-family: var(--font-code) !important; font-size: 14px; }
+#editor-container .CodeMirror { height: 100%; background: var(--bg) !important; color: var(--green) !important; font-family: var(--font) !important; font-size: 16px; line-height: 1.4; }
 .CodeMirror-cursor { border-left: 2px solid var(--green) !important; }
 .CodeMirror-selected { background: var(--green-dark) !important; }
 .CodeMirror-gutters { background: var(--bg) !important; border-right: 1px solid var(--border) !important; }
-.CodeMirror-linenumber { color: var(--green-dim) !important; font-family: var(--font-code) !important; }
-.cm-s-default .cm-keyword { color: var(--amber) !important; }
-.cm-s-default .cm-number { color: #00ff90 !important; }
+.CodeMirror-linenumber { color: var(--green-dim) !important; font-family: var(--font) !important; }
+/* Syntax colors: keywords=cyan, numbers=cyan, function names=red, function calls=orange */
+.cm-s-default .cm-keyword { color: var(--cyan) !important; }
+.cm-s-default .cm-number { color: var(--cyan) !important; }
 .cm-s-default .cm-string { color: var(--amber) !important; }
 .cm-s-default .cm-comment { color: #00aa3080 !important; font-style: italic; }
-.cm-s-default .cm-def { color: #00ffcc !important; }
+.cm-s-default .cm-def { color: var(--red) !important; }
 .cm-s-default .cm-variable { color: var(--green) !important; }
-.cm-s-default .cm-variable-2 { color: #88ffaa !important; }
-.cm-s-default .cm-property { color: #66ddaa !important; }
+.cm-s-default .cm-variable-2 { color: var(--orange) !important; }
+.cm-s-default .cm-property { color: var(--orange) !important; }
 .cm-s-default .cm-operator { color: var(--green) !important; }
-.cm-s-default .cm-atom { color: var(--amber) !important; }
+.cm-s-default .cm-atom { color: var(--cyan) !important; }
 .CodeMirror-activeline-background { background: #00ff4108 !important; }
 .cm-s-default .cm-matchingbracket { color: var(--amber) !important; text-decoration: underline; }
 .line-highlight { background: #ffb00020 !important; }
 
 #btn-row { display: flex; gap: 4px; padding: 4px 8px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); background: var(--bg); flex-wrap: wrap; }
-.btn { background: transparent; border: 1px solid var(--border); color: var(--green); font-family: var(--font-ui); font-size: 15px; padding: 3px 12px; cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+.btn { background: transparent; border: 1px solid var(--border); color: var(--green); font-family: var(--font); font-size: 16px; padding: 3px 12px; cursor: pointer; transition: all 0.15s; white-space: nowrap; }
 .btn:hover { background: var(--green-dark); box-shadow: 0 0 8px var(--green-dark); }
 .btn-amber { border-color: var(--amber-dim); color: var(--amber); }
 .btn-amber:hover { background: #ffb00015; box-shadow: 0 0 8px #ffb00020; }
 
-#console-container { height: 120px; min-height: 60px; overflow-y: auto; padding: 4px 8px; background: #050505; font-family: var(--font-code); font-size: 13px; border-top: 1px solid var(--border); }
+#console-container { height: 120px; min-height: 60px; overflow-y: auto; padding: 4px 8px; background: #050505; font-family: var(--font); font-size: 14px; border-top: 1px solid var(--border); }
 .console-line { padding: 1px 0; white-space: pre-wrap; word-break: break-all; }
 .console-line.log { color: var(--green-dim); }
 .console-line.error { color: var(--amber); }
@@ -75,20 +78,19 @@ html, body { height: 100%; background: var(--bg); color: var(--green); font-fami
 #monitor-bezel { border: 3px solid #333; border-radius: 8px; padding: 8px; background: #1a1a1a; box-shadow: inset 0 0 30px rgba(0,0,0,0.5), 0 0 15px var(--green-dark); position: relative; }
 #canvas-container { position: relative; width: 400px; height: 400px; overflow: hidden; background: black; }
 #canvas-container canvas { display: block !important; }
-#canvas-container::after { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.15) 2px, rgba(0,0,0,0.15) 4px); pointer-events: none; z-index: 10; }
-@keyframes flicker { 0% { opacity: 0.97; } 50% { opacity: 1; } 100% { opacity: 0.98; } }
-#canvas-container { animation: flicker 0.15s infinite; }
 
-#tweaks-panel { width: 100%; max-width: 416px; margin-top: 8px; max-height: 200px; overflow-y: auto; }
-#tweaks-toggle { font-family: var(--font-ui); font-size: 14px; color: var(--green-dim); cursor: pointer; padding: 4px; user-select: none; }
-#tweaks-content { display: none; padding: 4px 0; }
-#tweaks-content.open { display: block; }
-.tweak-row { display: flex; align-items: center; gap: 8px; padding: 3px 4px; font-size: 14px; }
-.tweak-row label { min-width: 140px; color: var(--green-dim); font-family: var(--font-ui); }
-.tweak-row input[type="range"] { flex: 1; accent-color: var(--green); background: transparent; }
+#tweaks-panel { width: 100%; max-width: 416px; margin-top: 8px; max-height: 250px; overflow-y: auto; }
+#tweaks-content { display: block; padding: 4px 0; }
+.tweak-row { display: flex; align-items: center; gap: 8px; padding: 3px 4px; font-size: 15px; }
+.tweak-row label { min-width: 140px; color: var(--green-dim); font-family: var(--font); }
+/* Slider: green filled, amber unfilled */
+.tweak-row input[type="range"] { flex: 1; -webkit-appearance: none; appearance: none; height: 6px; background: var(--amber); border-radius: 0; outline: none; }
+.tweak-row input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; background: var(--green); cursor: pointer; border: none; }
+.tweak-row input[type="range"]::-moz-range-thumb { width: 14px; height: 14px; background: var(--green); cursor: pointer; border: none; border-radius: 0; }
+.tweak-row input[type="range"]::-webkit-slider-runnable-track { background: linear-gradient(to right, var(--green) 0%, var(--green) var(--val-pct, 50%), var(--amber) var(--val-pct, 50%), var(--amber) 100%); height: 6px; }
 .tweak-row input[type="color"] { width: 30px; height: 24px; border: 1px solid var(--border); background: transparent; cursor: pointer; }
-.tweak-row input[type="text"] { flex: 1; background: var(--bg); border: 1px solid var(--border); color: var(--green); font-family: var(--font-code); padding: 2px 6px; }
-.tweak-row .val-display { min-width: 40px; text-align: right; color: var(--green); font-family: var(--font-code); font-size: 13px; }
+.tweak-row input[type="text"] { flex: 1; background: var(--bg); border: 1px solid var(--border); color: var(--green); font-family: var(--font); padding: 2px 6px; }
+.tweak-row .val-display { min-width: 40px; text-align: right; color: var(--green); font-family: var(--font); font-size: 14px; }
 .toggle-switch { width: 40px; height: 20px; border: 1px solid var(--border); background: var(--bg); cursor: pointer; position: relative; display: inline-block; }
 .toggle-switch::after { content: ''; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; background: var(--green-dim); transition: all 0.15s; }
 .toggle-switch.on::after { left: 22px; background: var(--green); box-shadow: 0 0 5px var(--green); }
@@ -100,7 +102,7 @@ html, body { height: 100%; background: var(--bg); color: var(--green); font-fami
 
 #confirm-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 1000; align-items: center; justify-content: center; }
 #confirm-overlay.show { display: flex; }
-#confirm-box { border: 2px solid var(--amber); background: var(--bg); padding: 20px 30px; font-family: var(--font-ui); font-size: 20px; color: var(--amber); text-align: center; box-shadow: 0 0 30px #ffb00030; }
+#confirm-box { border: 2px solid var(--amber); background: var(--bg); padding: 20px 30px; font-family: var(--font); font-size: 20px; color: var(--amber); text-align: center; box-shadow: 0 0 30px #ffb00030; }
 #confirm-box .confirm-btns { margin-top: 16px; display: flex; gap: 12px; justify-content: center; }
 </style>
 </head>
@@ -114,23 +116,24 @@ html, body { height: 100%; background: var(--bg); color: var(--green); font-fami
 </div>
 <div id="main">
   <div id="gallery"></div>
+  <div class="resize-handle" id="resize-1"></div>
   <div id="editor-panel">
     <div id="editor-container"><textarea id="editor"></textarea></div>
     <div id="btn-row">
-      <button class="btn" id="btn-run" onclick="manualRun()">▶ START</button>
+      <button class="btn" id="btn-run" onclick="manualRun()">▶ RUN</button>
       <button class="btn btn-amber" id="btn-reset" onclick="confirmReset()">↺ RESET</button>
-      <button class="btn" id="btn-undo" onclick="undo()">◄ TERUG</button>
-      <button class="btn" id="btn-redo" onclick="redo()">► OPNIEUW</button>
+      <button class="btn" id="btn-undo" onclick="undo()">◄ UNDO</button>
+      <button class="btn" id="btn-redo" onclick="redo()">► REDO</button>
       <button class="btn" id="btn-download" onclick="downloadHTML()">⬇ DOWNLOAD</button>
     </div>
     <div id="console-container"></div>
   </div>
+  <div class="resize-handle" id="resize-2"></div>
   <div id="canvas-panel">
     <div id="monitor-bezel">
       <div id="canvas-container"></div>
     </div>
     <div id="tweaks-panel">
-      <div id="tweaks-toggle" onclick="toggleTweaks()">▸ TWEAKS</div>
       <div id="tweaks-content"></div>
     </div>
   </div>
@@ -182,21 +185,22 @@ var STARTER_CODE = [
 // ============================================================
 // I18N
 // ============================================================
+// Interface is always English. Only snippet descriptions are translated.
 var STRINGS = {
   nl: {
-    run: '\u25b6 START', reset: '\u21ba RESET', undo: '\u25c4 TERUG', redo: '\u25ba OPNIEUW',
-    download: '\u2b07 DOWNLOAD', clear: 'WISSEN', tweaks: 'TWEAKS',
-    confirmReset: 'DIT VERVANGT JE CODE. DOORGAAN?',
-    confirmTemplate: 'TEMPLATE VERVANGT JE CODE. DOORGAAN?',
-    infiniteLoop: 'Oneindige lus gestopt',
-    errorPrefix: 'FOUT', copy: 'KOPIEER', viewCode: 'CODE',
-    movement: '> BEWEGING', physics: '> NATUURKUNDE', objects: '> OBJECTEN',
-    collision: '> BOTSING', visuals: '> VISUEEL', input: '> INVOER',
-    templates: '> GAME TEMPLATES', gameLogic: '> SPELLOGICA',
+    run: '\u25b6 RUN', reset: '\u21ba RESET', undo: '\u25c4 UNDO', redo: '\u25ba REDO',
+    download: '\u2b07 DOWNLOAD', clear: 'CLEAR',
+    confirmReset: 'THIS WILL REPLACE YOUR CODE. CONTINUE?',
+    confirmTemplate: 'TEMPLATE WILL REPLACE YOUR CODE. CONTINUE?',
+    infiniteLoop: 'Oneindige lus gestopt / Infinite loop stopped',
+    errorPrefix: 'ERROR', copy: 'COPY', viewCode: 'CODE',
+    movement: '> MOVEMENT', physics: '> PHYSICS', objects: '> OBJECTS',
+    collision: '> COLLISION', visuals: '> VISUALS', input: '> INPUT',
+    templates: '> GAME TEMPLATES', gameLogic: '> GAME LOGIC',
   },
   en: {
     run: '\u25b6 RUN', reset: '\u21ba RESET', undo: '\u25c4 UNDO', redo: '\u25ba REDO',
-    download: '\u2b07 DOWNLOAD', clear: 'CLEAR', tweaks: 'TWEAKS',
+    download: '\u2b07 DOWNLOAD', clear: 'CLEAR',
     confirmReset: 'THIS WILL REPLACE YOUR CODE. CONTINUE?',
     confirmTemplate: 'TEMPLATE WILL REPLACE YOUR CODE. CONTINUE?',
     infiniteLoop: 'Infinite loop stopped',
@@ -214,12 +218,6 @@ function setLang(lang) {
   localStorage.setItem('workshop_lang', lang);
   document.getElementById('btn-nl').classList.toggle('active', lang === 'nl');
   document.getElementById('btn-en').classList.toggle('active', lang === 'en');
-  document.getElementById('btn-run').textContent = t('run');
-  document.getElementById('btn-reset').textContent = t('reset');
-  document.getElementById('btn-undo').textContent = t('undo');
-  document.getElementById('btn-redo').textContent = t('redo');
-  document.getElementById('btn-download').textContent = t('download');
-  document.getElementById('tweaks-toggle').textContent = '\u25b8 ' + t('tweaks');
   renderGallery();
 }
 
@@ -544,6 +542,14 @@ function jumpToLine(line, col) {
 // ============================================================
 function insertSnippet(logic, draw) {
   var code = editor.getValue();
+
+  // Don't add if the snippet logic is already present
+  var firstLine = logic.split('\n')[0];
+  if (code.indexOf(firstLine) !== -1) {
+    logToConsole('Snippet already added', 'log');
+    return;
+  }
+
   var marker = '// === SETUP ===';
   var idx = code.indexOf(marker);
   if (idx !== -1) {
@@ -615,11 +621,11 @@ function downloadHTML() {
 // ============================================================
 // TWEAKS PANEL
 // ============================================================
+// NOTE: innerHTML usage below is safe — all content is generated from internal snippet
+// data (not user input). This is a local-only workshop tool with no server communication.
 function buildTweaks(vars) {
   var content = document.getElementById('tweaks-content');
   content.innerHTML = '';
-  if (!vars.length) { document.getElementById('tweaks-toggle').style.display = 'none'; return; }
-  document.getElementById('tweaks-toggle').style.display = 'block';
 
   for (var i = 0; i < vars.length; i++) {
     var v = vars[i];
@@ -642,11 +648,15 @@ function buildTweaks(vars) {
       if (uiValues[v.name] === undefined) uiValues[v.name] = numV;
       var sl = document.createElement('input');
       sl.type='range'; sl.min=minV; sl.max=maxV; sl.step=stepV; sl.value=numV;
+      var pct = ((numV - minV) / (maxV - minV)) * 100;
+      sl.style.setProperty('--val-pct', pct + '%');
       var disp = document.createElement('span');
       disp.className='val-display'; disp.textContent=numV;
-      (function(name,s,d){
-        s.oninput=function(){var v=parseFloat(s.value);uiValues[name]=v;d.textContent=v;if(currentSketch)currentSketch[name]=v;};
-      })(v.name,sl,disp);
+      (function(name,s,d,mn,mx){
+        s.oninput=function(){var v=parseFloat(s.value);uiValues[name]=v;d.textContent=v;
+          s.style.setProperty('--val-pct',((v-mn)/(mx-mn))*100+'%');
+          if(currentSketch)currentSketch[name]=v;};
+      })(v.name,sl,disp,minV,maxV);
       row.appendChild(sl); row.appendChild(disp);
     } else if (val.match(/^['"]#[0-9a-fA-F]{3,8}['"]$/)) {
       var colV = uiValues[v.name] !== undefined ? uiValues[v.name] : val.replace(/['"]/g,'');
@@ -671,12 +681,6 @@ function buildTweaks(vars) {
   }
 }
 
-function toggleTweaks() {
-  var c=document.getElementById('tweaks-content');
-  var t=document.getElementById('tweaks-toggle');
-  c.classList.toggle('open');
-  t.textContent=(c.classList.contains('open')?'\u25be ':'\u25b8 ')+STRINGS[currentLang].tweaks;
-}
 
 // ============================================================
 // CONFIRM DIALOG
@@ -728,7 +732,7 @@ function renderGallery() {
       var card=document.createElement('div');
       card.className='snippet-card';
       var ti=document.createElement('div'); ti.className='title';
-      ti.textContent=sn.title[currentLang]||sn.title.en;
+      ti.textContent=sn.title.en;
       var de=document.createElement('div'); de.className='desc';
       de.textContent=sn.desc[currentLang]||sn.desc.en;
       var acts=document.createElement('div'); acts.className='card-actions';
@@ -753,6 +757,42 @@ function renderGallery() {
 // ============================================================
 // INIT
 // ============================================================
+// ============================================================
+// RESIZABLE PANELS
+// ============================================================
+function initResize() {
+  var handle1 = document.getElementById('resize-1');
+  var handle2 = document.getElementById('resize-2');
+  var gallery = document.getElementById('gallery');
+  var canvasPanel = document.getElementById('canvas-panel');
+
+  function makeDraggable(handle, getTarget, side) {
+    var startX, startW;
+    handle.addEventListener('mousedown', function(e) {
+      e.preventDefault();
+      startX = e.clientX;
+      startW = getTarget().getBoundingClientRect().width;
+      handle.classList.add('active');
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
+    function onMove(e) {
+      var diff = e.clientX - startX;
+      var newW = side === 'left' ? startW + diff : startW - diff;
+      getTarget().style.width = Math.max(150, newW) + 'px';
+      if (editor) editor.refresh();
+    }
+    function onUp() {
+      handle.classList.remove('active');
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    }
+  }
+
+  makeDraggable(handle1, function() { return gallery; }, 'left');
+  makeDraggable(handle2, function() { return canvasPanel; }, 'right');
+}
+
 function init() {
   editor = CodeMirror.fromTextArea(document.getElementById('editor'), {
     mode:'javascript', lineNumbers:true, matchBrackets:true,
@@ -766,6 +806,7 @@ function init() {
   editor.on('change', scheduleRun);
   setLang(currentLang);
   renderGallery();
+  initResize();
   runSketch();
 }
 window.addEventListener('DOMContentLoaded', init);
