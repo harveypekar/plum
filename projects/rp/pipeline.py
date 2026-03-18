@@ -1,6 +1,10 @@
 import asyncio
+import logging
 from typing import Callable
 from .context import get_strategy
+from .mcp_client import get_router
+
+_log = logging.getLogger(__name__)
 
 
 class Pipeline:
@@ -51,10 +55,10 @@ def expand_variables(ctx: dict) -> dict:
     if ctx.get("post_prompt"):
         ctx["post_prompt"] = replace(ctx["post_prompt"])
 
-    # Inject scene state into system prompt if present
+    # Inject scene state into post prompt so it's close to generation
     scene_state = ctx.get("scene_state", "")
     if scene_state.strip():
-        ctx["system_prompt"] += "\n\n[Current Scene State]\n" + scene_state.strip()
+        ctx["post_prompt"] += "\n\n[Current Scene State — do NOT contradict this]\n" + scene_state.strip()
 
     return ctx
 
@@ -158,9 +162,18 @@ def clean_response(ctx: dict) -> dict:
     ai_name = ctx.get("ai_name", "")
     if ai_name and response.startswith(ai_name):
         after = response[len(ai_name):]
-        if after.startswith(": ") or after.startswith(" "):
-            response = after.lstrip(": ")
+        if after.startswith(": "):
+            response = after[2:]
     ctx["response"] = response
+    return ctx
+
+
+def inject_tools(ctx: dict) -> dict:
+    """Add tool descriptions to the system prompt if MCP tools are available."""
+    router = get_router()
+    if router.has_tools:
+        tool_block = router.get_tool_descriptions()
+        ctx["system_prompt"] = ctx.get("system_prompt", "") + "\n\n" + tool_block
     return ctx
 
 
@@ -169,6 +182,7 @@ def create_default_pipeline() -> Pipeline:
     p = Pipeline()
     p.add_pre(assemble_prompt)
     p.add_pre(expand_variables)
+    p.add_pre(inject_tools)
     p.add_pre(apply_context_strategy)
     p.add_post(clean_response)
     return p

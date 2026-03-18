@@ -21,6 +21,9 @@ for i in $(seq 1 10); do
     sleep 1
 done
 
+# Backup database before restart
+bash "$SCRIPT_DIR/../db/backup.sh" 2>/dev/null || true
+
 # Activate venv
 source .venv/bin/activate
 

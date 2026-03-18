@@ -28,6 +28,7 @@ build/
 # Claude Code worktrees (subagent isolation)
 .claude/worktrees/
 .worktrees/
+.superpowers/brainstorm/
 
 # Backups & temp
 *.swp
@@ -38,3 +39,4 @@ build/
 
 bak
 tmp
+projects/backup/
