@@ -1,5 +1,5 @@
 {
-  "ollama_url": "http://wsl-gateway:11434",
+  "ollama_url": "http://localhost:11434",
   "host": "127.0.0.1",
   "port": 8080,
   "default_model": "q8",
@@ -8,7 +8,8 @@
     "q17": "qwen3:1.7b",
     "q4": "qwen3:4b",
     "q8": "qwen3:8b",
-    "q25": "qwen2.5:7b-instruct-q3_K_M"
+    "q25": "qwen2.5:7b-instruct-q3_K_M",
+    "nemo": "mistral-nemo"
   },
   "default_options": {
     "temperature": 0.7,

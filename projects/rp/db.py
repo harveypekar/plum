@@ -1,3 +1,4 @@
+import hashlib
 import json
 import os
 import asyncpg
@@ -216,6 +217,11 @@ async def delete_conversation(conv_id: int) -> bool:
 
 # -- Messages --
 
+async def delete_all_messages(conv_id: int):
+    pool = await get_pool()
+    await pool.execute("DELETE FROM rp_messages WHERE conversation_id = $1", conv_id)
+
+
 async def get_messages(conv_id: int) -> list[dict]:
     pool = await get_pool()
     rows = await pool.fetch(
@@ -257,3 +263,66 @@ async def delete_message(msg_id: int) -> bool:
     pool = await get_pool()
     result = await pool.execute("DELETE FROM rp_messages WHERE id = $1", msg_id)
     return result == "DELETE 1"
+
+
+# -- First Message Cache --
+
+def _hash_data(data) -> str:
+    """Stable hash of any JSON-serializable data."""
+    raw = json.dumps(data, sort_keys=True, ensure_ascii=True)
+    return hashlib.sha256(raw.encode()).hexdigest()[:16]
+
+
+def compute_card_hash(card: dict) -> str:
+    """Hash the card's voice-relevant fields (description, personality, system_prompt, first_mes, mes_example)."""
+    data = card.get("card_data", {}).get("data", card.get("card_data", {}))
+    relevant = {
+        "description": data.get("description", ""),
+        "personality": data.get("personality", ""),
+        "system_prompt": data.get("system_prompt", ""),
+        "first_mes": data.get("first_mes", ""),
+        "mes_example": data.get("mes_example", ""),
+    }
+    return _hash_data(relevant)
+
+
+def compute_scenario_hash(scenario: dict | None) -> str:
+    """Hash the scenario's content fields."""
+    if not scenario:
+        return _hash_data({"none": True})
+    return _hash_data({
+        "description": scenario.get("description", ""),
+        "first_message": scenario.get("first_message", ""),
+    })
+
+
+def compute_combo_hash(card_hash: str, scenario_hash: str, model: str) -> str:
+    """Combine card + scenario + model into a single lookup hash."""
+    return _hash_data({"card": card_hash, "scenario": scenario_hash, "model": model})
+
+
+async def get_cached_first_message(combo_hash: str, card_hash: str, scenario_hash: str) -> str | None:
+    """Return cached first message if combo_hash matches AND component hashes are still fresh."""
+    pool = await get_pool()
+    row = await pool.fetchrow(
+        "SELECT content, card_hash, scenario_hash FROM rp_first_message_cache WHERE combo_hash = $1",
+        combo_hash,
+    )
+    if not row:
+        return None
+    # Verify component hashes haven't drifted
+    if row["card_hash"] != card_hash or row["scenario_hash"] != scenario_hash:
+        await pool.execute("DELETE FROM rp_first_message_cache WHERE combo_hash = $1", combo_hash)
+        return None
+    return row["content"]
+
+
+async def set_cached_first_message(combo_hash: str, card_hash: str, scenario_hash: str, model: str, content: str):
+    """Store or update a cached first message."""
+    pool = await get_pool()
+    await pool.execute(
+        "INSERT INTO rp_first_message_cache (combo_hash, card_hash, scenario_hash, model, content) "
+        "VALUES ($1, $2, $3, $4, $5) "
+        "ON CONFLICT (combo_hash) DO UPDATE SET card_hash=$2, scenario_hash=$3, content=$5, created_at=NOW()",
+        combo_hash, card_hash, scenario_hash, model, content,
+    )

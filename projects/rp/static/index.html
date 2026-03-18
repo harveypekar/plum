@@ -253,6 +253,13 @@
     font-family: inherit;
   }
   .message-actions button:hover { color: #58a6ff; }
+  .message-number {
+    font-size: 0.65em;
+    color: #484f58;
+    margin-top: 2px;
+    text-align: right;
+  }
+  .message.user .message-number { text-align: left; }
 
   /* Thinking section in messages */
   .msg-thinking {
@@ -452,6 +459,11 @@
   }
   .card-tile-actions button:hover { color: #f0f6fc; border-color: #484f58; }
   .card-tile-actions button.delete:hover { color: #f85149; }
+  button.confirming, .conv-delete.confirming {
+    color: #f85149 !important;
+    border-color: #f85149 !important;
+    font-weight: bold;
+  }
 
   /* Drop zone */
   .drop-zone {
@@ -565,6 +577,24 @@
     padding: 4px 10px;
     cursor: pointer;
     font-family: inherit;
+  }
+  .card-gen-progress {
+    margin-top: 10px;
+    height: 6px;
+    background: #30363d;
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .card-gen-progress-bar {
+    height: 100%;
+    width: 40%;
+    background: linear-gradient(90deg, #8957e5, #bc8cff);
+    border-radius: 3px;
+    animation: card-gen-slide 1.5s ease-in-out infinite;
+  }
+  @keyframes card-gen-slide {
+    0% { transform: translateX(-150%); }
+    100% { transform: translateX(350%); }
   }
   .card-editor h3 {
     font-size: 0.95em;
@@ -837,6 +867,8 @@
         <div class="chat-header-actions">
           <button id="continueBtn" title="Prompt AI to write">Continue</button>
           <button id="regenerateBtn" title="Regenerate last response">Regenerate</button>
+          <button id="restartBtn" title="Delete all messages and start over">Restart</button>
+          <button id="autoBtn" title="AI plays both sides">Auto</button>
         </div>
       </div>
       <div class="chat-messages" id="chatMessages">
@@ -936,12 +968,19 @@
           <div id="cardGenStep1">
             <div class="form-group">
               <label for="cardGenDescription">Describe your character</label>
-              <textarea id="cardGenDescription" rows="3" placeholder="A cheerful elven bard who travels from town to town..."></textarea>
+              <textarea id="cardGenDescription" rows="3" placeholder="e.g. A quiet librarian with a sharp tongue and a secret past..."></textarea>
+            </div>
+            <div class="form-group">
+              <label for="cardGenModel">Model</label>
+              <select id="cardGenModel"></select>
             </div>
             <div style="display:flex;gap:8px;align-items:center">
               <button id="cardGenGenerate" class="btn-primary" style="background:#8957e5">Generate</button>
               <button id="cardGenCancel" class="btn-secondary">Cancel</button>
               <span id="cardGenStatus" style="font-size:0.8em;color:#8b949e"></span>
+            </div>
+            <div id="cardGenProgress" class="card-gen-progress" style="display:none">
+              <div class="card-gen-progress-bar"></div>
             </div>
           </div>
           <div id="cardGenStep2" style="display:none">
