@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plum Dashboard</title>
+    <link rel="stylesheet" href="/front/styles.css">
+</head>
+<body>
+    <div class="tabs">
+        <button class="tab-btn active" data-tab="master">Master</button>
+        <button class="tab-btn" data-tab="rp">rp</button>
+    </div>
+
+    <!-- Master Dashboard Tab -->
+    <div id="master" class="tab-content active">
+        <div class="master-grid" id="service-grid"></div>
+    </div>
+
+    <!-- rp Tab -->
+    <div id="rp" class="tab-content">
+        <div class="rp-container">
+            <div class="north-panel">
+                <div class="panel-label">Services:</div>
+                <div id="rp-status-bar"></div>
+            </div>
+            <div class="centre-panel">
+                <iframe src="/rp/" title="rp UI"></iframe>
+            </div>
+            <div class="south-panel">
+                <div class="panel-label">rp Logs:</div>
+                <div class="logs" id="logs-rp-tab"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/front/app.js"></script>
+</body>
+</html>
