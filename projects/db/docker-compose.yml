@@ -8,5 +8,17 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
 
+  backup:
+    image: pgvector/pgvector:pg17
+    restart: unless-stopped
+    depends_on:
+      - postgres
+    env_file: .env
+    volumes:
+      - ./backup-watcher.sh:/backup-watcher.sh:ro
+      - ./backups:/backups
+    entrypoint: ["bash", "/backup-watcher.sh"]
+
 volumes:
   pgdata:
+    name: pgdata

@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+_log = logging.getLogger(__name__)
 from fastapi import FastAPI, UploadFile, File, HTTPException, Request
 from fastapi.responses import Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -14,10 +15,24 @@ from .models import (
     MessageResponse, SendMessageRequest, EditMessageRequest, SceneStateRequest,
 )
 from .pipeline import create_default_pipeline
+from .mcp_client import get_router as get_mcp_router
 
 _ollama = None
 _pipeline = None
 _resolve_model = None
+
+
+async def init_mcp():
+    """Register and discover MCP tool servers."""
+    import sys
+    from pathlib import Path
+    router = get_mcp_router()
+    server_path = str(Path(__file__).parent / "mcp_wikipedia.py")
+    # Use the same python that's running this process (the venv's python)
+    python = sys.executable
+    router.register_server("wikipedia", python, [server_path])
+    await router.discover_tools()
+    _log.info("MCP tools ready: %s", list(router._tools.keys()) if router.has_tools else "none")
 
 
 def setup(app: FastAPI, ollama, resolve_model=None):
@@ -115,7 +130,7 @@ def setup(app: FastAPI, ollama, resolve_model=None):
 
     # -- Card Generation --
 
-    _card_gen_model = "q25"
+    _card_gen_model = "qwen3:14b"
 
     _card_fields = {
         "name": "A unique, memorable character name",
@@ -145,11 +160,13 @@ def setup(app: FastAPI, ollama, resolve_model=None):
             "- mes_example: 2-3 example exchanges as a single string\n"
             "- scenario: default scenario (1 paragraph)\n"
             "- tags: array of string tags\n\n"
+            "Match the genre and tone of the user's description. Do NOT default to fantasy.\n"
             "Write vivid, specific descriptions with depth and quirks.\n"
             "Respond with ONLY the JSON object. No markdown fences, no explanation."
         )
 
-        model = _resolve_model(_card_gen_model) if _resolve_model else _card_gen_model
+        req_model = req.get("model", "") or _card_gen_model
+        model = _resolve_model(req_model) if _resolve_model else req_model
         result = await _ollama.generate(
             model=model, prompt=description, system=system,
             options={"temperature": 0.7, "num_predict": 2048, "think": False},
@@ -180,7 +197,8 @@ def setup(app: FastAPI, ollama, resolve_model=None):
             prompt += f"User instructions: {instructions}\n"
         prompt += f"\nRespond with ONLY the new value for '{field}'. No JSON, no field name, just the content."
 
-        model = _resolve_model(_card_gen_model) if _resolve_model else _card_gen_model
+        req_model = req.get("model", "") or _card_gen_model
+        model = _resolve_model(req_model) if _resolve_model else req_model
         result = await _ollama.generate(
             model=model, prompt=prompt,
             system="Output only the requested field content. No thinking, no preamble, no quotes around the value.",
@@ -265,16 +283,14 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         result = await db.create_conversation(
             conv.user_card_id, conv.ai_card_id, conv.scenario_id, conv.model
         )
-        # First message priority: scenario > card
         ai_card = await db.get_card(conv.ai_card_id)
-        ai_data = ai_card["card_data"].get("data", ai_card["card_data"])
+        user_card = await db.get_card(conv.user_card_id)
         scenario = await db.get_scenario(conv.scenario_id) if conv.scenario_id else None
-        first_mes = (scenario or {}).get("first_message", "") or ai_data.get("first_mes", "")
+        model = conv.model
+
+        first_mes = await _get_or_generate_first_message(result, ai_card, user_card, scenario, model)
+
         if first_mes:
-            user_card = await db.get_card(conv.user_card_id)
-            user_data = user_card["card_data"].get("data", user_card["card_data"])
-            first_mes = first_mes.replace("${user}", user_data.get("name", "User"))
-            first_mes = first_mes.replace("${char}", ai_data.get("name", "Character"))
             await db.add_message(result["id"], "assistant", first_mes)
         return result
 
@@ -300,6 +316,25 @@ def setup(app: FastAPI, ollama, resolve_model=None):
             raise HTTPException(404, "Conversation not found")
         return {"ok": True}
 
+    @app.post("/rp/conversations/{conv_id}/restart")
+    async def restart_conversation(conv_id: int):
+        conv = await db.get_conversation(conv_id)
+        if not conv:
+            raise HTTPException(404, "Conversation not found")
+        await db.delete_all_messages(conv_id)
+        await db.update_scene_state(conv_id, "")
+
+        ai_card = await db.get_card(conv["ai_card_id"])
+        user_card = await db.get_card(conv["user_card_id"])
+        scenario = await db.get_scenario(conv["scenario_id"]) if conv["scenario_id"] else None
+        model = conv["model"]
+
+        first_mes = await _get_or_generate_first_message(conv, ai_card, user_card, scenario, model)
+
+        if first_mes:
+            await db.add_message(conv_id, "assistant", first_mes)
+        return {"ok": True}
+
     @app.put("/rp/conversations/{conv_id}/scene-state")
     async def update_scene_state(conv_id: int, req: SceneStateRequest):
         if not await db.update_scene_state(conv_id, req.scene_state):
@@ -314,11 +349,31 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         messages = await db.get_messages(conv_id)
         msg_list = [{"role": m["role"], "content": m["content"]} for m in messages]
         model = _resolve_model(conv["model"])
-        clean = await _generate_scene_state(model, msg_list)
+        previous_state = conv.get("scene_state", "")
+        ai_card = await db.get_card(conv["ai_card_id"])
+        user_card = await db.get_card(conv["user_card_id"])
+        ai_data = ai_card.get("card_data", {}).get("data", ai_card.get("card_data", {}))
+        user_data = user_card.get("card_data", {}).get("data", user_card.get("card_data", {}))
+        clean = await _generate_scene_state(
+            model, msg_list, previous_state,
+            ai_name=ai_data.get("name", "Character"),
+            user_name=user_data.get("name", "User"),
+            ai_personality=ai_data.get("description", "")
+        )
         await db.update_scene_state(conv_id, clean)
         return {"scene_state": clean}
 
     # -- Chat --
+
+    _chat_defaults = {"num_predict": 768, "temperature": 1.05, "repeat_penalty": 1.08, "min_p": 0.1}
+
+    def _build_ollama_options(settings: dict) -> dict:
+        """Build ollama options from scenario settings with sensible defaults."""
+        opts = dict(_chat_defaults)
+        for k, v in settings.items():
+            if k not in ("context_strategy", "max_context_tokens", "model"):
+                opts[k] = v
+        return opts
 
     _template_path = Path(__file__).parent / "prompt.md"
 
@@ -351,6 +406,99 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         ai_data = ctx.get("ai_card", {}).get("card_data", {}).get("data", ctx.get("ai_card", {}).get("card_data", {}))
         return ai_data.get("name", "Character")
 
+    async def _get_or_generate_first_message(conv, ai_card, user_card, scenario, model):
+        """Check cache, return if fresh, otherwise generate and cache."""
+        card_hash = db.compute_card_hash(ai_card)
+        scenario_hash = db.compute_scenario_hash(scenario)
+        combo_hash = db.compute_combo_hash(card_hash, scenario_hash, model)
+
+        # Check cache
+        cached = await db.get_cached_first_message(combo_hash, card_hash, scenario_hash)
+        if cached:
+            _log.info("First message cache hit for combo %s", combo_hash)
+            return cached
+
+        # Generate
+        try:
+            first_mes = await _generate_first_message(conv, ai_card, user_card, scenario)
+        except Exception as e:
+            _log.warning("Failed to generate first message, falling back to card: %s", e)
+            ai_data = ai_card["card_data"].get("data", ai_card["card_data"])
+            user_data = user_card["card_data"].get("data", user_card["card_data"])
+            first_mes = (scenario or {}).get("first_message", "") or ai_data.get("first_mes", "")
+            first_mes = first_mes.replace("${user}", user_data.get("name", "User"))
+            first_mes = first_mes.replace("${char}", ai_data.get("name", "Character"))
+            return first_mes
+
+        # Cache the result
+        await db.set_cached_first_message(combo_hash, card_hash, scenario_hash, model, first_mes)
+        _log.info("First message cached for combo %s", combo_hash)
+        return first_mes
+
+    async def _generate_first_message(conv, ai_card, user_card, scenario):
+        """Generate a first message in the character's voice using scenario + card style reference."""
+        ai_data = ai_card["card_data"].get("data", ai_card["card_data"])
+        user_data = user_card["card_data"].get("data", user_card["card_data"])
+        char_name = ai_data.get("name", "Character")
+        user_name = user_data.get("name", "User")
+
+        # Build the generation prompt
+        scenario_desc = (scenario or {}).get("description", "")
+        style_reference = ai_data.get("first_mes", "")
+        system_prompt = ai_data.get("system_prompt", "")
+        description = ai_data.get("description", "")
+        personality = ai_data.get("personality", "")
+
+        prompt_parts = []
+        if system_prompt:
+            prompt_parts.append(system_prompt)
+        if description:
+            prompt_parts.append(f"Character: {description}")
+        if personality:
+            prompt_parts.append(f"Personality: {personality}")
+
+        prompt_parts.append(
+            f"\nWrite the opening scene for a roleplay conversation. "
+            f"Write as {char_name} in the style demonstrated below."
+        )
+        if scenario_desc:
+            prompt_parts.append(f"\nScenario to set up:\n{scenario_desc}")
+        else:
+            prompt_parts.append(f"\nSet up a natural opening scene where {char_name} and {user_name} encounter each other.")
+
+        if style_reference:
+            # Replace template vars in the reference
+            ref = style_reference.replace("{{user}}", user_name).replace("{{char}}", char_name)
+            prompt_parts.append(
+                f"\nStyle reference (match this prose register, voice, and level of detail — "
+                f"do NOT copy the content, write a NEW scene for the scenario above):\n{ref}"
+            )
+
+        prompt_parts.append(
+            f"\nWrite ONLY {char_name}'s opening. Do not write {user_name}'s actions or dialogue. "
+            f"300-500 words."
+        )
+
+        full_prompt = "\n\n".join(prompt_parts)
+        model = _resolve_model(conv["model"])
+
+        result = await asyncio.wait_for(
+            _ollama.generate(
+                model=model, prompt=full_prompt,
+                system=f"You are writing the opening narration for {char_name}. Stay in character.",
+                options={"temperature": 1.05, "num_predict": 768, "min_p": 0.1, "repeat_penalty": 1.08},
+            ),
+            timeout=120,
+        )
+        # Clean up
+        clean = result.strip()
+        # Strip char name prefix if echoed
+        if clean.startswith(char_name + ":"):
+            clean = clean[len(char_name) + 1:].strip()
+        elif clean.startswith(char_name + " "):
+            clean = clean[len(char_name) + 1:].strip()
+        return clean
+
     def _build_chat_messages(ctx):
         """Assemble the messages array for chat_stream()."""
         chat_messages = [{"role": "system", "content": ctx["system_prompt"]}]
@@ -367,47 +515,84 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         user_data = ctx.get("user_card", {}).get("card_data", {}).get("data", ctx.get("user_card", {}).get("card_data", {}))
         return user_data.get("name", "User")
 
+    def _get_ai_personality(ctx):
+        """Extract AI character personality description."""
+        ai_data = ctx.get("ai_card", {}).get("card_data", {}).get("data", ctx.get("ai_card", {}).get("card_data", {}))
+        return ai_data.get("description", "")
+
     _log = logging.getLogger("rp.routes")
 
     _scene_state_model = "q25"
     _scene_state_window = 8
 
-    def _build_scene_state_prompt(messages: list[dict]) -> str:
+    def _build_scene_state_prompt(messages: list[dict], previous_state: str = "",
+                                   ai_name: str = "Character", user_name: str = "User",
+                                   ai_personality: str = "") -> str:
         recent = messages[-_scene_state_window:]
         history = "\n".join(f"{m['role']}: {m['content']}" for m in recent)
+        prev_section = ""
+        if previous_state.strip():
+            prev_section = (
+                "PREVIOUS SCENE STATE (carry forward anything not contradicted by new messages):\n"
+                f"{previous_state.strip()}\n\n"
+            )
+        personality_hint = ""
+        if ai_personality:
+            # Extract just the first ~200 chars of personality for grounding
+            short = ai_personality[:200].rsplit(" ", 1)[0]
+            personality_hint = f"{ai_name}'s personality: {short}\n\n"
         return (
-            "Below are the LAST FEW messages of a roleplay conversation. "
-            "Based ONLY on these final messages, describe the CURRENT state of the scene "
-            "as it stands RIGHT NOW at the very end.\n\n"
-            "If characters moved, changed clothes, or shifted position in these messages, "
-            "report the NEW state, not where they were before.\n\n"
+            f"{prev_section}"
+            f"{personality_hint}"
+            "Below are the most recent messages. UPDATE the scene state based on what changed.\n"
+            "Keep everything from the previous state that still holds true. "
+            "Only change what the new messages contradict or add.\n\n"
+            f"Characters: {ai_name} (AI) and {user_name} (user).\n\n"
             "Format — one short line per category:\n"
             "Location: (where are they right now)\n"
-            "Clothing: (what each character is currently wearing, or naked)\n"
+            f"Clothing: (what {ai_name} and {user_name} are currently wearing — be specific, or 'fully naked' if they undressed)\n"
+            "Restraints: (describe the specific tie/pattern for each bound character — e.g. 'chest harness in red jute, wrists behind back' — or 'none')\n"
             "Position: (posture, who is where, physical contact)\n"
             "Props: (objects currently in play)\n"
-            "Mood: (emotional atmosphere right now)\n\n"
+            "Mood: (emotional atmosphere right now)\n"
+            f"Voice: (for each character: 1-2 words describing how they CURRENTLY sound — ground this in {ai_name}'s personality, not generic descriptors)\n\n"
             "No narration, no story, no explanation. Just the current facts.\n\n"
             f"Recent messages:\n{history}"
         )
 
-    async def _generate_scene_state(model: str, messages: list[dict]) -> str:
-        prompt = _build_scene_state_prompt(messages)
+    async def _generate_scene_state(model: str, messages: list[dict], previous_state: str = "",
+                                     ai_name: str = "Character", user_name: str = "User",
+                                     ai_personality: str = "") -> str:
+        prompt = _build_scene_state_prompt(messages, previous_state, ai_name, user_name, ai_personality)
         summary_model = _resolve_model(_scene_state_model) if _resolve_model else model
         result = await _ollama.generate(
             model=summary_model, prompt=prompt,
             system="Output only the scene state summary. No thinking, no preamble.",
-            options={"temperature": 0.2, "num_predict": 150, "think": False},
+            options={"temperature": 0.2, "num_predict": 200, "think": False},
         )
         clean = result.strip()
         if "<think>" in clean:
             clean = clean.split("</think>")[-1].strip()
-        return clean
+        # Omit lines where the value is empty or just "none"
+        lines = []
+        for line in clean.splitlines():
+            if ":" in line:
+                value = line.split(":", 1)[1].strip().lower()
+                if value and value != "none" and value != "n/a":
+                    lines.append(line)
+            elif line.strip():
+                lines.append(line)
+        return "\n".join(lines)
 
-    async def _auto_update_scene_state(conv_id: int, model: str, messages: list[dict]):
+    async def _auto_update_scene_state(conv_id: int, model: str, messages: list[dict],
+                                        ai_name: str = "Character", user_name: str = "User",
+                                        ai_personality: str = ""):
         """Background task: ask LLM to summarize current scene state."""
         try:
-            clean = await _generate_scene_state(model, messages)
+            conv = await db.get_conversation(conv_id)
+            previous_state = conv.get("scene_state", "") if conv else ""
+            clean = await _generate_scene_state(model, messages, previous_state,
+                                                ai_name, user_name, ai_personality)
             await db.update_scene_state(conv_id, clean)
         except Exception as e:
             _log.warning("Scene state auto-update failed: %s", e)
@@ -426,7 +611,7 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         model = _resolve_model(conv["model"])
         scenario = ctx.get("scenario") or {}
         settings = scenario.get("settings", {})
-        ollama_options = {k: v for k, v in settings.items() if k not in ("context_strategy", "max_context_tokens", "model")}
+        ollama_options = _build_ollama_options(settings)
 
         chat_messages = _build_chat_messages(ctx)
         user_name = _get_user_name(ctx)
@@ -438,34 +623,78 @@ def setup(app: FastAPI, ollama, resolve_model=None):
                 "debug_messages": ctx["messages"],
             }) + "\n"
 
-            tokens = []
+            cur_messages = list(chat_messages)
+            max_tool_rounds = 3
+            final_text = ""
             raw = {}
-            try:
-                async for chunk in _ollama.chat_stream(
-                    model=model, messages=chat_messages,
-                    options=ollama_options, stop=[f"{user_name}:"],
-                ):
-                    yield json.dumps(chunk) + "\n"
-                    if chunk.get("done"):
-                        raw = chunk
-                    elif not chunk.get("thinking"):
-                        tokens.append(chunk["token"])
-            except Exception as e:
-                yield json.dumps({"error": str(e), "done": True}) + "\n"
-                return
+
+            for _round in range(max_tool_rounds + 1):
+                tokens = []
+                try:
+                    async for chunk in _ollama.chat_stream(
+                        model=model, messages=cur_messages,
+                        options=ollama_options, stop=[f"{user_name}:"],
+                    ):
+                        yield json.dumps(chunk) + "\n"
+                        if chunk.get("done"):
+                            raw = chunk
+                        elif not chunk.get("thinking"):
+                            tokens.append(chunk["token"])
+                except Exception as e:
+                    yield json.dumps({"error": str(e), "done": True}) + "\n"
+                    return
+
+                response_text = "".join(tokens)
+                router = get_mcp_router()
+                tool_calls = router.parse_tool_calls(response_text) if router.has_tools else []
+
+                if not tool_calls or _round == max_tool_rounds:
+                    final_text = response_text
+                    break
+
+                # Resolve tool calls and continue generation
+                tool_results = []
+                for name, args, match_str in tool_calls:
+                    _log.info("MCP tool call: %s(%s)", name, args)
+                    yield json.dumps({"tool_call": name, "args": args}) + "\n"
+                    result = await router.call_tool(name, args)
+                    tool_results.append(f"[RESULT from {name}: {result}]")
+                    yield json.dumps({"tool_result": name, "preview": result[:200]}) + "\n"
+
+                # Strip tool calls from response, append results, ask model to continue
+                clean = response_text
+                for _, _, match_str in tool_calls:
+                    clean = clean.replace(match_str, "")
+                clean = clean.strip()
+
+                cur_messages.append({"role": "assistant", "content": clean})
+                cur_messages.append({"role": "user", "content": "\n".join(tool_results) + "\n\nContinue your response naturally, incorporating the information above. Do not use [TOOL:] again for the same query."})
 
             try:
-                response_text = "".join(tokens)
-                post_ctx = {"response": response_text, "ai_name": _get_ai_name(ctx)}
+                post_ctx = {"response": final_text, "ai_name": _get_ai_name(ctx)}
                 post_ctx = await _pipeline.run_post(post_ctx)
                 await db.add_message(conv_id, "assistant", post_ctx["response"], raw_response=raw)
                 # Update scene state in background
                 updated_msgs = ctx["messages"] + [{"role": "assistant", "content": post_ctx["response"]}]
-                asyncio.create_task(_auto_update_scene_state(conv_id, model, updated_msgs))
+                asyncio.create_task(_auto_update_scene_state(conv_id, model, updated_msgs,
+                                                _get_ai_name(ctx), _get_user_name(ctx), _get_ai_personality(ctx)))
             except Exception as e:
                 yield json.dumps({"error": f"Failed to save response: {e}", "done": True}) + "\n"
 
         return StreamingResponse(stream(), media_type="application/x-ndjson")
+
+    @app.post("/rp/conversations/{conv_id}/save-partial")
+    async def save_partial(conv_id: int, req: SendMessageRequest):
+        """Save a partial response when the user hits Stop mid-stream."""
+        conv = await db.get_conversation(conv_id)
+        if not conv:
+            raise HTTPException(404, "Conversation not found")
+        content = req.content.strip()
+        if not content:
+            return {"ok": False}
+        role = getattr(req, "role", "assistant") if hasattr(req, "role") else "assistant"
+        await db.add_message(conv_id, "assistant", content)
+        return {"ok": True}
 
     @app.put("/rp/messages/{msg_id}", response_model=MessageResponse)
     async def edit_message(msg_id: int, req: EditMessageRequest):
@@ -497,7 +726,7 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         model = _resolve_model(conv["model"])
         scenario = ctx.get("scenario") or {}
         settings = scenario.get("settings", {})
-        ollama_options = {k: v for k, v in settings.items() if k not in ("context_strategy", "max_context_tokens", "model")}
+        ollama_options = _build_ollama_options(settings)
 
         chat_messages = _build_chat_messages(ctx)
         user_name = _get_user_name(ctx)
@@ -531,7 +760,8 @@ def setup(app: FastAPI, ollama, resolve_model=None):
                 await db.add_message(conv_id, "assistant", post_ctx["response"], raw_response=raw)
                 # Update scene state in background
                 updated_msgs = ctx["messages"] + [{"role": "assistant", "content": post_ctx["response"]}]
-                asyncio.create_task(_auto_update_scene_state(conv_id, model, updated_msgs))
+                asyncio.create_task(_auto_update_scene_state(conv_id, model, updated_msgs,
+                                                _get_ai_name(ctx), _get_user_name(ctx), _get_ai_personality(ctx)))
             except Exception as e:
                 yield json.dumps({"error": f"Failed to save response: {e}", "done": True}) + "\n"
 
@@ -549,7 +779,7 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         model = _resolve_model(conv["model"])
         scenario = ctx.get("scenario") or {}
         settings = scenario.get("settings", {})
-        ollama_options = {k: v for k, v in settings.items() if k not in ("context_strategy", "max_context_tokens", "model")}
+        ollama_options = _build_ollama_options(settings)
 
         chat_messages = _build_chat_messages(ctx)
         user_name = _get_user_name(ctx)
@@ -583,7 +813,111 @@ def setup(app: FastAPI, ollama, resolve_model=None):
                 await db.add_message(conv_id, "assistant", post_ctx["response"], raw_response=raw)
                 # Update scene state in background
                 updated_msgs = ctx["messages"] + [{"role": "assistant", "content": post_ctx["response"]}]
-                asyncio.create_task(_auto_update_scene_state(conv_id, model, updated_msgs))
+                asyncio.create_task(_auto_update_scene_state(conv_id, model, updated_msgs,
+                                                _get_ai_name(ctx), _get_user_name(ctx), _get_ai_personality(ctx)))
+            except Exception as e:
+                yield json.dumps({"error": f"Failed to save response: {e}", "done": True}) + "\n"
+
+        return StreamingResponse(stream(), media_type="application/x-ndjson")
+
+    @app.post("/rp/conversations/{conv_id}/auto-reply")
+    async def auto_reply(conv_id: int):
+        """Generate the next message for whichever side should go next.
+        If last message was assistant, generate as user card (and save as 'user').
+        If last message was user, generate as ai card (and save as 'assistant').
+        """
+        conv = await db.get_conversation(conv_id)
+        if not conv:
+            raise HTTPException(404, "Conversation not found")
+
+        messages = await db.get_messages(conv_id)
+        last_role = messages[-1]["role"] if messages else "user"
+        # Determine which side generates next
+        generating_as_user = last_role == "assistant"
+        save_role = "user" if generating_as_user else "assistant"
+
+        if generating_as_user:
+            # Swap cards so pipeline builds prompt for user's character
+            swapped_conv = dict(conv)
+            swapped_conv["user_card_id"] = conv["ai_card_id"]
+            swapped_conv["ai_card_id"] = conv["user_card_id"]
+            # Flip message roles so the model sees the conversation from the other side
+            swapped_messages = []
+            for m in messages:
+                sm = dict(m)
+                sm["role"] = "assistant" if m["role"] == "user" else "user"
+                swapped_messages.append(sm)
+            ctx = await _build_pipeline_ctx(swapped_conv, swapped_messages)
+            # Override post prompt for user-side: shorter, more reactive
+            user_card = await db.get_card(conv["user_card_id"])
+            user_data = user_card["card_data"].get("data", user_card["card_data"])
+            user_name_str = user_data.get("name", "User")
+            ai_card = await db.get_card(conv["ai_card_id"])
+            ai_data = ai_card["card_data"].get("data", ai_card["card_data"])
+            ai_name_str = ai_data.get("name", "Character")
+            ctx["post_prompt"] = (
+                f"Write {user_name_str}'s next action or dialogue. Stay in character as {user_name_str}.\n"
+                f"NEVER write {ai_name_str}'s actions, speech, or thoughts.\n"
+                "Write 1-2 short paragraphs. Mix action and dialogue.\n"
+                "Use first person for actions (e.g. 'I walk over') and direct speech for dialogue.\n"
+                "Be reactive to what just happened — don't repeat or restart the scene."
+            )
+            # Re-inject scene state into overridden post prompt
+            scene_state = ctx.get("scene_state", "")
+            if scene_state.strip():
+                ctx["post_prompt"] += "\n\n[Current Scene State — do NOT contradict this]\n" + scene_state.strip()
+        else:
+            ctx = await _build_pipeline_ctx(conv, messages)
+
+        _auto_user_model = "qwen3:14b"
+        if generating_as_user:
+            model = _resolve_model(_auto_user_model)
+        else:
+            model = _resolve_model(conv["model"])
+        scenario = ctx.get("scenario") or {}
+        settings = scenario.get("settings", {})
+        ollama_options = _build_ollama_options(settings)
+        if generating_as_user:
+            # Instruct model: lower temperature, no thinking
+            ollama_options = {"temperature": 0.7, "num_predict": 256, "think": False}
+
+        chat_messages = _build_chat_messages(ctx)
+        user_name = _get_user_name(ctx)
+
+        async def stream():
+            yield json.dumps({
+                "debug_prompt": ctx["system_prompt"],
+                "debug_user_prompt": ctx.get("post_prompt", ""),
+                "debug_messages": ctx["messages"],
+                "auto_role": save_role,
+            }) + "\n"
+
+            tokens = []
+            raw = {}
+            try:
+                async for chunk in _ollama.chat_stream(
+                    model=model, messages=chat_messages,
+                    options=ollama_options, stop=[f"{user_name}:"],
+                ):
+                    yield json.dumps(chunk) + "\n"
+                    if chunk.get("done"):
+                        raw = chunk
+                    elif not chunk.get("thinking"):
+                        tokens.append(chunk["token"])
+            except Exception as e:
+                yield json.dumps({"error": str(e), "done": True}) + "\n"
+                return
+
+            try:
+                response_text = "".join(tokens)
+                post_ctx = {"response": response_text, "ai_name": _get_ai_name(ctx)}
+                post_ctx = await _pipeline.run_post(post_ctx)
+                await db.add_message(conv_id, save_role, post_ctx["response"], raw_response=raw)
+                # Update scene state in background
+                updated_msgs = [{"role": m["role"], "content": m["content"]} for m in messages]
+                updated_msgs.append({"role": save_role, "content": post_ctx["response"]})
+                asyncio.create_task(_auto_update_scene_state(conv_id, model, updated_msgs,
+                                                _get_ai_name(ctx), _get_user_name(ctx), _get_ai_personality(ctx)))
             except Exception as e:
                 yield json.dumps({"error": f"Failed to save response: {e}", "done": True}) + "\n"
 
