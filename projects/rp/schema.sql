@@ -56,3 +56,15 @@ CREATE TABLE IF NOT EXISTS rp_messages (
 );
 
 CREATE INDEX IF NOT EXISTS idx_rp_messages_conv ON rp_messages(conversation_id, sequence);
+
+CREATE TABLE IF NOT EXISTS rp_first_message_cache (
+    id              SERIAL PRIMARY KEY,
+    combo_hash      TEXT NOT NULL UNIQUE,
+    card_hash       TEXT NOT NULL,
+    scenario_hash   TEXT NOT NULL,
+    model           TEXT NOT NULL,
+    content         TEXT NOT NULL,
+    created_at      TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_rp_fmc_combo ON rp_first_message_cache(combo_hash);

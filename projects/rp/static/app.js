@@ -13,6 +13,7 @@
   let editingScenarioId = null;
   let isStreaming = false;
   let abortController = null;
+  let autoMode = false;
   let availableModels = [];
   let allCards = [];
   let allScenarios = [];
@@ -39,6 +40,28 @@
       }
     }
     return node;
+  }
+
+  function confirmAction(btn, onConfirm) {
+    if (btn.dataset.confirming) return;
+    btn.dataset.confirming = "1";
+    const orig = btn.textContent;
+    const origClass = btn.className;
+    btn.textContent = "Sure?";
+    btn.className = (origClass ? origClass + " " : "") + "confirming";
+    const reset = () => {
+      delete btn.dataset.confirming;
+      btn.textContent = orig;
+      btn.className = origClass;
+      document.removeEventListener("click", outsideClick, true);
+    };
+    const outsideClick = (e) => { if (!btn.contains(e.target)) reset(); };
+    setTimeout(() => document.addEventListener("click", outsideClick, true), 0);
+    btn.addEventListener("click", function handler() {
+      btn.removeEventListener("click", handler);
+      reset();
+      onConfirm();
+    }, { once: true });
   }
 
   function renderDialogue(bubble, content, role) {
@@ -78,12 +101,35 @@
     }
   }
 
+  var modelTags = {
+    "lumimaid": ["roleplay", "uncensored"],
+    "daturacookie": ["roleplay", "uncensored", "small"],
+    "cydonia": ["roleplay", "uncensored"],
+    "nevoria": ["roleplay", "uncensored"],
+    "mag-mell": ["roleplay"],
+    "dolphin": ["instruct", "uncensored", "small"],
+    "qwen2.5": ["instruct"],
+    "qwen3": ["instruct"],
+    "qwen:": ["instruct", "small"],
+    "llama3": ["instruct"],
+  };
+
+  function modelGetTags(name) {
+    var lower = name.toLowerCase();
+    for (var pattern in modelTags) {
+      if (lower.indexOf(pattern) !== -1) return modelTags[pattern];
+    }
+    return [];
+  }
+
   function modelLabel(m) {
     let label = m.alias ? m.alias + " (" + m.name + ")" : m.name;
     const parts = [];
     if (m.parameter_size) parts.push(m.parameter_size);
     if (m.quantization_level) parts.push(m.quantization_level);
-    if (parts.length > 0) label += " — " + parts.join(", ");
+    var tags = modelGetTags(m.name);
+    if (tags.length > 0) parts.push(tags.join(", "));
+    if (parts.length > 0) label += " — " + parts.join(" · ");
     return label;
   }
 
@@ -229,16 +275,17 @@
       const del = el("span", {
         className: "conv-delete",
         textContent: "\u2715",
-        onClick: async (e) => {
+        onClick: (e) => {
           e.stopPropagation();
-          if (!confirm("Delete this conversation?")) return;
-          await api("DELETE", "/rp/conversations/" + c.id);
-          if (currentConvId === c.id) {
-            currentConvId = null;
-            currentConvDetail = null;
-            renderChatEmpty();
-          }
-          loadConversations();
+          confirmAction(del, async () => {
+            await api("DELETE", "/rp/conversations/" + c.id);
+            if (currentConvId === c.id) {
+              currentConvId = null;
+              currentConvDetail = null;
+              renderChatEmpty();
+            }
+            loadConversations();
+          });
         },
       });
       item.appendChild(del);
@@ -297,8 +344,8 @@
       container.appendChild(banner);
     }
 
-    for (const msg of messages) {
-      appendMessageBubble(container, msg, user_card, ai_card);
+    for (var i = 0; i < messages.length; i++) {
+      appendMessageBubble(container, messages[i], user_card, ai_card, i);
     }
 
     // Scroll to bottom
@@ -325,7 +372,7 @@
     }
   }
 
-  function appendMessageBubble(container, msg, userCard, aiCard) {
+  function appendMessageBubble(container, msg, userCard, aiCard, msgIndex) {
     const isUser = msg.role === "user";
     const wrapper = el("div", { className: "message " + msg.role });
 
@@ -350,15 +397,21 @@
     });
     const delBtn = el("button", {
       textContent: "Delete",
-      onClick: async () => {
-        if (!confirm("Delete this message?")) return;
-        await api("DELETE", "/rp/messages/" + msg.id);
-        openConversation(currentConvId);
+      onClick: () => {
+        confirmAction(delBtn, async () => {
+          await api("DELETE", "/rp/messages/" + msg.id);
+          openConversation(currentConvId);
+        });
       },
     });
     actions.appendChild(editBtn);
     actions.appendChild(delBtn);
     col.appendChild(actions);
+
+    // Message number
+    if (msgIndex !== undefined) {
+      col.appendChild(el("div", { className: "message-number", textContent: "#" + (msgIndex + 1) }));
+    }
 
     wrapper.appendChild(col);
     container.appendChild(wrapper);
@@ -487,7 +540,7 @@
     if (!hadError) openConversation(currentConvId);
   }
 
-  async function streamResponse(url, body, container) {
+  async function streamResponse(url, body, container, forceRole) {
     abortController = new AbortController();
     const opts = {
       method: "POST",
@@ -498,11 +551,13 @@
       opts.body = JSON.stringify(body);
     }
 
-    // Create AI message bubble for streaming
-    const wrapper = el("div", { className: "message assistant" });
+    // Create message bubble for streaming — role may be overridden by auto_role from server
+    var streamRole = forceRole || "assistant";
+    const wrapper = el("div", { className: "message " + streamRole });
     const avatar = el("img", { className: "message-avatar", alt: "" });
     if (currentConvDetail) {
-      setAvatarSrc(avatar, currentConvDetail.ai_card.id, currentConvDetail.ai_card.has_avatar);
+      var card = streamRole === "user" ? currentConvDetail.user_card : currentConvDetail.ai_card;
+      setAvatarSrc(avatar, card.id, card.has_avatar);
     }
     wrapper.appendChild(avatar);
 
@@ -538,6 +593,15 @@
           if (chunk.debug_prompt !== undefined) {
             $("underHoodPromptContent").textContent = chunk.debug_prompt || "(empty)";
             $("underHoodUserPromptContent").textContent = chunk.debug_user_prompt || "(empty)";
+            // Update bubble side if auto_role differs
+            if (chunk.auto_role && chunk.auto_role !== streamRole) {
+              streamRole = chunk.auto_role;
+              wrapper.className = "message " + streamRole;
+              if (currentConvDetail) {
+                var roleCard = streamRole === "user" ? currentConvDetail.user_card : currentConvDetail.ai_card;
+                setAvatarSrc(avatar, roleCard.id, roleCard.has_avatar);
+              }
+            }
             continue;
           }
 
@@ -578,7 +642,7 @@
             // Re-render with dialogue coloring
             var fullText = bubble.textContent;
             bubble.textContent = "";
-            renderDialogue(bubble, fullText, "assistant");
+            renderDialogue(bubble, fullText, streamRole);
             if (thinkingContent) {
               const toggle = thinkingSection.querySelector(".msg-thinking-toggle");
               toggle.textContent = "Hide thinking";
@@ -589,11 +653,29 @@
             bubble.textContent += chunk.token;
           }
 
-          container.scrollTop = container.scrollHeight;
+          var atBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 60;
+          if (atBottom) container.scrollTop = container.scrollHeight;
         }
       }
     } catch (e) {
-      if (e.name !== "AbortError") {
+      if (e.name === "AbortError") {
+        // Stop was pressed — save whatever we have so far
+        var partialText = bubble.textContent.trim();
+        if (partialText && currentConvId) {
+          try {
+            await fetch("/rp/conversations/" + currentConvId + "/save-partial", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ content: partialText, role: streamRole }),
+            });
+          } catch (_) {}
+        }
+        bubble.classList.remove("streaming-cursor");
+        if (partialText) {
+          bubble.textContent = "";
+          renderDialogue(bubble, partialText, streamRole);
+        }
+      } else {
         hadError = true;
         bubble.classList.remove("streaming-cursor");
         bubble.textContent += "\n[Stream error: " + e.message + "]";
@@ -610,6 +692,8 @@
   // ---------------------------------------------------------------------------
   $("sendBtn").addEventListener("click", sendMessage);
   $("stopBtn").addEventListener("click", () => {
+    autoMode = false;
+    updateAutoBtn();
     if (abortController) abortController.abort();
   });
   $("chatInput").addEventListener("keydown", (e) => {
@@ -628,6 +712,75 @@
 
   $("continueBtn").addEventListener("click", continueConversation);
   $("regenerateBtn").addEventListener("click", regenerateResponse);
+  $("restartBtn").addEventListener("click", () => {
+    if (!currentConvId || isStreaming) return;
+    confirmAction($("restartBtn"), async () => {
+      var container = $("chatMessages");
+      container.textContent = "";
+      var timerStart = Date.now();
+      var timerEl = el("div", { className: "chat-empty", style: { textAlign: "center" } });
+      var timerText = el("div", { textContent: "Generating opening scene... 0s" });
+      timerEl.appendChild(timerText);
+      container.appendChild(timerEl);
+      var timerInterval = setInterval(() => {
+        timerText.textContent = "Generating opening scene... " + Math.floor((Date.now() - timerStart) / 1000) + "s";
+      }, 1000);
+      try {
+        await api("POST", "/rp/conversations/" + currentConvId + "/restart");
+        clearInterval(timerInterval);
+        openConversation(currentConvId);
+      } catch (e) {
+        clearInterval(timerInterval);
+        openConversation(currentConvId);
+      }
+    });
+  });
+
+  function updateAutoBtn() {
+    var btn = $("autoBtn");
+    btn.textContent = autoMode ? "Stop Auto" : "Auto";
+    btn.style.background = autoMode ? "#f85149" : "";
+    btn.style.color = autoMode ? "#fff" : "";
+    btn.style.borderColor = autoMode ? "#f85149" : "";
+  }
+
+  async function autoReplyLoop() {
+    while (autoMode && currentConvId && !isStreaming) {
+      isStreaming = true;
+      $("sendBtn").style.display = "none";
+      $("stopBtn").style.display = "";
+
+      var container = $("chatMessages");
+      var hadError = await streamResponse(
+        "/rp/conversations/" + currentConvId + "/auto-reply",
+        undefined, container
+      );
+
+      isStreaming = false;
+      $("sendBtn").style.display = "";
+      $("stopBtn").style.display = "none";
+
+      if (hadError) {
+        autoMode = false;
+        updateAutoBtn();
+        break;
+      }
+      // Brief pause between turns
+      await new Promise(function (r) { setTimeout(r, 500); });
+    }
+    if (!autoMode) {
+      openConversation(currentConvId);
+    }
+  }
+
+  $("autoBtn").addEventListener("click", () => {
+    if (!currentConvId) return;
+    autoMode = !autoMode;
+    updateAutoBtn();
+    if (autoMode) {
+      autoReplyLoop();
+    }
+  });
 
   // Scene state toggle
   $("sceneStateToggle").addEventListener("click", () => {
@@ -751,6 +904,20 @@
       return;
     }
 
+    // Show a timer while waiting for first message generation
+    $("newChatModal").classList.remove("open");
+    switchView("chat");
+    var timerStart = Date.now();
+    var timerEl = el("div", { className: "chat-empty", style: { textAlign: "center" } });
+    var timerText = el("div", { textContent: "Generating opening scene... 0s" });
+    timerEl.appendChild(timerText);
+    $("chatMessages").textContent = "";
+    $("chatMessages").appendChild(timerEl);
+    var timerInterval = setInterval(() => {
+      var elapsed = Math.floor((Date.now() - timerStart) / 1000);
+      timerText.textContent = "Generating opening scene... " + elapsed + "s";
+    }, 1000);
+
     try {
       const conv = await api("POST", "/rp/conversations", {
         user_card_id: userCardId,
@@ -758,11 +925,12 @@
         scenario_id: scenarioId,
         model: model,
       });
-      $("newChatModal").classList.remove("open");
-      switchView("chat");
+      clearInterval(timerInterval);
       await loadConversations();
       openConversation(conv.id);
     } catch (e) {
+      clearInterval(timerInterval);
+      $("chatMessages").textContent = "";
       alert("Error creating conversation: " + e.message);
     }
   });
@@ -829,11 +997,12 @@
       const delBtn = el("button", {
         className: "delete",
         textContent: "Del",
-        onClick: async (e) => {
+        onClick: (e) => {
           e.stopPropagation();
-          if (!confirm("Delete card \"" + card.name + "\"?")) return;
-          await api("DELETE", "/rp/cards/" + card.id);
-          loadCards();
+          confirmAction(delBtn, async () => {
+            await api("DELETE", "/rp/cards/" + card.id);
+            loadCards();
+          });
         },
       });
       actions.appendChild(editBtn);
@@ -969,6 +1138,7 @@
     $("cardGenStatus").textContent = "";
     $("cardGenStep1").style.display = "";
     $("cardGenStep2").style.display = "none";
+    populateModelSelect($("cardGenModel"));
     $("cardGenerator").classList.add("open");
     $("cardEditor").classList.remove("open");
     $("cardGenDescription").focus();
@@ -993,15 +1163,19 @@
     }
   });
 
+  var cardGenSelectedModel = "";
+
   async function cardGenFullGenerate() {
     var desc = $("cardGenDescription").value.trim();
     if (!desc) return;
 
+    cardGenSelectedModel = $("cardGenModel").value;
     $("cardGenGenerate").disabled = true;
     $("cardGenStatus").textContent = "Generating...";
+    $("cardGenProgress").style.display = "";
 
     try {
-      var resp = await api("POST", "/rp/cards/generate", { description: desc });
+      var resp = await api("POST", "/rp/cards/generate", { description: desc, model: cardGenSelectedModel });
       if (resp.error) {
         $("cardGenStatus").textContent = "Error: " + resp.error;
       } else {
@@ -1015,6 +1189,7 @@
       $("cardGenStatus").textContent = "Failed: " + e.message;
     }
 
+    $("cardGenProgress").style.display = "none";
     $("cardGenGenerate").disabled = false;
   }
 
@@ -1113,6 +1288,7 @@
         card: cardGenCard,
         field: field,
         instructions: instructions,
+        model: cardGenSelectedModel,
       });
       cardGenCard[field] = resp.value;
       var ta = $("cardGen_" + field);
@@ -1249,11 +1425,12 @@
       const delBtn = el("button", {
         className: "delete",
         textContent: "Del",
-        onClick: async (e) => {
+        onClick: (e) => {
           e.stopPropagation();
-          if (!confirm("Delete scenario \"" + s.name + "\"?")) return;
-          await api("DELETE", "/rp/scenarios/" + s.id);
-          loadScenarios();
+          confirmAction(delBtn, async () => {
+            await api("DELETE", "/rp/scenarios/" + s.id);
+            loadScenarios();
+          });
         },
       });
       actions.appendChild(editBtn);
@@ -1372,8 +1549,7 @@
         _serverCommit = data.git_commit || "";
         dot.style.background = "#3fb950";
         dot.title = "Server online — click for details";
-        info.textContent = _serverCommit + " " + (data.git_subject || "");
-        info.style.color = "#8b949e";
+        var parts = [_serverCommit, data.git_subject || ""].filter(Boolean).join(" ");
         // Check current git HEAD to detect staleness
         try {
           var gitRes = await fetch("/.git-head");
@@ -1381,11 +1557,22 @@
             var gitData = await gitRes.json();
             var head = gitData.commit || "";
             if (head && _serverCommit && head !== _serverCommit) {
-              info.textContent = _serverCommit + " " + (data.git_subject || "") + " (outdated)";
+              parts += " (code outdated — restart)";
               info.style.color = "#d29922";
+              info.textContent = parts;
+              return;
             }
           }
         } catch {}
+        // Check if active conversation's card was updated since loaded
+        var cardHint = await checkCardStaleness();
+        if (cardHint) {
+          parts += " · " + cardHint;
+          info.style.color = "#d29922";
+        } else {
+          info.style.color = "#8b949e";
+        }
+        info.textContent = parts;
       } else {
         dot.style.background = "#f85149";
         dot.title = "Server error";
@@ -1399,6 +1586,20 @@
       info.style.color = "#f85149";
     }
   }
+
+  async function checkCardStaleness() {
+    if (!currentConvDetail) return null;
+    var aiId = currentConvDetail.ai_card.id;
+    var loadedAt = currentConvDetail.ai_card.updated_at;
+    try {
+      var card = await api("GET", "/rp/cards/" + aiId);
+      if (card.updated_at !== loadedAt) {
+        return "card updated — start new conversation";
+      }
+    } catch {}
+    return null;
+  }
+
   checkServerStatus();
   setInterval(checkServerStatus, 30000);
 
