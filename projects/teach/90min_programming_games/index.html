@@ -1,0 +1,813 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>⌈ GAME LAB ⌉</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/codemirror.min.css">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --green: #00ff41; --green-dim: #00ff4180; --green-dark: #00ff4130;
+  --amber: #ffb000; --amber-dim: #ffb00080;
+  --cyan: #00ffff; --red: #ff4444; --orange: #ff8c00;
+  --bg: #0a0a0a; --bg-panel: #0d0d0d; --bg-card: #111; --border: #00ff4140;
+  --font: 'Courier New', 'Consolas', monospace;
+}
+html, body { height: 100%; background: var(--bg); color: var(--green); font-family: var(--font); font-size: 18px; overflow: hidden; }
+.glow { text-shadow: 0 0 5px var(--green-dim), 0 0 15px var(--green-dark); }
+.glow-amber { text-shadow: 0 0 5px var(--amber-dim); }
+
+#top-bar { display: flex; align-items: center; justify-content: space-between; padding: 6px 16px; border-bottom: 1px solid var(--border); background: var(--bg); height: 44px; flex-shrink: 0; }
+#top-bar h1 { font-family: var(--font); font-size: 26px; font-weight: normal; letter-spacing: 4px; color: var(--green); }
+#lang-toggle { display: flex; gap: 4px; }
+#lang-toggle button { background: transparent; border: 1px solid var(--border); color: var(--green); font-family: var(--font); font-size: 16px; padding: 2px 10px; cursor: pointer; transition: all 0.15s; }
+#lang-toggle button:hover, #lang-toggle button.active { background: var(--green-dark); box-shadow: 0 0 8px var(--green-dark); }
+
+#main { display: flex; height: calc(100% - 44px); }
+
+/* Resize handles */
+.resize-handle { width: 5px; cursor: col-resize; background: var(--border); flex-shrink: 0; transition: background 0.15s; }
+.resize-handle:hover, .resize-handle.active { background: var(--green); }
+
+#gallery { width: 280px; min-width: 150px; overflow-y: auto; padding: 8px; flex-shrink: 0; }
+.cat-header { font-family: var(--font); font-size: 18px; color: var(--amber); padding: 12px 4px 4px; letter-spacing: 2px; }
+.snippet-card { border: none; margin: 2px 0; padding: 6px 8px; cursor: pointer; transition: all 0.15s; background: transparent; border-left: 2px solid transparent; }
+.snippet-card:hover { border-left-color: var(--green); background: #00ff4108; }
+.snippet-card .title { font-size: 16px; color: var(--green); margin-bottom: 2px; }
+.snippet-card .desc { font-size: 14px; color: var(--green-dim); margin-bottom: 4px; }
+.snippet-card .card-actions { display: flex; gap: 4px; }
+.snippet-card .code-preview { display: none; margin-top: 6px; padding: 6px; background: var(--bg); border: 1px solid var(--border); font-family: var(--font); font-size: 13px; white-space: pre-wrap; max-height: 200px; overflow-y: auto; color: var(--green-dim); }
+.snippet-card.expanded .code-preview { display: block; }
+
+#editor-panel { flex: 1; display: flex; flex-direction: column; min-width: 300px; }
+#editor-container { flex: 1; overflow: hidden; }
+#editor-container .CodeMirror { height: 100%; background: var(--bg) !important; color: var(--green) !important; font-family: var(--font) !important; font-size: 16px; line-height: 1.4; }
+.CodeMirror-cursor { border-left: 2px solid var(--green) !important; }
+.CodeMirror-selected { background: var(--green-dark) !important; }
+.CodeMirror-gutters { background: var(--bg) !important; border-right: 1px solid var(--border) !important; }
+.CodeMirror-linenumber { color: var(--green-dim) !important; font-family: var(--font) !important; }
+/* Syntax colors: keywords=cyan, numbers=cyan, function names=red, function calls=orange */
+.cm-s-default .cm-keyword { color: var(--cyan) !important; }
+.cm-s-default .cm-number { color: var(--cyan) !important; }
+.cm-s-default .cm-string { color: var(--amber) !important; }
+.cm-s-default .cm-comment { color: #00ff41 !important; font-style: italic; }
+.cm-s-default .cm-def { color: var(--red) !important; }
+.cm-s-default .cm-variable { color: var(--amber) !important; }
+.cm-s-default .cm-variable-2 { color: var(--amber) !important; }
+.cm-s-default .cm-property { color: var(--orange) !important; }
+.cm-s-default .cm-operator { color: var(--cyan) !important; }
+.cm-s-default .cm-atom { color: var(--cyan) !important; }
+.CodeMirror-activeline-background { background: #00ff4108 !important; }
+.cm-s-default .cm-matchingbracket { color: var(--amber) !important; text-decoration: underline; }
+.line-highlight { background: #ffb00020 !important; }
+
+#btn-row { display: flex; gap: 4px; padding: 4px 8px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); background: var(--bg); flex-wrap: wrap; }
+.btn { background: transparent; border: 1px solid var(--border); color: var(--green); font-family: var(--font); font-size: 16px; padding: 3px 12px; cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+.btn:hover { background: var(--green-dark); box-shadow: 0 0 8px var(--green-dark); }
+.btn-amber { border-color: var(--amber-dim); color: var(--amber); }
+.btn-amber:hover { background: #ffb00015; box-shadow: 0 0 8px #ffb00020; }
+
+#console-container { height: 120px; min-height: 60px; overflow-y: auto; padding: 4px 8px; background: #050505; font-family: var(--font); font-size: 14px; border-top: 1px solid var(--border); }
+.console-line { padding: 1px 0; white-space: pre-wrap; word-break: break-all; }
+.console-line.log { color: var(--green-dim); }
+.console-line.error { color: var(--amber); }
+.console-line a { color: var(--amber); text-decoration: underline; cursor: pointer; }
+
+#canvas-panel { width: 440px; min-width: 300px; display: flex; flex-direction: column; align-items: center; padding: 12px; flex-shrink: 0; }
+#monitor-bezel { border: 3px solid #333; border-radius: 8px; padding: 8px; background: #1a1a1a; box-shadow: inset 0 0 30px rgba(0,0,0,0.5), 0 0 15px var(--green-dark); position: relative; }
+#canvas-container { position: relative; width: 400px; height: 400px; overflow: hidden; background: black; }
+#canvas-container canvas { display: block !important; }
+
+#tweaks-panel { width: 100%; max-width: 416px; margin-top: 8px; max-height: 250px; overflow-y: auto; }
+#tweaks-content { display: block; padding: 4px 0; }
+.tweak-row { display: flex; align-items: center; gap: 8px; padding: 3px 4px; font-size: 15px; }
+.tweak-row label { min-width: 140px; color: var(--green-dim); font-family: var(--font); }
+/* Slider: green filled, amber unfilled */
+.tweak-row input[type="range"] { flex: 1; -webkit-appearance: none; appearance: none; height: 6px; background: var(--amber); border-radius: 0; outline: none; }
+.tweak-row input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; background: var(--green); cursor: pointer; border: none; }
+.tweak-row input[type="range"]::-moz-range-thumb { width: 14px; height: 14px; background: var(--green); cursor: pointer; border: none; border-radius: 0; }
+.tweak-row input[type="range"]::-webkit-slider-runnable-track { background: linear-gradient(to right, var(--green) 0%, var(--green) var(--val-pct, 50%), var(--amber) var(--val-pct, 50%), var(--amber) 100%); height: 6px; }
+.tweak-row input[type="color"] { width: 30px; height: 24px; border: 1px solid var(--border); background: transparent; cursor: pointer; }
+.tweak-row input[type="text"] { flex: 1; background: var(--bg); border: 1px solid var(--border); color: var(--green); font-family: var(--font); padding: 2px 6px; }
+.tweak-row .val-display { min-width: 40px; text-align: right; color: var(--green); font-family: var(--font); font-size: 14px; }
+.toggle-switch { width: 40px; height: 20px; border: 1px solid var(--border); background: var(--bg); cursor: pointer; position: relative; display: inline-block; }
+.toggle-switch::after { content: ''; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; background: var(--green-dim); transition: all 0.15s; }
+.toggle-switch.on::after { left: 22px; background: var(--green); box-shadow: 0 0 5px var(--green); }
+
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--green-dark); }
+::-webkit-scrollbar-thumb:hover { background: var(--green-dim); }
+
+#confirm-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 1000; align-items: center; justify-content: center; }
+#confirm-overlay.show { display: flex; }
+#confirm-box { border: 2px solid var(--amber); background: var(--bg); padding: 20px 30px; font-family: var(--font); font-size: 20px; color: var(--amber); text-align: center; box-shadow: 0 0 30px #ffb00030; }
+#confirm-box .confirm-btns { margin-top: 16px; display: flex; gap: 12px; justify-content: center; }
+</style>
+</head>
+<body>
+<div id="top-bar">
+  <h1 class="glow">⌈ GAME LAB ⌉</h1>
+  <div id="lang-toggle">
+    <button id="btn-nl" class="active" onclick="setLang('nl')">NL</button>
+    <button id="btn-en" onclick="setLang('en')">EN</button>
+  </div>
+</div>
+<div id="main">
+  <div id="gallery"></div>
+  <div class="resize-handle" id="resize-1"></div>
+  <div id="editor-panel">
+    <div id="editor-container"><textarea id="editor"></textarea></div>
+    <div id="btn-row">
+      <button class="btn" id="btn-run" onclick="manualRun()">▶ RUN</button>
+      <button class="btn btn-amber" id="btn-reset" onclick="confirmReset()">↺ RESET</button>
+      <button class="btn" id="btn-undo" onclick="undo()">◄ UNDO</button>
+      <button class="btn" id="btn-redo" onclick="redo()">► REDO</button>
+      <button class="btn" id="btn-download" onclick="downloadHTML()">⬇ DOWNLOAD</button>
+    </div>
+    <div id="console-container"></div>
+  </div>
+  <div class="resize-handle" id="resize-2"></div>
+  <div id="canvas-panel">
+    <div id="monitor-bezel">
+      <div id="canvas-container"></div>
+    </div>
+    <div id="tweaks-panel">
+      <div id="tweaks-content"></div>
+    </div>
+  </div>
+</div>
+<div id="confirm-overlay">
+  <div id="confirm-box">
+    <div id="confirm-msg"></div>
+    <div class="confirm-btns">
+      <button class="btn" id="confirm-y" onclick="confirmResolve(true)">[Y]</button>
+      <button class="btn btn-amber" id="confirm-n" onclick="confirmResolve(false)">[N]</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/mode/javascript/javascript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/addon/edit/matchbrackets.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/addon/edit/closebrackets.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/addon/selection/active-line.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/p5.min.js"></script>
+
+<script>
+// NOTE: This is an in-browser code editor (like p5.js Web Editor, CodePen, JSFiddle).
+// Dynamic code evaluation is the core purpose — all code runs client-side only.
+
+// ============================================================
+// CONFIGURATION
+// ============================================================
+var STARTER_CODE = [
+  '// JOUW GAME / YOUR GAME',
+  '',
+  '// === LOGIC ===',
+  'let x = 200;',
+  'let y = 200;',
+  '',
+  '// === SETUP ===',
+  'function setup() {',
+  '  createCanvas(400, 400);',
+  '}',
+  '',
+  '// === DRAW ===',
+  'function draw() {',
+  '  background(0);',
+  '  fill(0, 255, 65);',
+  '  circle(x, y, 30);',
+  '}'
+].join('\n');
+
+// ============================================================
+// I18N
+// ============================================================
+// Interface is always English. Only snippet descriptions are translated.
+var STRINGS = {
+  nl: {
+    run: '\u25b6 RUN', reset: '\u21ba RESET', undo: '\u25c4 UNDO', redo: '\u25ba REDO',
+    download: '\u2b07 DOWNLOAD', clear: 'CLEAR',
+    confirmReset: 'THIS WILL REPLACE YOUR CODE. CONTINUE?',
+    confirmTemplate: 'TEMPLATE WILL REPLACE YOUR CODE. CONTINUE?',
+    infiniteLoop: 'Oneindige lus gestopt / Infinite loop stopped',
+    errorPrefix: 'ERROR', copy: 'COPY', viewCode: 'CODE',
+    movement: '> MOVEMENT', physics: '> PHYSICS', objects: '> OBJECTS',
+    collision: '> COLLISION', visuals: '> VISUALS', input: '> INPUT',
+    templates: '> GAME TEMPLATES', gameLogic: '> GAME LOGIC',
+  },
+  en: {
+    run: '\u25b6 RUN', reset: '\u21ba RESET', undo: '\u25c4 UNDO', redo: '\u25ba REDO',
+    download: '\u2b07 DOWNLOAD', clear: 'CLEAR',
+    confirmReset: 'THIS WILL REPLACE YOUR CODE. CONTINUE?',
+    confirmTemplate: 'TEMPLATE WILL REPLACE YOUR CODE. CONTINUE?',
+    infiniteLoop: 'Infinite loop stopped',
+    errorPrefix: 'ERROR', copy: 'COPY', viewCode: 'CODE',
+    movement: '> MOVEMENT', physics: '> PHYSICS', objects: '> OBJECTS',
+    collision: '> COLLISION', visuals: '> VISUALS', input: '> INPUT',
+    templates: '> GAME TEMPLATES', gameLogic: '> GAME LOGIC',
+  }
+};
+var currentLang = localStorage.getItem('workshop_lang') || 'nl';
+function t(key) { return STRINGS[currentLang][key] || key; }
+
+function setLang(lang) {
+  currentLang = lang;
+  localStorage.setItem('workshop_lang', lang);
+  document.getElementById('btn-nl').classList.toggle('active', lang === 'nl');
+  document.getElementById('btn-en').classList.toggle('active', lang === 'en');
+  renderGallery();
+}
+
+// ============================================================
+// SNIPPETS DATA
+// ============================================================
+var SNIPPETS = [
+  // --- MOVEMENT ---
+  { id:'arrows', cat:'movement', template:false,
+    title:{nl:'Pijltjestoetsen',en:'Arrow keys'},
+    desc:{nl:'Beweeg in 4 richtingen',en:'Move in 4 directions'},
+    logic:'// --- LOGIC: arrows ---\n// Beweeg met pijltjestoetsen (arrow keys)\nlet arrows_speed_ui = 3; // Snelheid (speed) min:1 max:10\n\nfunction arrows_move() {\n  if (keyIsDown(LEFT_ARROW)) x -= arrows_speed_ui;\n  if (keyIsDown(RIGHT_ARROW)) x += arrows_speed_ui;\n  if (keyIsDown(UP_ARROW)) y -= arrows_speed_ui;\n  if (keyIsDown(DOWN_ARROW)) y += arrows_speed_ui;\n}',
+    draw:'arrows_move();' },
+  { id:'wasd', cat:'movement', template:false,
+    title:{nl:'WASD toetsen',en:'WASD keys'},
+    desc:{nl:'Beweeg met W/A/S/D',en:'Move with W/A/S/D'},
+    logic:'// --- LOGIC: wasd ---\n// Beweeg met W/A/S/D toetsen\nlet wasd_speed_ui = 3; // Snelheid (speed) min:1 max:10\n\nfunction wasd_move() {\n  if (keyIsDown(65)) x -= wasd_speed_ui;\n  if (keyIsDown(68)) x += wasd_speed_ui;\n  if (keyIsDown(87)) y -= wasd_speed_ui;\n  if (keyIsDown(83)) y += wasd_speed_ui;\n}',
+    draw:'wasd_move();' },
+  { id:'mousefollow', cat:'movement', template:false,
+    title:{nl:'Volg de muis',en:'Mouse follow'},
+    desc:{nl:'Vloeiend naar muispositie',en:'Smoothly follow mouse'},
+    logic:'// --- LOGIC: mousefollow ---\n// Volg de muis met vloeiende beweging (lerp = lineaire interpolatie)\nlet mousefollow_smooth_ui = 0.05; // Vloeiendheid (smoothing) min:0.01 max:0.3 step:0.01\n\nfunction mousefollow_update() {\n  x = lerp(x, mouseX, mousefollow_smooth_ui);\n  y = lerp(y, mouseY, mousefollow_smooth_ui);\n}',
+    draw:'mousefollow_update();' },
+  { id:'clickmove', cat:'movement', template:false,
+    title:{nl:'Klik om te bewegen',en:'Click to move'},
+    desc:{nl:'Klik ergens om erheen te gaan',en:'Click somewhere to move there'},
+    logic:'// --- LOGIC: clickmove ---\n// Klik om een doel (target) te kiezen\nlet clickmove_tx = 200, clickmove_ty = 200;\nlet clickmove_speed_ui = 3; // Snelheid (speed) min:1 max:10\n\nfunction clickmove_update() {\n  let dx = clickmove_tx - x, dy = clickmove_ty - y;\n  let d = sqrt(dx*dx + dy*dy);\n  if (d > clickmove_speed_ui) {\n    x += (dx/d) * clickmove_speed_ui;\n    y += (dy/d) * clickmove_speed_ui;\n  }\n}\n\nfunction mousePressed() {\n  clickmove_tx = mouseX;\n  clickmove_ty = mouseY;\n}',
+    draw:'clickmove_update();' },
+
+  // --- PHYSICS ---
+  { id:'gravity', cat:'physics', template:false,
+    title:{nl:'Zwaartekracht',en:'Gravity'},
+    desc:{nl:'Object valt naar beneden',en:'Object falls down'},
+    logic:'// --- LOGIC: gravity ---\n// Zwaartekracht: snelheid (velocity) neemt toe door versnelling (acceleration)\nlet gravity_vy = 0;\nlet gravity_accel_ui = 0.5; // Zwaartekracht (gravity) min:0 max:2 step:0.1\nlet gravity_ground = 380;\n\nfunction gravity_apply() {\n  gravity_vy += gravity_accel_ui;\n  y += gravity_vy;\n  if (y >= gravity_ground) {\n    y = gravity_ground;\n    gravity_vy = 0;\n  }\n}',
+    draw:'gravity_apply();' },
+  { id:'jump', cat:'physics', template:false,
+    title:{nl:'Springen',en:'Jump'},
+    desc:{nl:'Druk spatie om te springen',en:'Press space to jump'},
+    logic:'// --- LOGIC: jump ---\n// Springen: geef een negatieve snelheid (velocity) omhoog\nlet jump_vy = 0;\nlet jump_gravity_ui = 0.6; // Zwaartekracht (gravity) min:0 max:2 step:0.1\nlet jump_force_ui = -10; // Springkracht (jump force) min:-20 max:-2 step:0.5\nlet jump_ground = 380, jump_onGround = true;\n\nfunction jump_apply() {\n  jump_vy += jump_gravity_ui;\n  y += jump_vy;\n  if (y >= jump_ground) { y = jump_ground; jump_vy = 0; jump_onGround = true; }\n}\n\nfunction keyPressed() {\n  if (key === " " && jump_onGround) { jump_vy = jump_force_ui; jump_onGround = false; }\n}',
+    draw:'jump_apply();' },
+  { id:'bounce', cat:'physics', template:false,
+    title:{nl:'Stuiteren',en:'Bounce'},
+    desc:{nl:'Stuitert tegen de randen',en:'Bounces off walls'},
+    logic:'// --- LOGIC: bounce ---\n// Stuiteren: keer de snelheid (velocity) om bij de rand\nlet bounce_vx = 3, bounce_vy = 2;\n\nfunction bounce_update() {\n  x += bounce_vx; y += bounce_vy;\n  if (x <= 15 || x >= 385) bounce_vx *= -1;\n  if (y <= 15 || y >= 385) bounce_vy *= -1;\n}',
+    draw:'bounce_update();' },
+  { id:'friction', cat:'physics', template:false,
+    title:{nl:'Wrijving',en:'Friction'},
+    desc:{nl:'Snelheid neemt af over tijd',en:'Velocity decreases over time'},
+    logic:'// --- LOGIC: friction ---\n// Wrijving (friction): vermenigvuldig snelheid met een factor < 1\nlet friction_vx = 0, friction_vy = 0;\nlet friction_factor_ui = 0.95; // Wrijving (friction) min:0.8 max:0.999 step:0.005\nlet friction_push_ui = 2; // Duwkracht (push) min:0.5 max:5 step:0.5\n\nfunction friction_update() {\n  if (keyIsDown(LEFT_ARROW)) friction_vx -= friction_push_ui;\n  if (keyIsDown(RIGHT_ARROW)) friction_vx += friction_push_ui;\n  if (keyIsDown(UP_ARROW)) friction_vy -= friction_push_ui;\n  if (keyIsDown(DOWN_ARROW)) friction_vy += friction_push_ui;\n  friction_vx *= friction_factor_ui; friction_vy *= friction_factor_ui;\n  x += friction_vx; y += friction_vy;\n}',
+    draw:'friction_update();' },
+
+  // --- OBJECTS ---
+  { id:'spawntimer', cat:'objects', template:false,
+    title:{nl:'Spawn op timer',en:'Spawn on timer'},
+    desc:{nl:'Objecten verschijnen automatisch',en:'Objects appear automatically'},
+    logic:'// --- LOGIC: spawntimer ---\n// Maak (spawn) objecten op een tijdsinterval (timer)\nlet spawntimer_items = [];\nlet spawntimer_interval_ui = 30; // Interval (frames) min:5 max:120 step:5\n\nfunction spawntimer_update() {\n  if (frameCount % spawntimer_interval_ui === 0) {\n    spawntimer_items.push({ x: random(20,380), y: random(20,380), size: random(5,15) });\n  }\n}\nfunction spawntimer_draw() {\n  fill(0,255,65,150); noStroke();\n  for (let it of spawntimer_items) circle(it.x, it.y, it.size);\n}',
+    draw:'spawntimer_update();\nspawntimer_draw();' },
+  { id:'spawnclick', cat:'objects', template:false,
+    title:{nl:'Spawn bij klik',en:'Spawn on click'},
+    desc:{nl:'Klik om een object te maken',en:'Click to create an object'},
+    logic:'// --- LOGIC: spawnclick ---\n// Maak (spawn) objecten waar je klikt\nlet spawnclick_items = [];\n\nfunction mousePressed() {\n  spawnclick_items.push({ x:mouseX, y:mouseY, s:random(10,25), c:[random(100,255),random(100,255),random(100,255)] });\n}\nfunction spawnclick_draw() {\n  noStroke();\n  for (let it of spawnclick_items) { fill(it.c[0],it.c[1],it.c[2],180); circle(it.x,it.y,it.s); }\n}',
+    draw:'spawnclick_draw();' },
+  { id:'randomspawn', cat:'objects', template:false,
+    title:{nl:'Willekeurig spawnen',en:'Random spawn'},
+    desc:{nl:'Objecten verschijnen willekeurig',en:'Objects appear randomly'},
+    logic:'// --- LOGIC: randomspawn ---\n// Objecten op willekeurige (random) posities die langzaam verdwijnen\nlet randomspawn_items = [];\nlet randomspawn_max_ui = 20; // Maximum min:5 max:100 step:5\n\nfunction randomspawn_update() {\n  if (randomspawn_items.length < randomspawn_max_ui && random() < 0.05)\n    randomspawn_items.push({ x:random(400), y:random(400), s:random(5,20), a:255 });\n  for (let i = randomspawn_items.length-1; i >= 0; i--) {\n    randomspawn_items[i].a -= 1;\n    if (randomspawn_items[i].a <= 0) randomspawn_items.splice(i,1);\n  }\n}\nfunction randomspawn_draw() {\n  noStroke();\n  for (let it of randomspawn_items) { fill(0,255,65,it.a); circle(it.x,it.y,it.s); }\n}',
+    draw:'randomspawn_update();\nrandomspawn_draw();' },
+  { id:'objectpool', cat:'objects', template:false,
+    title:{nl:'Bewegende objecten',en:'Moving objects'},
+    desc:{nl:'Groep objecten die bewegen',en:'Group of moving objects'},
+    logic:'// --- LOGIC: objectpool ---\n// Een verzameling (array) van bewegende objecten\nlet objectpool_items = [];\nlet objectpool_count_ui = 15; // Aantal (count) min:3 max:50\n\nfunction objectpool_init() {\n  objectpool_items = [];\n  for (let i=0; i<objectpool_count_ui; i++)\n    objectpool_items.push({ x:random(400), y:random(400), vx:random(-2,2), vy:random(-2,2), s:random(8,20) });\n}\nfunction objectpool_update() {\n  if (!objectpool_items.length) objectpool_init();\n  for (let o of objectpool_items) {\n    o.x += o.vx; o.y += o.vy;\n    if (o.x<0||o.x>400) o.vx*=-1;\n    if (o.y<0||o.y>400) o.vy*=-1;\n  }\n}\nfunction objectpool_draw() {\n  noStroke(); fill(0,255,100,150);\n  for (let o of objectpool_items) circle(o.x,o.y,o.s);\n}',
+    draw:'objectpool_update();\nobjectpool_draw();' },
+
+  // --- COLLISION ---
+  { id:'collcircle', cat:'collision', template:false,
+    title:{nl:'Cirkel vs cirkel',en:'Circle vs circle'},
+    desc:{nl:'Botsing tussen twee cirkels',en:'Collision between circles'},
+    logic:'// --- LOGIC: collcircle ---\n// Botsingsdetectie (collision) tussen cirkels: vergelijk afstand (distance) met straal (radius)\nlet collcircle_x2 = 300, collcircle_y2 = 200;\nlet collcircle_size_ui = 40; // Grootte (size) min:10 max:80\n\nfunction collcircle_draw() {\n  let hit = dist(x,y,collcircle_x2,collcircle_y2) < collcircle_size_ui;\n  fill(hit ? color(255,180,0) : color(0,100,255));\n  circle(collcircle_x2, collcircle_y2, collcircle_size_ui);\n}',
+    draw:'collcircle_draw();' },
+  { id:'collrect', cat:'collision', template:false,
+    title:{nl:'Punt vs rechthoek',en:'Point vs rectangle'},
+    desc:{nl:'Is een punt in een rechthoek?',en:'Is a point inside a rectangle?'},
+    logic:'// --- LOGIC: collrect ---\n// Controleer of een punt (point) in een rechthoek (rectangle) valt\nlet collrect_rx=150, collrect_ry=150, collrect_rw=100, collrect_rh=100;\n\nfunction collrect_draw() {\n  let hit = x>collrect_rx && x<collrect_rx+collrect_rw && y>collrect_ry && y<collrect_ry+collrect_rh;\n  stroke(0,255,65); noFill();\n  if (hit) { stroke(255,180,0); fill(255,180,0,30); }\n  rect(collrect_rx, collrect_ry, collrect_rw, collrect_rh);\n}',
+    draw:'collrect_draw();' },
+  { id:'collect', cat:'collision', template:false,
+    title:{nl:'Verzamelen',en:'Collect'},
+    desc:{nl:'Raak objecten aan om te verzamelen',en:'Touch objects to collect'},
+    logic:'// --- LOGIC: collect ---\n// Verzamel (collect) objecten door ze aan te raken\nlet collect_items = [], collect_score = 0;\n\nfunction collect_init() {\n  collect_items = []; collect_score = 0;\n  for (let i=0; i<10; i++) collect_items.push({ x:random(30,370), y:random(30,370) });\n}\nfunction collect_update() {\n  if (!collect_items.length) collect_init();\n  for (let i=collect_items.length-1; i>=0; i--)\n    if (dist(x,y,collect_items[i].x,collect_items[i].y) < 25) { collect_items.splice(i,1); collect_score++; }\n}\nfunction collect_draw() {\n  fill(255,255,0); noStroke();\n  for (let it of collect_items) circle(it.x,it.y,12);\n  fill(0,255,65); textSize(16); textAlign(LEFT,TOP);\n  text("Score: "+collect_score, 10, 10);\n}',
+    draw:'collect_update();\ncollect_draw();' },
+
+  // --- VISUALS ---
+  { id:'particles', cat:'visuals', template:false,
+    title:{nl:'Deeltjesspoor',en:'Particle trail'},
+    desc:{nl:'Kleine deeltjes die vervagen',en:'Small fading particles'},
+    logic:'// --- LOGIC: particles ---\n// Deeltjes (particles) die vervagen (fade) achter het object\nlet particles_list = [];\nlet particles_rate_ui = 3; // Per frame min:1 max:10\n\nfunction particles_update() {\n  for (let i=0; i<particles_rate_ui; i++)\n    particles_list.push({ x:x+random(-5,5), y:y+random(-5,5), vx:random(-1,1), vy:random(-1,1), life:60 });\n  for (let i=particles_list.length-1; i>=0; i--) {\n    let p=particles_list[i]; p.x+=p.vx; p.y+=p.vy; p.life--;\n    if (p.life<=0) particles_list.splice(i,1);\n  }\n}\nfunction particles_draw() {\n  noStroke();\n  for (let p of particles_list) { fill(0,255,65,p.life*4); circle(p.x,p.y,4); }\n}',
+    draw:'particles_update();\nparticles_draw();' },
+  { id:'aftertrails', cat:'visuals', template:false,
+    title:{nl:'Naspoor',en:'Aftertrails'},
+    desc:{nl:'Vervagende kopie\u00ebn achter je',en:'Fading ghost copies'},
+    logic:'// --- LOGIC: aftertrails ---\n// Naspoor: bewaar laatste posities en teken met afnemende dekking (opacity)\nlet aftertrails_hist = [];\nlet aftertrails_len_ui = 20; // Lengte (length) min:5 max:60\n\nfunction aftertrails_update() {\n  aftertrails_hist.push({x:x, y:y});\n  if (aftertrails_hist.length > aftertrails_len_ui) aftertrails_hist.shift();\n}\nfunction aftertrails_draw() {\n  noStroke();\n  for (let i=0; i<aftertrails_hist.length; i++) {\n    let a = map(i,0,aftertrails_hist.length,10,150);\n    let s = map(i,0,aftertrails_hist.length,10,28);\n    fill(0,255,65,a); circle(aftertrails_hist[i].x, aftertrails_hist[i].y, s);\n  }\n}',
+    draw:'aftertrails_update();\naftertrails_draw();' },
+  { id:'screenshake', cat:'visuals', template:false,
+    title:{nl:'Schermtrillen',en:'Screen shake'},
+    desc:{nl:'Scherm trilt bij klik',en:'Screen shakes on click'},
+    logic:'// --- LOGIC: screenshake ---\n// Schermtrillen (screen shake): verschuif alles willekeurig\nlet screenshake_amt = 0;\nlet screenshake_decay_ui = 0.9; // Afname (decay) min:0.8 max:0.99 step:0.01\n\nfunction screenshake_apply() {\n  if (screenshake_amt > 0.5) {\n    translate(random(-screenshake_amt,screenshake_amt), random(-screenshake_amt,screenshake_amt));\n    screenshake_amt *= screenshake_decay_ui;\n  }\n}\n\nfunction mousePressed() { screenshake_amt = 15; }',
+    draw:'screenshake_apply();' },
+  { id:'flash', cat:'visuals', template:false,
+    title:{nl:'Knipperen',en:'Flash / Blink'},
+    desc:{nl:'Object knippert',en:'Object blinks'},
+    logic:'// --- LOGIC: flash ---\n// Knipperen (blink): wissel zichtbaarheid op basis van frametelling (frameCount)\nlet flash_rate_ui = 10; // Snelheid (rate) min:2 max:30\nlet flash_visible = true;\n\nfunction flash_update() {\n  flash_visible = (frameCount % flash_rate_ui) < (flash_rate_ui / 2);\n}',
+    draw:'flash_update();' },
+  { id:'sprite', cat:'visuals', template:false,
+    title:{nl:'Sprite animatie',en:'Sprite animation'},
+    desc:{nl:'Doorloop beelden voor animatie',en:'Cycle frames for animation'},
+    logic:'// --- LOGIC: sprite ---\n// Sprite animatie: wissel tussen beelden (frames)\nlet sprite_frame = 0;\nlet sprite_speed_ui = 8; // Snelheid (speed) min:2 max:30\nlet sprite_nframes = 4;\n\nfunction sprite_draw_frame() {\n  let f = floor(sprite_frame) % sprite_nframes;\n  push(); translate(x, y); noStroke(); fill(0,255,65);\n  if (f===0) { circle(0,0,30); }\n  else if (f===1) { circle(0,-2,30); rect(-8,10,4,8); rect(4,10,4,8); }\n  else if (f===2) { circle(0,0,30); rect(-10,10,4,6); rect(6,10,4,6); }\n  else { circle(0,2,30); rect(-6,10,4,8); rect(2,10,4,8); }\n  pop();\n  sprite_frame += 60 / sprite_speed_ui * 0.016;\n}',
+    draw:'sprite_draw_frame();' },
+  { id:'gpuparticles', cat:'visuals', template:false,
+    title:{nl:'GPU Deeltjes',en:'GPU Particles'},
+    desc:{nl:'Duizenden deeltjes via de GPU',en:'Thousands of particles via GPU'},
+    logic:'// --- LOGIC: gpuparticles ---\n// GPU deeltjes: de grafische kaart (GPU) kan duizenden vormen tegelijk tekenen\nlet gpuparticles_gfx;\nlet gpuparticles_count_ui = 2000; // Aantal (count) min:100 max:5000 step:100\n\nfunction gpuparticles_draw_fx() {\n  if (!gpuparticles_gfx) gpuparticles_gfx = createGraphics(400,400,WEBGL);\n  gpuparticles_gfx.clear();\n  gpuparticles_gfx.noStroke();\n  let t = frameCount * 0.02;\n  for (let i=0; i<gpuparticles_count_ui; i++) {\n    let a = i*0.1+t, r = 50+sin(i*0.05+t)*100;\n    let px = cos(a)*r, py = sin(a*0.7)*r;\n    gpuparticles_gfx.fill(0,255,65,100+sin(i+t)*80);\n    gpuparticles_gfx.circle(px,py,3);\n  }\n  image(gpuparticles_gfx, 0, 0);\n}',
+    draw:'gpuparticles_draw_fx();' },
+  { id:'gpurects', cat:'visuals', template:false,
+    title:{nl:'GPU Rechthoeken',en:'GPU Rectangle flood'},
+    desc:{nl:'Honderden draaiende rechthoeken',en:'Hundreds of rotating rectangles'},
+    logic:'// --- LOGIC: gpurects ---\n// GPU rechthoeken: WEBGL modus maakt honderden vormen snel\nlet gpurects_gfx;\nlet gpurects_count_ui = 300; // Aantal (count) min:50 max:800 step:50\n\nfunction gpurects_draw_fx() {\n  if (!gpurects_gfx) gpurects_gfx = createGraphics(400,400,WEBGL);\n  gpurects_gfx.clear(); gpurects_gfx.noFill(); gpurects_gfx.strokeWeight(1);\n  let t = frameCount*0.01;\n  for (let i=0; i<gpurects_count_ui; i++) {\n    gpurects_gfx.push();\n    let a=i*0.3+t, r=30+(i%100)*1.5;\n    gpurects_gfx.translate(cos(a)*r, sin(a)*r, 0);\n    gpurects_gfx.rotateZ(a+t);\n    let s=5+sin(i*0.1+t*2)*10;\n    gpurects_gfx.stroke(0,255,65,80+sin(i+t)*60);\n    gpurects_gfx.rect(-s/2,-s/2,s,s);\n    gpurects_gfx.pop();\n  }\n  image(gpurects_gfx, 0, 0);\n}',
+    draw:'gpurects_draw_fx();' },
+  { id:'gpushader', cat:'visuals', template:false,
+    title:{nl:'GPU Shader filter',en:'GPU Shader filter'},
+    desc:{nl:'Kleur-effect via de GPU',en:'Color effect via GPU'},
+    logic:'// --- LOGIC: gpushader ---\n// GPU shader: een programma dat op de grafische kaart draait\nlet gpushader_gfx, gpushader_shdr;\nlet gpushader_intensity_ui = 0.5; // Intensiteit (intensity) min:0 max:1 step:0.05\n\nfunction gpushader_apply() {\n  if (!gpushader_gfx) {\n    gpushader_gfx = createGraphics(400,400,WEBGL);\n    gpushader_shdr = gpushader_gfx.createFilterShader(`\n      precision mediump float;\n      varying vec2 vTexCoord;\n      uniform sampler2D tex0;\n      uniform float u_time;\n      uniform float u_int;\n      void main() {\n        vec2 uv = vTexCoord;\n        vec4 c = texture2D(tex0, uv);\n        float w = sin(uv.y*30.0+u_time*3.0)*u_int*0.1;\n        c.r += w; c.g += w*0.5;\n        gl_FragColor = c;\n      }\n    `);\n  }\n  gpushader_gfx.image(get(),-200,-200,400,400);\n  gpushader_shdr.setUniform("u_time", millis()/1000.0);\n  gpushader_shdr.setUniform("u_int", gpushader_intensity_ui);\n  gpushader_gfx.filter(gpushader_shdr);\n  image(gpushader_gfx, 0, 0);\n}',
+    draw:'gpushader_apply();' },
+
+  // --- INPUT ---
+  { id:'webcam', cat:'input', template:false,
+    title:{nl:'Webcam',en:'Webcam'},
+    desc:{nl:'Webcam als achtergrond',en:'Webcam as background'},
+    logic:'// --- LOGIC: webcam ---\n// Webcam: gebruik het camerabeeld (video capture)\nlet webcam_cap, webcam_ok = false;\n\nfunction webcam_init() {\n  if (!webcam_cap) {\n    try {\n      webcam_cap = createCapture(VIDEO, function() { webcam_ok = true; });\n      webcam_cap.size(400,400); webcam_cap.hide();\n    } catch(e) { console.log("Webcam niet beschikbaar"); }\n  }\n}\nfunction webcam_draw_bg() {\n  webcam_init();\n  if (webcam_ok && webcam_cap) image(webcam_cap, 0, 0, 400, 400);\n}',
+    draw:'webcam_draw_bg();' },
+
+  // --- GAME TEMPLATES ---
+  { id:'flappy', cat:'templates', template:true,
+    title:{nl:'Flappy Bird',en:'Flappy Bird'},
+    desc:{nl:'Vlieg door de openingen!',en:'Fly through the gaps!'},
+    code:'// FLAPPY BIRD\n// Tik spatie of klik om te vliegen (flap)\n\n// === LOGIC ===\nlet flappy_y = 200, flappy_vy = 0;\nlet flappy_gravity_ui = 0.4; // Zwaartekracht (gravity) min:0.1 max:1 step:0.05\nlet flappy_flap_ui = -6; // Flapkracht (flap force) min:-12 max:-2 step:0.5\nlet flappy_speed_ui = 3; // Buissnelheid (pipe speed) min:1 max:6 step:0.5\nlet flappy_gap_ui = 120; // Opening (gap size) min:60 max:200 step:10\nlet flappy_pipes = [], flappy_score = 0, flappy_dead = false;\n\nfunction flappy_reset() { flappy_y=200; flappy_vy=0; flappy_pipes=[]; flappy_score=0; flappy_dead=false; }\nfunction flappy_addPipe() { flappy_pipes.push({ x:420, gy:random(80,300-flappy_gap_ui), sc:false }); }\n\n// === SETUP ===\nfunction setup() { createCanvas(400,400); flappy_addPipe(); }\n\n// === DRAW ===\nfunction draw() {\n  background(0);\n  if (flappy_dead) {\n    fill(255,0,0); textSize(40); textAlign(CENTER,CENTER); text("GAME OVER",200,170);\n    fill(0,255,65); textSize(16); text("Score: "+flappy_score,200,210);\n    text("Klik om opnieuw te spelen",200,240); return;\n  }\n  flappy_vy += flappy_gravity_ui; flappy_y += flappy_vy;\n  if (frameCount%90===0) flappy_addPipe();\n  for (let i=flappy_pipes.length-1; i>=0; i--) {\n    let p=flappy_pipes[i]; p.x -= flappy_speed_ui;\n    fill(0,180,0); noStroke();\n    rect(p.x,0,40,p.gy); rect(p.x,p.gy+flappy_gap_ui,40,400);\n    if (!p.sc && p.x+40<50) { flappy_score++; p.sc=true; }\n    if (50>p.x && 50<p.x+40 && (flappy_y<p.gy+10 || flappy_y>p.gy+flappy_gap_ui-10)) flappy_dead=true;\n    if (p.x<-50) flappy_pipes.splice(i,1);\n  }\n  if (flappy_y>395||flappy_y<5) flappy_dead=true;\n  fill(255,255,0); noStroke(); circle(50,flappy_y,24);\n  fill(0,255,65); textSize(20); textAlign(LEFT,TOP); text("SCORE: "+flappy_score,10,10);\n}\nfunction keyPressed() { if(key===" "){if(flappy_dead){flappy_reset();return;} flappy_vy=flappy_flap_ui;} }\nfunction mousePressed() { if(flappy_dead){flappy_reset();return;} flappy_vy=flappy_flap_ui; }' },
+
+  { id:'platformer', cat:'templates', template:true,
+    title:{nl:'Platformer',en:'Platformer'},
+    desc:{nl:'Spring op platformen!',en:'Jump on platforms!'},
+    code:'// PLATFORMER\n// Pijltjes om te bewegen, spatie om te springen\n\n// === LOGIC ===\nlet pl_x=50, pl_y=300, pl_vx=0, pl_vy=0, pl_onG=false;\nlet pl_speed_ui = 4; // Loopsnelheid (run speed) min:1 max:8\nlet pl_jump_ui = -10; // Springkracht (jump force) min:-15 max:-4 step:0.5\nlet pl_grav_ui = 0.5; // Zwaartekracht (gravity) min:0.1 max:1 step:0.05\nlet pl_platforms = [\n  {x:0,y:380,w:400,h:20},{x:50,y:300,w:80,h:12},{x:180,y:250,w:80,h:12},\n  {x:300,y:200,w:80,h:12},{x:150,y:150,w:80,h:12},{x:20,y:100,w:80,h:12},{x:250,y:320,w:80,h:12}\n];\nlet pl_coins=[{x:90,y:280,t:false},{x:220,y:230,t:false},{x:340,y:180,t:false},{x:190,y:130,t:false},{x:60,y:80,t:false}];\nlet pl_score=0;\n\n// === SETUP ===\nfunction setup() { createCanvas(400,400); }\n\n// === DRAW ===\nfunction draw() {\n  background(10,10,30);\n  pl_vx=0;\n  if(keyIsDown(LEFT_ARROW)) pl_vx=-pl_speed_ui;\n  if(keyIsDown(RIGHT_ARROW)) pl_vx=pl_speed_ui;\n  pl_vy+=pl_grav_ui; pl_x+=pl_vx; pl_y+=pl_vy;\n  pl_onG=false;\n  for(let p of pl_platforms){\n    if(pl_x+10>p.x && pl_x-10<p.x+p.w && pl_y+15>p.y && pl_y+15<p.y+p.h+10 && pl_vy>=0)\n      { pl_y=p.y-15; pl_vy=0; pl_onG=true; }\n  }\n  pl_x=constrain(pl_x,10,390);\n  fill(0,200,100); noStroke();\n  for(let p of pl_platforms) rect(p.x,p.y,p.w,p.h);\n  fill(255,255,0);\n  for(let c of pl_coins){ if(!c.t){ circle(c.x,c.y,14); if(dist(pl_x,pl_y,c.x,c.y)<20){c.t=true;pl_score++;} }}\n  fill(0,255,65); rect(pl_x-10,pl_y-15,20,30);\n  textSize(18); textAlign(LEFT,TOP); text("COINS: "+pl_score+"/"+pl_coins.length,10,10);\n}\nfunction keyPressed(){ if(key===" "&&pl_onG) pl_vy=pl_jump_ui; }' },
+
+  { id:'micromachines', cat:'templates', template:true,
+    title:{nl:'Micromachines',en:'Micromachines'},
+    desc:{nl:'Top-down racen!',en:'Top-down racing!'},
+    code:'// MICROMACHINES\n// Draai met links/rechts, gas met omhoog\n\n// === LOGIC ===\nlet mm_x=200, mm_y=300, mm_a=-PI/2, mm_spd=0, mm_laps=0, mm_cp=false;\nlet mm_max_ui=4; // Max snelheid (speed) min:1 max:8\nlet mm_acc_ui=0.1; // Versnelling (accel) min:0.02 max:0.3 step:0.02\nlet mm_turn_ui=0.04; // Draaisnelheid (turn) min:0.01 max:0.1 step:0.005\nlet mm_fric_ui=0.97; // Wrijving (friction) min:0.9 max:0.999 step:0.005\nlet mm_track=[{x:200,y:80},{x:340,y:120},{x:360,y:250},{x:300,y:350},{x:200,y:370},{x:100,y:350},{x:40,y:250},{x:60,y:120}];\n\n// === SETUP ===\nfunction setup() { createCanvas(400,400); }\n\n// === DRAW ===\nfunction draw() {\n  background(40,80,40);\n  stroke(80); strokeWeight(50); noFill();\n  beginShape(); for(let p of mm_track) curveVertex(p.x,p.y);\n  for(let i=0;i<3;i++) curveVertex(mm_track[i].x,mm_track[i].y); endShape();\n  stroke(255); strokeWeight(3); line(190,60,210,60);\n  if(keyIsDown(LEFT_ARROW)) mm_a-=mm_turn_ui;\n  if(keyIsDown(RIGHT_ARROW)) mm_a+=mm_turn_ui;\n  if(keyIsDown(UP_ARROW)) mm_spd=min(mm_spd+mm_acc_ui,mm_max_ui);\n  if(keyIsDown(DOWN_ARROW)) mm_spd=max(mm_spd-mm_acc_ui*2,-mm_max_ui/2);\n  mm_spd*=mm_fric_ui; mm_x+=cos(mm_a)*mm_spd; mm_y+=sin(mm_a)*mm_spd;\n  if(mm_x<0)mm_x=400; if(mm_x>400)mm_x=0; if(mm_y<0)mm_y=400; if(mm_y>400)mm_y=0;\n  if(mm_y>300&&!mm_cp) mm_cp=true;\n  if(mm_y<100&&mm_cp) { mm_laps++; mm_cp=false; }\n  push(); translate(mm_x,mm_y); rotate(mm_a);\n  fill(255,0,0); noStroke(); rect(-12,-6,24,12,3);\n  fill(255,200,0); rect(8,-4,4,8); pop();\n  fill(0,255,65); noStroke(); textSize(18); textAlign(LEFT,TOP);\n  text("RONDEN/LAPS: "+mm_laps,10,10);\n}' },
+
+  { id:'spaceinvaders', cat:'templates', template:true,
+    title:{nl:'Space Invaders',en:'Space Invaders'},
+    desc:{nl:'Schiet de aliens neer!',en:'Shoot the aliens!'},
+    code:'// SPACE INVADERS\n// Pijltjes om te bewegen, spatie om te schieten\n\n// === LOGIC ===\nlet si_px=200, si_bullets=[], si_enemies=[], si_dir=1, si_score=0, si_go=false;\nlet si_espd_ui=1; // Vijandsnelheid (enemy speed) min:0.5 max:4 step:0.5\nlet si_bspd_ui=5; // Kogelsnelheid (bullet speed) min:2 max:10\nlet si_pspd_ui=4; // Spelerspeed (player speed) min:1 max:8\n\nfunction si_init() {\n  si_enemies=[];\n  for(let r=0;r<4;r++) for(let c=0;c<8;c++)\n    si_enemies.push({x:40+c*40, y:40+r*35, alive:true});\n}\n\n// === SETUP ===\nfunction setup() { createCanvas(400,400); si_init(); }\n\n// === DRAW ===\nfunction draw() {\n  background(0);\n  if(si_go) {\n    fill(255,0,0); textSize(40); textAlign(CENTER,CENTER); text("GAME OVER",200,170);\n    fill(0,255,65); textSize(16); text("Score: "+si_score,200,210);\n    text("Klik om opnieuw te spelen",200,240); return;\n  }\n  if(keyIsDown(LEFT_ARROW)) si_px-=si_pspd_ui;\n  if(keyIsDown(RIGHT_ARROW)) si_px+=si_pspd_ui;\n  si_px=constrain(si_px,15,385);\n  fill(0,255,65); noStroke(); rect(si_px-15,370,30,10);\n  triangle(si_px-15,370,si_px+15,370,si_px,360);\n  fill(255,255,0);\n  for(let i=si_bullets.length-1;i>=0;i--) {\n    si_bullets[i].y-=si_bspd_ui; rect(si_bullets[i].x-2,si_bullets[i].y,4,10);\n    if(si_bullets[i].y<0) si_bullets.splice(i,1);\n  }\n  let edge=false;\n  for(let e of si_enemies) { if(!e.alive)continue; if((e.x>380&&si_dir>0)||(e.x<20&&si_dir<0)) edge=true; }\n  if(edge) { si_dir*=-1; for(let e of si_enemies) e.y+=15; }\n  for(let e of si_enemies) { if(e.alive) e.x+=si_espd_ui*si_dir; }\n  for(let e of si_enemies) {\n    if(!e.alive) continue;\n    for(let i=si_bullets.length-1;i>=0;i--) {\n      if(abs(si_bullets[i].x-e.x)<14&&abs(si_bullets[i].y-e.y)<12)\n        { e.alive=false; si_bullets.splice(i,1); si_score+=10; break; }\n    }\n    if(e.alive) { fill(255,80,80); rect(e.x-12,e.y-8,24,16,3); fill(255,200,200); rect(e.x-8,e.y-4,4,4); rect(e.x+4,e.y-4,4,4); }\n    if(e.alive&&e.y>355) si_go=true;\n  }\n  if(si_enemies.every(function(e){return !e.alive;})) { si_init(); si_espd_ui+=0.3; }\n  fill(0,255,65); textSize(18); textAlign(LEFT,TOP); text("SCORE: "+si_score,10,10);\n}\nfunction keyPressed() {\n  if(key===" "&&!si_go) si_bullets.push({x:si_px,y:360});\n  if(key===" "&&si_go) { si_go=false; si_score=0; si_espd_ui=1; si_init(); }\n}\nfunction mousePressed() { if(si_go){si_go=false;si_score=0;si_espd_ui=1;si_init();} }' },
+
+  // --- GAME LOGIC ---
+  { id:'score', cat:'gameLogic', template:false,
+    title:{nl:'Puntenteller',en:'Score counter'},
+    desc:{nl:'Toon en verhoog een score',en:'Display and increment score'},
+    logic:'// --- LOGIC: score ---\n// Puntenteller (score counter)\nlet score_points = 0;\nlet score_size_ui = 20; // Tekstgrootte (text size) min:12 max:40\n\nfunction score_display() {\n  fill(0,255,65); noStroke(); textSize(score_size_ui);\n  textAlign(LEFT,TOP); text("SCORE: "+score_points, 10, 10);\n}\nfunction score_add(n) { score_points += (n||1); }',
+    draw:'score_display();' },
+  { id:'lives', cat:'gameLogic', template:false,
+    title:{nl:'Levens / HP',en:'Lives / HP'},
+    desc:{nl:'Gezondheidsbalk met harten',en:'Health bar with hearts'},
+    logic:'// --- LOGIC: lives ---\n// Levens (lives): toon harten\nlet lives_cur = 3;\nlet lives_max_ui = 3; // Max levens (lives) min:1 max:10\n\nfunction lives_display() {\n  fill(255,0,0); noStroke(); textSize(20); textAlign(RIGHT,TOP);\n  let h="";\n  for(let i=0;i<lives_max_ui;i++) h+=(i<lives_cur)?"\u2665 ":"\u2661 ";\n  text(h, 390, 10);\n}\nfunction lives_lose() { lives_cur = max(0, lives_cur-1); }',
+    draw:'lives_display();' },
+  { id:'gameover', cat:'gameLogic', template:false,
+    title:{nl:'Game Over',en:'Game Over'},
+    desc:{nl:'Eindscherm',en:'End screen'},
+    logic:'// --- LOGIC: gameover ---\n// Game Over scherm\nlet gameover_active = false;\n\nfunction gameover_display() {\n  if (gameover_active) {\n    fill(0,0,0,180); rect(0,0,400,400);\n    fill(255,0,0); textSize(48); textAlign(CENTER,CENTER);\n    text("GAME OVER", 200, 180);\n    fill(0,255,65); textSize(16);\n    text("Klik om opnieuw te starten", 200, 230);\n    noLoop();\n  }\n}\nfunction mousePressed() { if(gameover_active){gameover_active=false;loop();} }',
+    draw:'gameover_display();' },
+  { id:'timer', cat:'gameLogic', template:false,
+    title:{nl:'Afteltimer',en:'Countdown timer'},
+    desc:{nl:'Tel af van N seconden',en:'Count down from N seconds'},
+    logic:'// --- LOGIC: timer ---\n// Afteltimer (countdown)\nlet timer_start_ui = 60; // Starttijd (seconds) min:10 max:300 step:10\nlet timer_rem = -1, timer_sf = 0;\n\nfunction timer_update() {\n  if (timer_rem<0) { timer_rem=timer_start_ui; timer_sf=frameCount; }\n  let el = floor((frameCount-timer_sf)/60);\n  timer_rem = max(0, timer_start_ui-el);\n}\nfunction timer_display() {\n  timer_update();\n  fill(0,255,65); noStroke(); textSize(20); textAlign(RIGHT,TOP);\n  text(nf(floor(timer_rem/60),2)+":"+nf(timer_rem%60,2), 390, 35);\n}',
+    draw:'timer_display();' },
+];
+
+// ============================================================
+// STATE
+// ============================================================
+var editor, currentSketch = null;
+var undoStack = [], redoStack = [];
+var lastSnapshot = '';
+var uiValues = {};
+var runTimeout = null;
+var lineHighlight = null;
+var confirmCallback = null;
+
+// ============================================================
+// LOOP PROTECTION
+// ============================================================
+function instrumentLoops(code) {
+  var id = 0;
+  var out = code.replace(/((?:while|for)\s*\([^)]*?\))\s*\{/g, function(m, head) {
+    id++;
+    return head + '{if(++__lc' + id + '>1e5)throw new Error("' + t('infiniteLoop') + '");';
+  });
+  var decls = '';
+  for (var i = 1; i <= id; i++) decls += 'var __lc' + i + '=0;';
+  return decls + out;
+}
+
+// ============================================================
+// _UI PROCESSING
+// ============================================================
+function processUI(code) {
+  var vars = [];
+  var processed = code.replace(
+    /^(let|const|var)\s+(\w+_ui)\s*=\s*(.+?)\s*;(.*)$/gm,
+    function(m, decl, name, value, rest) {
+      vars.push({ name: name, defaultValue: value.trim(), comment: rest.trim().replace(/^\/\/\s*/, '') });
+      return ''; // preserve line count
+    }
+  );
+  return { code: processed, uiVars: vars };
+}
+
+// ============================================================
+// SKETCH EXECUTION
+// ============================================================
+window.__wLog = function(msg) { logToConsole(msg, 'log'); };
+window.__wErr = function(msg, err) { logToConsole(msg, 'error', err); };
+
+function runSketch() {
+  var rawCode = editor.getValue();
+  var container = document.getElementById('canvas-container');
+  localStorage.setItem('workshop_code', rawCode);
+  pushSnapshot();
+
+  if (currentSketch) { currentSketch.remove(); currentSketch = null; }
+  container.innerHTML = '';
+
+  var result = processUI(rawCode);
+  var safe = instrumentLoops(result.code);
+  var uiVars = result.uiVars;
+  var headerLines = 2 + uiVars.length;
+
+  try {
+    var body = 'with(p) {\n';
+    body += 'var console={log:function(){window.__wLog(Array.from(arguments).map(String).join(" "))},error:function(){window.__wErr(Array.from(arguments).map(String).join(" "))},warn:function(){window.__wLog("[WARN] "+Array.from(arguments).map(String).join(" "))}};\n';
+    for (var i = 0; i < uiVars.length; i++) {
+      var v = uiVars[i];
+      var saved = uiValues[v.name];
+      body += 'p["' + v.name + '"]=' + (saved !== undefined ? JSON.stringify(saved) : v.defaultValue) + ';\n';
+    }
+    body += 'try{\n' + safe + '\n}catch(e){window.__wErr(e.message,e);return;}\n';
+    body += 'if(typeof setup==="function")p.setup=setup;\n';
+    body += 'if(typeof draw==="function"){var __d=draw;p.draw=function(){try{__d();}catch(e){window.__wErr(e.message,e);p.noLoop();}};}\n';
+    body += 'if(typeof mousePressed==="function")p.mousePressed=mousePressed;\n';
+    body += 'if(typeof mouseReleased==="function")p.mouseReleased=mouseReleased;\n';
+    body += 'if(typeof keyPressed==="function")p.keyPressed=keyPressed;\n';
+    body += 'if(typeof keyReleased==="function")p.keyReleased=keyReleased;\n';
+    body += '}\n';
+
+    var fn = new Function('p', body);
+    currentSketch = new p5(function(p) { fn(p); }, container);
+    currentSketch.__lineOffset = headerLines;
+    buildTweaks(uiVars);
+  } catch(e) {
+    logToConsole(e.message, 'error', e);
+  }
+}
+
+function manualRun() { clearTimeout(runTimeout); runSketch(); }
+function scheduleRun() { clearTimeout(runTimeout); runTimeout = setTimeout(runSketch, 1000); }
+
+// ============================================================
+// CONSOLE
+// ============================================================
+function logToConsole(msg, type, err) {
+  var con = document.getElementById('console-container');
+  var div = document.createElement('div');
+  div.className = 'console-line ' + type;
+
+  if (type === 'error') {
+    var line = null, col = 0;
+    if (err && err.stack) {
+      var sm = err.stack.match(/<anonymous>:(\d+):(\d+)/);
+      if (sm) {
+        var offset = (currentSketch && currentSketch.__lineOffset) || 0;
+        line = parseInt(sm[1]) - offset;
+        col = parseInt(sm[2]);
+      }
+    }
+    if (line && line > 0) {
+      var prefix = '> ' + t('errorPrefix') + ' ';
+      var link = document.createElement('a');
+      link.textContent = '[ln ' + line + ', col ' + col + ']';
+      link.onclick = function() { jumpToLine(line - 1, col - 1); };
+      div.textContent = prefix;
+      div.appendChild(link);
+      div.appendChild(document.createTextNode(': ' + msg));
+    } else {
+      div.textContent = '> ' + t('errorPrefix') + ': ' + msg;
+    }
+  } else {
+    div.textContent = '> ' + msg;
+  }
+  con.appendChild(div);
+  con.scrollTop = con.scrollHeight;
+}
+
+function clearConsole() { document.getElementById('console-container').innerHTML = ''; }
+
+function jumpToLine(line, col) {
+  editor.setCursor(line, col || 0);
+  editor.focus();
+  if (lineHighlight !== null) editor.removeLineClass(lineHighlight, 'background', 'line-highlight');
+  lineHighlight = line;
+  editor.addLineClass(line, 'background', 'line-highlight');
+  setTimeout(function() { editor.removeLineClass(line, 'background', 'line-highlight'); }, 1500);
+}
+
+// ============================================================
+// SNIPPET INSERTION
+// ============================================================
+function insertSnippet(logic, draw) {
+  var code = editor.getValue();
+
+  // Don't add if the snippet logic is already present
+  var firstLine = logic.split('\n')[0];
+  if (code.indexOf(firstLine) !== -1) {
+    logToConsole('Snippet already added', 'log');
+    return;
+  }
+
+  var marker = '// === SETUP ===';
+  var idx = code.indexOf(marker);
+  if (idx !== -1) {
+    code = code.slice(0, idx) + logic + '\n\n' + code.slice(idx);
+  } else {
+    code = logic + '\n\n' + code;
+  }
+  var last = code.lastIndexOf('}');
+  if (last !== -1) {
+    code = code.slice(0, last) + '  ' + draw + '\n' + code.slice(last);
+  }
+  editor.setValue(code);
+  scheduleRun();
+}
+
+function replaceWithTemplate(code) {
+  showConfirm(t('confirmTemplate'), function(yes) {
+    if (yes) { pushSnapshot(); editor.setValue(code); scheduleRun(); }
+  });
+}
+
+// ============================================================
+// UNDO / REDO
+// ============================================================
+function pushSnapshot() {
+  var cur = editor.getValue();
+  if (cur !== lastSnapshot) {
+    undoStack.push(lastSnapshot);
+    redoStack.length = 0;
+    lastSnapshot = cur;
+    if (undoStack.length > 100) undoStack.shift();
+  }
+}
+
+function undo() {
+  if (!undoStack.length) return;
+  redoStack.push(editor.getValue());
+  var prev = undoStack.pop();
+  lastSnapshot = prev;
+  editor.setValue(prev);
+  scheduleRun();
+}
+
+function redo() {
+  if (!redoStack.length) return;
+  undoStack.push(editor.getValue());
+  var next = redoStack.pop();
+  lastSnapshot = next;
+  editor.setValue(next);
+  scheduleRun();
+}
+
+// ============================================================
+// PERSISTENCE
+// ============================================================
+function downloadHTML() {
+  var code = editor.getValue();
+  var html = '<!DOCTYPE html>\n<html>\n<head>\n<meta charset="utf-8">\n<title>My Game</title>\n';
+  html += '<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/p5.min.js"><\/script>\n';
+  html += '<style>body{margin:0;background:#000;display:flex;justify-content:center;align-items:center;height:100vh;}</style>\n';
+  html += '</head>\n<body>\n<script>\n' + code + '\n<\/script>\n</body>\n</html>';
+  var blob = new Blob([html], { type: 'text/html' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url; a.download = 'my-game.html'; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ============================================================
+// TWEAKS PANEL
+// ============================================================
+// NOTE: innerHTML usage below is safe — all content is generated from internal snippet
+// data (not user input). This is a local-only workshop tool with no server communication.
+function buildTweaks(vars) {
+  var content = document.getElementById('tweaks-content');
+  content.innerHTML = '';
+
+  for (var i = 0; i < vars.length; i++) {
+    var v = vars[i];
+    var row = document.createElement('div');
+    row.className = 'tweak-row';
+    var lbl = document.createElement('label');
+    lbl.textContent = v.name;
+    row.appendChild(lbl);
+
+    var val = v.defaultValue.trim();
+    var minV=0, maxV=10, stepV=0.1;
+    var rm = v.comment.match(/min:([\d.-]+)/); if(rm) minV=parseFloat(rm[1]);
+    rm = v.comment.match(/max:([\d.-]+)/); if(rm) maxV=parseFloat(rm[1]);
+    rm = v.comment.match(/step:([\d.-]+)/); if(rm) stepV=parseFloat(rm[1]);
+
+    if (val.match(/^-?[\d.]+$/) && !isNaN(parseFloat(val))) {
+      var numV = uiValues[v.name] !== undefined ? uiValues[v.name] : parseFloat(val);
+      if (uiValues[v.name] === undefined) uiValues[v.name] = numV;
+      var sl = document.createElement('input');
+      sl.type='range'; sl.min=minV; sl.max=maxV; sl.step=stepV; sl.value=numV;
+      var pct = ((numV - minV) / (maxV - minV)) * 100;
+      sl.style.setProperty('--val-pct', pct + '%');
+      var disp = document.createElement('span');
+      disp.className='val-display'; disp.textContent=numV;
+      (function(name,s,d,mn,mx){
+        s.oninput=function(){var v=parseFloat(s.value);uiValues[name]=v;d.textContent=v;
+          s.style.setProperty('--val-pct',((v-mn)/(mx-mn))*100+'%');
+          if(currentSketch)currentSketch[name]=v;};
+      })(v.name,sl,disp,minV,maxV);
+      row.appendChild(sl); row.appendChild(disp);
+    } else if (val.match(/^['"]#[0-9a-fA-F]{3,8}['"]$/)) {
+      var colV = uiValues[v.name] !== undefined ? uiValues[v.name] : val.replace(/['"]/g,'');
+      if (uiValues[v.name]===undefined) uiValues[v.name]=colV;
+      var ci = document.createElement('input'); ci.type='color'; ci.value=colV;
+      (function(name,c){c.oninput=function(){uiValues[name]=c.value;if(currentSketch)currentSketch[name]=c.value;};})(v.name,ci);
+      row.appendChild(ci);
+    } else if (val==='true'||val==='false') {
+      var bV = uiValues[v.name]!==undefined?uiValues[v.name]:(val==='true');
+      if(uiValues[v.name]===undefined) uiValues[v.name]=bV;
+      var tog=document.createElement('div'); tog.className='toggle-switch'+(bV?' on':'');
+      (function(name,t){t.onclick=function(){var n=!uiValues[name];uiValues[name]=n;t.classList.toggle('on',n);if(currentSketch)currentSketch[name]=n;};})(v.name,tog);
+      row.appendChild(tog);
+    } else if (val.match(/^['"].*['"]$/)) {
+      var sV=uiValues[v.name]!==undefined?uiValues[v.name]:val.replace(/^['"]|['"]$/g,'');
+      if(uiValues[v.name]===undefined) uiValues[v.name]=sV;
+      var ti=document.createElement('input'); ti.type='text'; ti.value=sV;
+      (function(name,inp){inp.oninput=function(){uiValues[name]=inp.value;if(currentSketch)currentSketch[name]=inp.value;};})(v.name,ti);
+      row.appendChild(ti);
+    }
+    content.appendChild(row);
+  }
+}
+
+
+// ============================================================
+// CONFIRM DIALOG
+// ============================================================
+function showConfirm(msg, cb) {
+  document.getElementById('confirm-msg').textContent=msg;
+  document.getElementById('confirm-overlay').classList.add('show');
+  confirmCallback=cb;
+}
+function confirmResolve(result) {
+  document.getElementById('confirm-overlay').classList.remove('show');
+  if(confirmCallback) confirmCallback(result);
+  confirmCallback=null;
+}
+function confirmReset() {
+  showConfirm(t('confirmReset'), function(yes) {
+    if(yes){
+      editor.setValue(STARTER_CODE);
+      lastSnapshot=STARTER_CODE;
+      undoStack.length=0; redoStack.length=0;
+      Object.keys(uiValues).forEach(function(k){delete uiValues[k];});
+      runSketch();
+    }
+  });
+}
+
+// ============================================================
+// GALLERY
+// ============================================================
+function renderGallery() {
+  var gallery = document.getElementById('gallery');
+  gallery.innerHTML = '';
+  var cats = [
+    {key:'movement',label:t('movement')},{key:'physics',label:t('physics')},
+    {key:'objects',label:t('objects')},{key:'collision',label:t('collision')},
+    {key:'visuals',label:t('visuals')},{key:'input',label:t('input')},
+    {key:'templates',label:t('templates')},{key:'gameLogic',label:t('gameLogic')}
+  ];
+  for (var c=0; c<cats.length; c++) {
+    var cat=cats[c];
+    var snips=SNIPPETS.filter(function(s){return s.cat===cat.key;});
+    if(!snips.length) continue;
+    var hdr=document.createElement('div');
+    hdr.className='cat-header glow-amber';
+    hdr.textContent=cat.label;
+    gallery.appendChild(hdr);
+    for (var s=0; s<snips.length; s++) {
+      var sn=snips[s];
+      var card=document.createElement('div');
+      card.className='snippet-card';
+      var ti=document.createElement('div'); ti.className='title';
+      ti.textContent=sn.title.en;
+      var de=document.createElement('div'); de.className='desc';
+      de.textContent=sn.desc[currentLang]||sn.desc.en;
+      var acts=document.createElement('div'); acts.className='card-actions';
+      var cb=document.createElement('button'); cb.className='btn';
+      cb.textContent=t('copy'); cb.style.fontSize='13px'; cb.style.padding='2px 8px';
+      (function(snippet){cb.onclick=function(e){e.stopPropagation();
+        if(snippet.template) replaceWithTemplate(snippet.code);
+        else insertSnippet(snippet.logic,snippet.draw);
+      };})(sn);
+      var vb=document.createElement('button'); vb.className='btn';
+      vb.textContent=t('viewCode'); vb.style.fontSize='13px'; vb.style.padding='2px 8px';
+      (function(c){vb.onclick=function(e){e.stopPropagation();c.classList.toggle('expanded');};})(card);
+      acts.appendChild(cb); acts.appendChild(vb);
+      var cp=document.createElement('div'); cp.className='code-preview';
+      cp.textContent=sn.template?sn.code:(sn.logic+'\n\n'+sn.draw);
+      card.appendChild(ti); card.appendChild(de); card.appendChild(acts); card.appendChild(cp);
+      gallery.appendChild(card);
+    }
+  }
+}
+
+// ============================================================
+// INIT
+// ============================================================
+// ============================================================
+// RESIZABLE PANELS
+// ============================================================
+function initResize() {
+  var handle1 = document.getElementById('resize-1');
+  var handle2 = document.getElementById('resize-2');
+  var gallery = document.getElementById('gallery');
+  var canvasPanel = document.getElementById('canvas-panel');
+
+  function makeDraggable(handle, getTarget, side) {
+    var startX, startW;
+    handle.addEventListener('mousedown', function(e) {
+      e.preventDefault();
+      startX = e.clientX;
+      startW = getTarget().getBoundingClientRect().width;
+      handle.classList.add('active');
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
+    function onMove(e) {
+      var diff = e.clientX - startX;
+      var newW = side === 'left' ? startW + diff : startW - diff;
+      getTarget().style.width = Math.max(150, newW) + 'px';
+      if (editor) editor.refresh();
+    }
+    function onUp() {
+      handle.classList.remove('active');
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    }
+  }
+
+  makeDraggable(handle1, function() { return gallery; }, 'left');
+  makeDraggable(handle2, function() { return canvasPanel; }, 'right');
+}
+
+function init() {
+  editor = CodeMirror.fromTextArea(document.getElementById('editor'), {
+    mode:'javascript', lineNumbers:true, matchBrackets:true,
+    autoCloseBrackets:true, styleActiveLine:true,
+    indentUnit:2, tabSize:2, indentWithTabs:false
+  });
+  var saved = localStorage.getItem('workshop_code');
+  var code = saved || STARTER_CODE;
+  editor.setValue(code);
+  lastSnapshot = code;
+  editor.on('change', scheduleRun);
+  setLang(currentLang);
+  renderGallery();
+  initResize();
+  runSketch();
+}
+window.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
