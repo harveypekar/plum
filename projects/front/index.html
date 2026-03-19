@@ -17,19 +17,69 @@
         <div class="master-grid" id="service-grid"></div>
     </div>
 
-    <!-- rp Tab -->
+    <!-- rp Tab: Dockable Panel Layout -->
     <div id="rp" class="tab-content">
-        <div class="rp-container">
-            <div class="north-panel">
-                <div class="panel-label">Services:</div>
-                <div id="rp-status-bar"></div>
+        <div class="dock-layout" id="dock-layout">
+            <!-- North panel -->
+            <div class="dock-panel dock-north" id="dock-north" data-dock="north">
+                <div class="dock-panel-header">
+                    <span class="dock-panel-title">Services</span>
+                    <button class="dock-toggle" data-dock="north">&ndash;</button>
+                </div>
+                <div class="dock-panel-body" id="rp-status-bar"></div>
             </div>
-            <div class="centre-panel">
-                <iframe src="/rp/" title="rp UI"></iframe>
+
+            <!-- North resize handle -->
+            <div class="dock-handle dock-handle-h" data-resize="north"></div>
+
+            <!-- Middle row: west | center | east -->
+            <div class="dock-middle">
+                <!-- West panel -->
+                <div class="dock-panel dock-west" id="dock-west" data-dock="west">
+                    <div class="dock-panel-header">
+                        <span class="dock-panel-title">aiserver</span>
+                        <button class="dock-toggle" data-dock="west">&ndash;</button>
+                    </div>
+                    <div class="dock-panel-body">
+                        <div class="logs" id="logs-aiserver-dock">Loading...</div>
+                    </div>
+                </div>
+
+                <!-- West resize handle -->
+                <div class="dock-handle dock-handle-v" data-resize="west"></div>
+
+                <!-- Center: rp UI -->
+                <div class="dock-center">
+                    <iframe src="/rp/" title="rp UI"></iframe>
+                </div>
+
+                <!-- East resize handle -->
+                <div class="dock-handle dock-handle-v" data-resize="east"></div>
+
+                <!-- East panel -->
+                <div class="dock-panel dock-east" id="dock-east" data-dock="east">
+                    <div class="dock-panel-header">
+                        <span class="dock-panel-title">ollama</span>
+                        <button class="dock-toggle" data-dock="east">&ndash;</button>
+                    </div>
+                    <div class="dock-panel-body">
+                        <div class="logs" id="logs-ollama-dock">Loading...</div>
+                    </div>
+                </div>
             </div>
-            <div class="south-panel">
-                <div class="panel-label">rp Logs:</div>
-                <div class="logs" id="logs-rp-tab"></div>
+
+            <!-- South resize handle -->
+            <div class="dock-handle dock-handle-h" data-resize="south"></div>
+
+            <!-- South panel -->
+            <div class="dock-panel dock-south" id="dock-south" data-dock="south">
+                <div class="dock-panel-header">
+                    <span class="dock-panel-title">rp Logs</span>
+                    <button class="dock-toggle" data-dock="south">&ndash;</button>
+                </div>
+                <div class="dock-panel-body">
+                    <div class="logs" id="logs-rp-dock">Loading...</div>
+                </div>
             </div>
         </div>
     </div>

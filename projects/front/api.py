@@ -2,16 +2,22 @@ import subprocess
 import time
 from pathlib import Path
 
+import httpx
 from fastapi import FastAPI
 
 PLUM_ROOT = Path(__file__).resolve().parent.parent.parent
 LOGS_DIR = PLUM_ROOT / 'logs'
 
-SERVICE_PROCESS_MAP = {
+# Services detected via pgrep
+PROCESS_SERVICES = {
     'postgresql': 'postgres',
     'ollama': 'ollama',
-    'aiserver': 'uvicorn',
-    'rp': 'uvicorn',
+}
+
+# Services detected via HTTP health check
+HTTP_SERVICES = {
+    'aiserver': 'http://127.0.0.1:8080/health',
+    'rp': 'http://127.0.0.1:8080/rp/',
 }
 
 RESTART_SCRIPTS = {
@@ -27,6 +33,15 @@ def _check_process_running(process_name: str) -> bool:
         )
         return result.returncode == 0
     except (FileNotFoundError, subprocess.TimeoutExpired):
+        return False
+
+
+async def _check_http(url: str) -> bool:
+    try:
+        async with httpx.AsyncClient(timeout=2) as client:
+            resp = await client.get(url)
+            return resp.status_code < 500
+    except Exception:
         return False
 
 
@@ -50,11 +65,13 @@ def setup(app: FastAPI):
 
     @app.get('/api/services/{service}/status')
     async def service_status(service: str):
-        process_name = SERVICE_PROCESS_MAP.get(service)
-        if not process_name:
+        if service in HTTP_SERVICES:
+            running = await _check_http(HTTP_SERVICES[service])
+        elif service in PROCESS_SERVICES:
+            running = _check_process_running(PROCESS_SERVICES[service])
+        else:
             return {'service': service, 'status': 'unknown'}
 
-        running = _check_process_running(process_name)
         return {
             'service': service,
             'status': 'running' if running else 'stopped',
