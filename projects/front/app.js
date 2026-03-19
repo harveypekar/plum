@@ -1,6 +1,7 @@
 const SERVICES = ['postgresql', 'ollama', 'aiserver', 'rp'];
 const POLL_STATUS_MS = 2000;
 const POLL_LOGS_MS = 3000;
+const DOCK_STORAGE_KEY = 'plum-dock-state';
 
 const app = {
     currentTab: 'master',
@@ -11,6 +12,7 @@ const app = {
         this.setupTabs();
         this.setupRestartButtons();
         this.startPolling();
+        dock.init();
     },
 
     // --- DOM helpers ---
@@ -27,7 +29,7 @@ const app = {
         return e;
     },
 
-    // --- Rendering ---
+    // --- Master tab rendering ---
 
     renderServiceCards() {
         const grid = document.getElementById('service-grid');
@@ -45,9 +47,12 @@ const app = {
         });
     },
 
+    // --- rp tab status bar ---
+
     renderRpStatusBar() {
         const bar = document.getElementById('rp-status-bar');
-        SERVICES.filter(s => s !== 'rp').forEach(s => {
+        if (!bar) return;
+        SERVICES.forEach(s => {
             const wrapper = this.el('div', { class: 'service-status-inline', id: `rp-inline-${s}` }, [
                 this.el('span', { class: 'status-indicator status-unknown' }, `\u25CF ${s}`),
                 this.el('button', { class: 'inline-restart-btn', 'data-service': s }, 'RESTART'),
@@ -139,7 +144,7 @@ const app = {
             card.classList.toggle('stopped', status === 'stopped');
         }
 
-        // RP tab inline status
+        // rp tab inline status
         const inline = document.getElementById(`rp-inline-${service}`);
         if (inline) {
             const ind = inline.querySelector('.status-indicator');
@@ -158,14 +163,15 @@ const app = {
             const data = await res.json();
             this.updateLogs(service, data.lines || []);
         } catch {
-            // silently skip — logs may not exist yet
+            // silently skip
         }
     },
 
     updateLogs(service, lines) {
+        // Master tab + rp tab dock panels
         const targets = [
             document.getElementById(`logs-${service}`),
-            document.getElementById(`logs-${service}-tab`),
+            document.getElementById(`logs-${service}-dock`),
         ];
 
         targets.forEach(container => {
@@ -182,5 +188,135 @@ const app = {
         });
     },
 };
+
+
+// ===== Dockable Panel System =====
+
+const dock = {
+    sizes: { north: 60, south: 180, west: 250, east: 250 },
+    collapsed: { north: false, south: false, west: false, east: false },
+    dragging: null,
+
+    init() {
+        this.loadState();
+        this.applySizes();
+        this.setupToggles();
+        this.setupHandles();
+    },
+
+    // --- Persistence ---
+
+    loadState() {
+        try {
+            const saved = JSON.parse(localStorage.getItem(DOCK_STORAGE_KEY));
+            if (saved) {
+                if (saved.sizes) Object.assign(this.sizes, saved.sizes);
+                if (saved.collapsed) Object.assign(this.collapsed, saved.collapsed);
+            }
+        } catch { /* ignore */ }
+
+        // Apply collapsed state from loaded data
+        Object.keys(this.collapsed).forEach(side => {
+            if (this.collapsed[side]) {
+                const panel = document.getElementById(`dock-${side}`);
+                if (panel) panel.classList.add('collapsed');
+            }
+        });
+    },
+
+    saveState() {
+        localStorage.setItem(DOCK_STORAGE_KEY, JSON.stringify({
+            sizes: this.sizes,
+            collapsed: this.collapsed,
+        }));
+    },
+
+    applySizes() {
+        const layout = document.getElementById('dock-layout');
+        if (!layout) return;
+        layout.style.setProperty('--dock-north-size', this.collapsed.north ? '30px' : this.sizes.north + 'px');
+        layout.style.setProperty('--dock-south-size', this.collapsed.south ? '30px' : this.sizes.south + 'px');
+
+        const middle = layout.querySelector('.dock-middle');
+        if (middle) {
+            middle.style.setProperty('--dock-west-size', this.collapsed.west ? '30px' : this.sizes.west + 'px');
+            middle.style.setProperty('--dock-east-size', this.collapsed.east ? '30px' : this.sizes.east + 'px');
+        }
+    },
+
+    // --- Collapse / Expand ---
+
+    setupToggles() {
+        document.querySelectorAll('.dock-toggle').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const side = btn.getAttribute('data-dock');
+                this.toggle(side);
+            });
+        });
+    },
+
+    toggle(side) {
+        this.collapsed[side] = !this.collapsed[side];
+        const panel = document.getElementById(`dock-${side}`);
+        if (panel) panel.classList.toggle('collapsed', this.collapsed[side]);
+
+        // Update button text
+        const btn = panel.querySelector('.dock-toggle');
+        if (btn) btn.textContent = this.collapsed[side] ? '+' : '\u2013';
+
+        this.applySizes();
+        this.saveState();
+    },
+
+    // --- Resize handles ---
+
+    setupHandles() {
+        document.querySelectorAll('.dock-handle').forEach(handle => {
+            handle.addEventListener('mousedown', e => this.startDrag(e, handle));
+        });
+
+        document.addEventListener('mousemove', e => this.onDrag(e));
+        document.addEventListener('mouseup', () => this.stopDrag());
+    },
+
+    startDrag(e, handle) {
+        e.preventDefault();
+        const side = handle.getAttribute('data-resize');
+        if (this.collapsed[side]) return;
+
+        this.dragging = {
+            side,
+            startPos: (side === 'west' || side === 'east') ? e.clientX : e.clientY,
+            startSize: this.sizes[side],
+        };
+
+        handle.classList.add('dragging');
+        document.getElementById('dock-layout').classList.add('resizing');
+    },
+
+    onDrag(e) {
+        if (!this.dragging) return;
+        const { side, startPos, startSize } = this.dragging;
+        const isHorizontal = (side === 'west' || side === 'east');
+        const currentPos = isHorizontal ? e.clientX : e.clientY;
+        let delta = currentPos - startPos;
+
+        // Invert delta for east and south (they grow in opposite direction)
+        if (side === 'east' || side === 'south') delta = -delta;
+
+        const newSize = Math.max(40, Math.min(startSize + delta, 600));
+        this.sizes[side] = newSize;
+        this.applySizes();
+    },
+
+    stopDrag() {
+        if (!this.dragging) return;
+        document.querySelectorAll('.dock-handle.dragging').forEach(h => h.classList.remove('dragging'));
+        document.getElementById('dock-layout').classList.remove('resizing');
+        this.dragging = null;
+        this.saveState();
+    },
+};
+
 
 document.addEventListener('DOMContentLoaded', () => app.init());
