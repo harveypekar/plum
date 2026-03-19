@@ -199,7 +199,12 @@ const dock = {
 
     init() {
         this.loadState();
+        if (window.innerWidth < 1200) {
+            this.collapsed.west = true;
+            this.collapsed.east = true;
+        }
         this.applySizes();
+        this.applyCollapsedClasses();
         this.setupToggles();
         this.setupHandles();
     },
@@ -214,13 +219,15 @@ const dock = {
                 if (saved.collapsed) Object.assign(this.collapsed, saved.collapsed);
             }
         } catch { /* ignore */ }
+    },
 
-        // Apply collapsed state from loaded data
+    applyCollapsedClasses() {
         Object.keys(this.collapsed).forEach(side => {
-            if (this.collapsed[side]) {
-                const panel = document.getElementById(`dock-${side}`);
-                if (panel) panel.classList.add('collapsed');
-            }
+            const panel = document.getElementById(`dock-${side}`);
+            if (!panel) return;
+            panel.classList.toggle('collapsed', this.collapsed[side]);
+            const btn = panel.querySelector('.dock-toggle');
+            if (btn) btn.textContent = this.collapsed[side] ? '+' : '\u2013';
         });
     },
 
