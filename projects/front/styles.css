@@ -127,6 +127,8 @@ body {
     display: grid;
     grid-template-columns: var(--dock-west-size, 250px) 4px 1fr 4px var(--dock-east-size, 250px);
     min-height: 0;
+    min-width: 0;
+    overflow: hidden;
 }
 
 /* Panel base */
@@ -226,6 +228,7 @@ body {
 .dock-center {
     min-height: 0;
     min-width: 0;
+    width: 100%;
     overflow: hidden;
     border: 2px solid #0f0;
     background: #001a00;
@@ -255,3 +258,14 @@ body {
 
 /* Disable pointer events on iframe while resizing */
 .dock-layout.resizing iframe { pointer-events: none; }
+
+/* Responsive: collapse side panels on narrow screens */
+@media (max-width: 1200px) {
+    .dock-middle {
+        grid-template-columns: 0 0 1fr 0 0;
+    }
+    .dock-west, .dock-east,
+    .dock-handle-v {
+        display: none;
+    }
+}
