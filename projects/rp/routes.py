@@ -1,7 +1,7 @@
 import asyncio
 import json
 import logging
-_log = logging.getLogger(__name__)
+
 from fastapi import FastAPI, UploadFile, File, HTTPException, Request
 from fastapi.responses import Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -16,6 +16,8 @@ from .models import (
 )
 from .pipeline import create_default_pipeline
 from .mcp_client import get_router as get_mcp_router
+
+_log = logging.getLogger(__name__)
 
 _ollama = None
 _pipeline = None
@@ -528,61 +530,23 @@ def setup(app: FastAPI, ollama, resolve_model=None):
     def _build_scene_state_prompt(messages: list[dict], previous_state: str = "",
                                    ai_name: str = "Character", user_name: str = "User",
                                    ai_personality: str = "") -> str:
+        from .scene_state import build_scene_state_prompt
         recent = messages[-_scene_state_window:]
-        history = "\n".join(f"{m['role']}: {m['content']}" for m in recent)
-        prev_section = ""
-        if previous_state.strip():
-            prev_section = (
-                "PREVIOUS SCENE STATE (carry forward anything not contradicted by new messages):\n"
-                f"{previous_state.strip()}\n\n"
-            )
-        personality_hint = ""
-        if ai_personality:
-            # Extract just the first ~200 chars of personality for grounding
-            short = ai_personality[:200].rsplit(" ", 1)[0]
-            personality_hint = f"{ai_name}'s personality: {short}\n\n"
-        return (
-            f"{prev_section}"
-            f"{personality_hint}"
-            "Below are the most recent messages. UPDATE the scene state based on what changed.\n"
-            "Keep everything from the previous state that still holds true. "
-            "Only change what the new messages contradict or add.\n\n"
-            f"Characters: {ai_name} (AI) and {user_name} (user).\n\n"
-            "Format — one short line per category:\n"
-            "Location: (where are they right now)\n"
-            f"Clothing: (what {ai_name} and {user_name} are currently wearing — be specific, or 'fully naked' if they undressed)\n"
-            "Restraints: (describe the specific tie/pattern for each bound character — e.g. 'chest harness in red jute, wrists behind back' — or 'none')\n"
-            "Position: (posture, who is where, physical contact)\n"
-            "Props: (objects currently in play)\n"
-            "Mood: (emotional atmosphere right now)\n"
-            f"Voice: (for each character: 1-2 words describing how they CURRENTLY sound — ground this in {ai_name}'s personality, not generic descriptors)\n\n"
-            "No narration, no story, no explanation. Just the current facts.\n\n"
-            f"Recent messages:\n{history}"
-        )
+        return build_scene_state_prompt(recent, previous_state, ai_name, user_name,
+                                         ai_personality)
 
     async def _generate_scene_state(model: str, messages: list[dict], previous_state: str = "",
                                      ai_name: str = "Character", user_name: str = "User",
                                      ai_personality: str = "") -> str:
         prompt = _build_scene_state_prompt(messages, previous_state, ai_name, user_name, ai_personality)
         summary_model = _resolve_model(_scene_state_model) if _resolve_model else model
+        from .scene_state import clean_scene_state_response
         result = await _ollama.generate(
             model=summary_model, prompt=prompt,
             system="Output only the scene state summary. No thinking, no preamble.",
             options={"temperature": 0.2, "num_predict": 200, "think": False},
         )
-        clean = result.strip()
-        if "<think>" in clean:
-            clean = clean.split("</think>")[-1].strip()
-        # Omit lines where the value is empty or just "none"
-        lines = []
-        for line in clean.splitlines():
-            if ":" in line:
-                value = line.split(":", 1)[1].strip().lower()
-                if value and value != "none" and value != "n/a":
-                    lines.append(line)
-            elif line.strip():
-                lines.append(line)
-        return "\n".join(lines)
+        return clean_scene_state_response(result)
 
     async def _auto_update_scene_state(conv_id: int, model: str, messages: list[dict],
                                         ai_name: str = "Character", user_name: str = "User",
@@ -692,7 +656,6 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         content = req.content.strip()
         if not content:
             return {"ok": False}
-        role = getattr(req, "role", "assistant") if hasattr(req, "role") else "assistant"
         await db.add_message(conv_id, "assistant", content)
         return {"ok": True}
 
