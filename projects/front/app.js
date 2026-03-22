@@ -3,65 +3,109 @@ const POLL_STATUS_MS = 2000;
 const POLL_LOGS_MS = 3000;
 const DOCK_STORAGE_KEY = 'plum-dock-state';
 
+// ===== Panel definitions =====
+// Each panel has an id, title, and a render function that returns DOM content.
+
+const PANELS = {
+    services: {
+        id: 'services',
+        title: 'Services',
+        render() {
+            const container = document.createElement('div');
+            container.id = 'rp-status-bar';
+            app.renderRpStatusBar(container);
+            return container;
+        },
+    },
+    'logs-aiserver': {
+        id: 'logs-aiserver',
+        title: 'aiserver',
+        render() {
+            const div = el('div', { class: 'logs', id: 'logs-aiserver-dock' }, 'Loading...');
+            return div;
+        },
+    },
+    'logs-ollama': {
+        id: 'logs-ollama',
+        title: 'ollama',
+        render() {
+            return el('div', { class: 'logs', id: 'logs-ollama-dock' }, 'Loading...');
+        },
+    },
+    'logs-rp': {
+        id: 'logs-rp',
+        title: 'rp Logs',
+        render() {
+            return el('div', { class: 'logs', id: 'logs-rp-dock' }, 'Loading...');
+        },
+    },
+    'logs-postgresql': {
+        id: 'logs-postgresql',
+        title: 'postgresql',
+        render() {
+            return el('div', { class: 'logs', id: 'logs-postgresql-dock' }, 'Loading...');
+        },
+    },
+};
+
+const DEFAULT_LAYOUT = {
+    north: ['services'],
+    south: ['logs-rp'],
+    west: ['logs-aiserver'],
+    east: ['logs-ollama'],
+};
+
+// ===== DOM helper =====
+
+function el(tag, attrs, children) {
+    const e = document.createElement(tag);
+    if (attrs) Object.entries(attrs).forEach(([k, v]) => {
+        if (k === 'class') e.className = v;
+        else if (k.startsWith('data-')) e.setAttribute(k, v);
+        else e[k] = v;
+    });
+    if (typeof children === 'string') e.textContent = children;
+    else if (Array.isArray(children)) children.forEach(c => e.appendChild(c));
+    return e;
+}
+
+
+// ===== App (tabs, polling, master tab) =====
+
 const app = {
     currentTab: 'master',
 
     init() {
         this.renderServiceCards();
-        this.renderRpStatusBar();
         this.setupTabs();
         this.setupRestartButtons();
-        this.startPolling();
         dock.init();
+        this.startPolling();
     },
-
-    // --- DOM helpers ---
-
-    el(tag, attrs, children) {
-        const e = document.createElement(tag);
-        if (attrs) Object.entries(attrs).forEach(([k, v]) => {
-            if (k === 'class') e.className = v;
-            else if (k.startsWith('data-')) e.setAttribute(k, v);
-            else e[k] = v;
-        });
-        if (typeof children === 'string') e.textContent = children;
-        else if (Array.isArray(children)) children.forEach(c => e.appendChild(c));
-        return e;
-    },
-
-    // --- Master tab rendering ---
 
     renderServiceCards() {
         const grid = document.getElementById('service-grid');
         SERVICES.forEach(s => {
-            const card = this.el('div', { class: 'service-card', id: `service-${s}` }, [
-                this.el('div', { class: 'service-name' }, s),
-                this.el('div', { class: 'status-indicator status-unknown' }, '\u25CF CHECKING...'),
-                this.el('button', { class: 'restart-btn', 'data-service': s }, 'RESTART'),
-                this.el('div', { class: 'logs-section' }, [
-                    this.el('div', { class: 'logs-label' }, 'Logs:'),
-                    this.el('div', { class: 'logs', id: `logs-${s}` }, 'Loading...'),
+            grid.appendChild(el('div', { class: 'service-card', id: `service-${s}` }, [
+                el('div', { class: 'service-name' }, s),
+                el('div', { class: 'status-indicator status-unknown' }, '\u25CF CHECKING...'),
+                el('button', { class: 'restart-btn', 'data-service': s }, 'RESTART'),
+                el('div', { class: 'logs-section' }, [
+                    el('div', { class: 'logs-label' }, 'Logs:'),
+                    el('div', { class: 'logs', id: `logs-${s}` }, 'Loading...'),
                 ]),
-            ]);
-            grid.appendChild(card);
+            ]));
         });
     },
 
-    // --- rp tab status bar ---
-
-    renderRpStatusBar() {
-        const bar = document.getElementById('rp-status-bar');
-        if (!bar) return;
+    renderRpStatusBar(container) {
         SERVICES.forEach(s => {
-            const wrapper = this.el('div', { class: 'service-status-inline', id: `rp-inline-${s}` }, [
-                this.el('span', { class: 'status-indicator status-unknown' }, `\u25CF ${s}`),
-                this.el('button', { class: 'inline-restart-btn', 'data-service': s }, 'RESTART'),
-            ]);
-            bar.appendChild(wrapper);
+            container.appendChild(el('div', { class: 'service-status-inline', id: `rp-inline-${s}` }, [
+                el('span', { class: 'status-indicator status-unknown' }, `\u25CF ${s}`),
+                el('button', { class: 'inline-restart-btn', 'data-service': s }, 'RESTART'),
+            ]));
         });
     },
-
-    // --- Tabs ---
 
     setupTabs() {
         document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -77,8 +121,6 @@ const app = {
         this.currentTab = tabName;
     },
 
-    // --- Restart ---
-
     setupRestartButtons() {
         document.addEventListener('click', e => {
             const btn = e.target.closest('[data-service]');
@@ -92,7 +134,6 @@ const app = {
         btn.textContent = 'RESTARTING...';
         btn.classList.add('restarting');
         btn.disabled = true;
-
         try {
             const res = await fetch(`/api/services/${service}/restart`, { method: 'POST' });
             const data = await res.json();
@@ -107,8 +148,6 @@ const app = {
             btn.disabled = false;
         }
     },
-
-    // --- Polling ---
 
     startPolling() {
         this.pollAllServices();
@@ -135,7 +174,6 @@ const app = {
         const cls = status === 'running' ? 'status-running' : status === 'stopped' ? 'status-stopped' : 'status-unknown';
         const label = status === 'running' ? '\u25CF RUNNING' : status === 'stopped' ? '\u25CF STOPPED' : '\u25CF UNKNOWN';
 
-        // Master dashboard card
         const card = document.getElementById(`service-${service}`);
         if (card) {
             const ind = card.querySelector('.status-indicator');
@@ -144,7 +182,6 @@ const app = {
             card.classList.toggle('stopped', status === 'stopped');
         }
 
-        // rp tab inline status
         const inline = document.getElementById(`rp-inline-${service}`);
         if (inline) {
             const ind = inline.querySelector('.status-indicator');
@@ -162,26 +199,20 @@ const app = {
             const res = await fetch(`/api/logs/${service}?lines=20`);
             const data = await res.json();
             this.updateLogs(service, data.lines || []);
-        } catch {
-            // silently skip
-        }
+        } catch { /* skip */ }
     },
 
     updateLogs(service, lines) {
-        // Master tab + rp tab dock panels
-        const targets = [
-            document.getElementById(`logs-${service}`),
-            document.getElementById(`logs-${service}-dock`),
-        ];
-
-        targets.forEach(container => {
+        [document.getElementById(`logs-${service}`),
+         document.getElementById(`logs-${service}-dock`),
+        ].forEach(container => {
             if (!container) return;
             container.textContent = '';
             if (lines.length === 0) {
-                container.appendChild(this.el('div', { class: 'log-line' }, 'No logs'));
+                container.appendChild(el('div', { class: 'log-line' }, 'No logs'));
             } else {
                 lines.forEach(line => {
-                    container.appendChild(this.el('div', { class: 'log-line' }, line));
+                    container.appendChild(el('div', { class: 'log-line' }, line));
                 });
             }
             container.scrollTop = container.scrollHeight;
@@ -190,133 +221,289 @@ const app = {
 };
 
 
-// ===== Dockable Panel System =====
+// ===== Dock System =====
 
 const dock = {
+    // Layout: which panel IDs are in each slot
+    layout: null,
     sizes: { north: 60, south: 180, west: 250, east: 250 },
-    collapsed: { north: false, south: false, west: false, east: false },
-    dragging: null,
+    collapsed: {},
+    dragging: null,   // { panelId, fromSlot, ghost, overlay }
+    resizing: null,
 
     init() {
         this.loadState();
-        this.applySizes();
-        this.setupToggles();
-        this.setupHandles();
+        this.render();
+        this.setupResize();
     },
 
-    // --- Persistence ---
+    // --- State ---
 
     loadState() {
         try {
             const saved = JSON.parse(localStorage.getItem(DOCK_STORAGE_KEY));
             if (saved) {
+                if (saved.layout) this.layout = saved.layout;
                 if (saved.sizes) Object.assign(this.sizes, saved.sizes);
-                if (saved.collapsed) Object.assign(this.collapsed, saved.collapsed);
+                if (saved.collapsed) this.collapsed = saved.collapsed;
             }
         } catch { /* ignore */ }
-
-        // Apply collapsed state from loaded data
-        Object.keys(this.collapsed).forEach(side => {
-            if (this.collapsed[side]) {
-                const panel = document.getElementById(`dock-${side}`);
-                if (panel) panel.classList.add('collapsed');
-            }
-        });
+        if (!this.layout) this.layout = JSON.parse(JSON.stringify(DEFAULT_LAYOUT));
     },
 
     saveState() {
         localStorage.setItem(DOCK_STORAGE_KEY, JSON.stringify({
+            layout: this.layout,
             sizes: this.sizes,
             collapsed: this.collapsed,
         }));
     },
 
-    applySizes() {
-        const layout = document.getElementById('dock-layout');
-        if (!layout) return;
-        layout.style.setProperty('--dock-north-size', this.collapsed.north ? '30px' : this.sizes.north + 'px');
-        layout.style.setProperty('--dock-south-size', this.collapsed.south ? '30px' : this.sizes.south + 'px');
+    // --- Render entire dock from layout state ---
 
-        const middle = layout.querySelector('.dock-middle');
-        if (middle) {
-            middle.style.setProperty('--dock-west-size', this.collapsed.west ? '30px' : this.sizes.west + 'px');
-            middle.style.setProperty('--dock-east-size', this.collapsed.east ? '30px' : this.sizes.east + 'px');
+    render() {
+        const root = document.getElementById('dock-layout');
+        root.textContent = '';
+
+        const hasNorth = this.layout.north.length > 0;
+        const hasSouth = this.layout.south.length > 0;
+        const hasWest = this.layout.west.length > 0;
+        const hasEast = this.layout.east.length > 0;
+
+        // Build grid-template-rows
+        const rows = [];
+        if (hasNorth) {
+            const sz = this.collapsed.north ? 30 : this.sizes.north;
+            rows.push(sz + 'px', '4px');
+        }
+        rows.push('1fr');
+        if (hasSouth) rows.push('4px', (this.collapsed.south ? 30 : this.sizes.south) + 'px');
+        root.style.gridTemplateRows = rows.join(' ');
+
+        // North slot
+        if (hasNorth) {
+            root.appendChild(this.renderSlot('north'));
+            root.appendChild(this.makeHandle('h', 'north'));
+        }
+
+        // Middle row
+        const middle = el('div', { class: 'dock-middle' });
+        if (hasWest) {
+            const w = this.collapsed.west ? 30 : this.sizes.west;
+            const slot = this.renderSlot('west');
+            slot.style.width = w + 'px';
+            slot.style.flexShrink = '0';
+            middle.appendChild(slot);
+            middle.appendChild(this.makeHandle('v', 'west'));
+        }
+
+        // Center
+        const center = el('div', { class: 'dock-center' }, [
+            el('iframe', { src: '/rp/', title: 'rp UI' }),
+        ]);
+        // Drop overlay lives inside center
+        center.appendChild(this.createDropOverlay());
+        middle.appendChild(center);
+
+        if (hasEast) {
+            middle.appendChild(this.makeHandle('v', 'east'));
+            const e = this.collapsed.east ? 30 : this.sizes.east;
+            const slot = this.renderSlot('east');
+            slot.style.width = e + 'px';
+            slot.style.flexShrink = '0';
+            middle.appendChild(slot);
+        }
+        root.appendChild(middle);
+
+        // South slot
+        if (hasSouth) {
+            root.appendChild(this.makeHandle('h', 'south'));
+            root.appendChild(this.renderSlot('south'));
         }
     },
 
-    // --- Collapse / Expand ---
+    renderSlot(position) {
+        const panelIds = this.layout[position];
+        const slot = el('div', { class: `dock-slot dock-slot-${position}` });
+        slot.setAttribute('data-slot', position);
+        const isCollapsed = !!this.collapsed[position];
 
-    setupToggles() {
-        document.querySelectorAll('.dock-toggle').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const side = btn.getAttribute('data-dock');
-                this.toggle(side);
+        panelIds.forEach(panelId => {
+            const def = PANELS[panelId];
+            if (!def) return;
+
+            const header = el('div', { class: 'dock-panel-header' }, [
+                el('span', { class: 'dock-panel-title' }, def.title),
+                el('div', { class: 'dock-panel-controls' }, [
+                    this.makeToggleBtn(position),
+                ]),
+            ]);
+
+            // Drag start on header
+            header.addEventListener('mousedown', e => {
+                if (e.target.closest('.dock-toggle')) return;
+                this.startDrag(e, panelId, position);
             });
+
+            const body = el('div', { class: 'dock-panel-body' }, [def.render()]);
+            const panel = el('div', {
+                class: 'dock-panel' + (isCollapsed ? ' collapsed' : ''),
+                id: `dock-panel-${panelId}`,
+            }, [header, body]);
+
+            slot.appendChild(panel);
         });
+
+        return slot;
     },
 
-    toggle(side) {
-        this.collapsed[side] = !this.collapsed[side];
-        const panel = document.getElementById(`dock-${side}`);
-        if (panel) panel.classList.toggle('collapsed', this.collapsed[side]);
+    makeToggleBtn(position) {
+        const isCollapsed = !!this.collapsed[position];
+        const btn = el('button', { class: 'dock-toggle' }, isCollapsed ? '+' : '\u2013');
+        btn.addEventListener('click', () => {
+            this.collapsed[position] = !this.collapsed[position];
+            this.saveState();
+            this.render();
+        });
+        return btn;
+    },
 
-        // Update button text
-        const btn = panel.querySelector('.dock-toggle');
-        if (btn) btn.textContent = this.collapsed[side] ? '+' : '\u2013';
+    makeHandle(dir, slot) {
+        const handle = el('div', {
+            class: `dock-handle dock-handle-${dir}`,
+            'data-resize': slot,
+        });
+        return handle;
+    },
 
-        this.applySizes();
-        this.saveState();
+    createDropOverlay() {
+        const overlay = el('div', { class: 'dock-drop-overlay', id: 'dock-drop-overlay' });
+        ['north', 'south', 'west', 'east'].forEach(zone => {
+            const drop = el('div', { class: 'dock-drop-zone', 'data-zone': zone }, [
+                el('span', { class: 'dock-drop-zone-label' }, zone),
+            ]);
+            drop.addEventListener('mouseenter', () => drop.classList.add('hover'));
+            drop.addEventListener('mouseleave', () => drop.classList.remove('hover'));
+            drop.addEventListener('mouseup', () => this.dropPanel(zone));
+            overlay.appendChild(drop);
+        });
+        return overlay;
+    },
+
+    // --- Drag and Drop ---
+
+    startDrag(e, panelId, fromSlot) {
+        e.preventDefault();
+        const ghost = el('div', { class: 'dock-drag-ghost' }, PANELS[panelId].title);
+        ghost.style.left = e.clientX + 10 + 'px';
+        ghost.style.top = e.clientY + 10 + 'px';
+        document.body.appendChild(ghost);
+
+        const layout = document.getElementById('dock-layout');
+        layout.classList.add('dragging');
+
+        const overlay = document.getElementById('dock-drop-overlay');
+        if (overlay) overlay.classList.add('active');
+
+        this.dragging = { panelId, fromSlot, ghost };
+
+        const onMove = e => {
+            ghost.style.left = e.clientX + 10 + 'px';
+            ghost.style.top = e.clientY + 10 + 'px';
+        };
+
+        const onUp = () => {
+            document.removeEventListener('mousemove', onMove);
+            document.removeEventListener('mouseup', onUp);
+            this.endDrag();
+        };
+
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+    },
+
+    dropPanel(targetSlot) {
+        if (!this.dragging) return;
+        const { panelId, fromSlot } = this.dragging;
+
+        if (targetSlot !== fromSlot) {
+            // Remove from old slot
+            this.layout[fromSlot] = this.layout[fromSlot].filter(id => id !== panelId);
+
+            // Add to new slot (avoid duplicates)
+            if (!this.layout[targetSlot]) this.layout[targetSlot] = [];
+            if (!this.layout[targetSlot].includes(panelId)) {
+                this.layout[targetSlot].push(panelId);
+            }
+
+            this.saveState();
+        }
+
+        this.endDrag();
+        this.render();
+    },
+
+    endDrag() {
+        if (!this.dragging) return;
+        if (this.dragging.ghost) this.dragging.ghost.remove();
+
+        const layout = document.getElementById('dock-layout');
+        layout.classList.remove('dragging');
+
+        const overlay = document.getElementById('dock-drop-overlay');
+        if (overlay) overlay.classList.remove('active');
+
+        // Clear hover from all zones
+        document.querySelectorAll('.dock-drop-zone').forEach(z => z.classList.remove('hover'));
+
+        this.dragging = null;
     },
 
     // --- Resize handles ---
 
-    setupHandles() {
-        document.querySelectorAll('.dock-handle').forEach(handle => {
-            handle.addEventListener('mousedown', e => this.startDrag(e, handle));
+    setupResize() {
+        document.addEventListener('mousedown', e => {
+            const handle = e.target.closest('.dock-handle');
+            if (!handle) return;
+            e.preventDefault();
+
+            const slot = handle.getAttribute('data-resize');
+            if (this.collapsed[slot]) return;
+
+            const isH = handle.classList.contains('dock-handle-h');
+
+            this.resizing = {
+                slot,
+                startPos: isH ? e.clientY : e.clientX,
+                startSize: this.sizes[slot],
+                isH,
+            };
+
+            handle.classList.add('dragging');
+            document.getElementById('dock-layout').classList.add('dragging');
         });
 
-        document.addEventListener('mousemove', e => this.onDrag(e));
-        document.addEventListener('mouseup', () => this.stopDrag());
-    },
+        document.addEventListener('mousemove', e => {
+            if (!this.resizing) return;
+            const { slot, startPos, startSize, isH } = this.resizing;
+            const current = isH ? e.clientY : e.clientX;
+            let delta = current - startPos;
 
-    startDrag(e, handle) {
-        e.preventDefault();
-        const side = handle.getAttribute('data-resize');
-        if (this.collapsed[side]) return;
+            // Invert for east/south (grow opposite direction)
+            if (slot === 'east' || slot === 'south') delta = -delta;
 
-        this.dragging = {
-            side,
-            startPos: (side === 'west' || side === 'east') ? e.clientX : e.clientY,
-            startSize: this.sizes[side],
-        };
+            this.sizes[slot] = Math.max(30, Math.min(startSize + delta, 600));
+            this.render();
+        });
 
-        handle.classList.add('dragging');
-        document.getElementById('dock-layout').classList.add('resizing');
-    },
-
-    onDrag(e) {
-        if (!this.dragging) return;
-        const { side, startPos, startSize } = this.dragging;
-        const isHorizontal = (side === 'west' || side === 'east');
-        const currentPos = isHorizontal ? e.clientX : e.clientY;
-        let delta = currentPos - startPos;
-
-        // Invert delta for east and south (they grow in opposite direction)
-        if (side === 'east' || side === 'south') delta = -delta;
-
-        const newSize = Math.max(40, Math.min(startSize + delta, 600));
-        this.sizes[side] = newSize;
-        this.applySizes();
-    },
-
-    stopDrag() {
-        if (!this.dragging) return;
-        document.querySelectorAll('.dock-handle.dragging').forEach(h => h.classList.remove('dragging'));
-        document.getElementById('dock-layout').classList.remove('resizing');
-        this.dragging = null;
-        this.saveState();
+        document.addEventListener('mouseup', () => {
+            if (!this.resizing) return;
+            document.querySelectorAll('.dock-handle.dragging').forEach(h => h.classList.remove('dragging'));
+            document.getElementById('dock-layout').classList.remove('dragging');
+            this.resizing = null;
+            this.saveState();
+        });
     },
 };
-
 
 document.addEventListener('DOMContentLoaded', () => app.init());
