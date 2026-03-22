@@ -1,0 +1,7 @@
+numpy
+Pillow
+scipy
+ipywidgets>=8.0
+ipycanvas
+jupyterlab
+pytest
