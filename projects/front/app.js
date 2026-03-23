@@ -1,7 +1,9 @@
 const SERVICES = ['postgresql', 'ollama', 'aiserver', 'rp'];
 const POLL_STATUS_MS = 2000;
 const POLL_LOGS_MS = 3000;
-const DOCK_STORAGE_KEY = 'plum-dock-state';
+
+const DOCK_STORAGE_KEY_MASTER = 'plum-dock-state-master';
+const DOCK_STORAGE_KEY_RP = 'plum-dock-state-rp';
 
 // ===== Panel definitions =====
 // Each panel has an id, title, and a render function that returns DOM content.
@@ -46,13 +48,35 @@ const PANELS = {
             return el('div', { class: 'logs', id: 'logs-postgresql-dock' }, 'Loading...');
         },
     },
+    'rp-browser': {
+        id: 'rp-browser',
+        title: 'RP Browser',
+        render() { return el('div', { id: 'rp-browser-root' }, 'Loading...'); },
+    },
+    'rp-scene-state': {
+        id: 'rp-scene-state',
+        title: 'Scene State',
+        render() { return el('div', { id: 'rp-scene-state-root' }, 'Loading...'); },
+    },
+    'rp-under-hood': {
+        id: 'rp-under-hood',
+        title: 'Under the Hood',
+        render() { return el('div', { id: 'rp-under-hood-root' }, 'Loading...'); },
+    },
 };
 
-const DEFAULT_LAYOUT = {
+const DEFAULT_LAYOUT_MASTER = {
     north: ['services'],
     south: ['logs-rp'],
     west: ['logs-aiserver'],
     east: ['logs-ollama'],
+};
+
+const DEFAULT_LAYOUT_RP = {
+    north: ['services'],
+    south: ['logs-rp', 'rp-scene-state', 'rp-under-hood'],
+    west: ['rp-browser'],
+    east: [],
 };
 
 // ===== DOM helper =====
@@ -119,6 +143,14 @@ const app = {
         document.getElementById(tabName).classList.add('active');
         document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
         this.currentTab = tabName;
+
+        // Apply theme
+        document.body.classList.toggle('theme-amber', tabName === 'rp');
+
+        // Switch dock layout when entering rp tab
+        if (tabName === 'rp') {
+            dock.switchLayout(tabName);
+        }
     },
 
     setupRestartButtons() {
@@ -230,29 +262,44 @@ const dock = {
     collapsed: {},
     dragging: null,   // { panelId, fromSlot, ghost, overlay }
     resizing: null,
+    currentStorageKey: DOCK_STORAGE_KEY_RP,
 
     init() {
-        this.loadState();
+        this.loadState(DOCK_STORAGE_KEY_RP, DEFAULT_LAYOUT_RP);
         this.render();
         this.setupResize();
     },
 
+    // --- Per-tab layout switching ---
+
+    switchLayout(tabName) {
+        if (tabName === 'rp') {
+            this.loadState(DOCK_STORAGE_KEY_RP, DEFAULT_LAYOUT_RP);
+        } else {
+            this.loadState(DOCK_STORAGE_KEY_MASTER, DEFAULT_LAYOUT_MASTER);
+        }
+        this.render();
+    },
+
     // --- State ---
 
-    loadState() {
+    loadState(storageKey, defaultLayout) {
+        this.currentStorageKey = storageKey;
+        this.layout = null;
+        this.collapsed = {};
         try {
-            const saved = JSON.parse(localStorage.getItem(DOCK_STORAGE_KEY));
+            const saved = JSON.parse(localStorage.getItem(storageKey));
             if (saved) {
                 if (saved.layout) this.layout = saved.layout;
                 if (saved.sizes) Object.assign(this.sizes, saved.sizes);
                 if (saved.collapsed) this.collapsed = saved.collapsed;
             }
         } catch { /* ignore */ }
-        if (!this.layout) this.layout = JSON.parse(JSON.stringify(DEFAULT_LAYOUT));
+        if (!this.layout) this.layout = JSON.parse(JSON.stringify(defaultLayout));
     },
 
     saveState() {
-        localStorage.setItem(DOCK_STORAGE_KEY, JSON.stringify({
+        localStorage.setItem(this.currentStorageKey, JSON.stringify({
             layout: this.layout,
             sizes: this.sizes,
             collapsed: this.collapsed,
@@ -298,9 +345,14 @@ const dock = {
         }
 
         // Center
-        const center = el('div', { class: 'dock-center' }, [
-            el('iframe', { src: '/rp/', title: 'rp UI' }),
-        ]);
+        const center = el('div', { class: 'dock-center' });
+        if (app.currentTab === 'rp' && typeof rpCenter !== 'undefined' && rpCenter && rpCenter.render) {
+            center.appendChild(rpCenter.render());
+        } else if (app.currentTab === 'rp') {
+            center.appendChild(el('div', { style: 'padding: 20px; color: var(--accent);' }, 'RP Center - Loading...'));
+        } else {
+            center.appendChild(el('iframe', { src: '/rp/', title: 'rp UI' }));
+        }
         // Drop overlay lives inside center
         center.appendChild(this.createDropOverlay());
         middle.appendChild(center);
