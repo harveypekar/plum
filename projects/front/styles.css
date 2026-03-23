@@ -902,6 +902,27 @@ body {
     padding: 4px 8px;
 }
 
+.rp-form-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.rp-form-hint {
+    font-size: 11px;
+    opacity: 0.6;
+}
+
+.rp-form-numeric-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 8px;
+}
+
+.rp-form-numeric-row input {
+    width: 100%;
+}
+
 /* Responsive */
 @media (max-width: 1200px) {
     .dock-slot-west, .dock-slot-east { display: none !important; }
