@@ -1034,6 +1034,347 @@ const rpChat = {
     },
 };
 
+// ===== RP: Cards =====
+
+const rpCards = {
+    async renderEditor(container, cardId) {
+        container.textContent = '';
+        let card = null;
+        let cardData = {};
+
+        if (cardId !== null) {
+            try {
+                card = rpState.cards.find(c => c.id === cardId);
+                if (!card) card = await rpApi('GET', '/rp/cards/' + cardId);
+                cardData = card.card_data.data || card.card_data;
+            } catch (e) {
+                container.appendChild(el('div', { class: 'rp-error' }, 'Failed to load card: ' + e.message));
+                return;
+            }
+        }
+
+        const form = el('div', { class: 'rp-form' });
+        form.appendChild(el('div', { class: 'rp-form-title' }, cardId ? 'Edit Card' : 'New Card'));
+
+        // Avatar preview (existing cards only)
+        if (card) {
+            const avatarPreview = document.createElement('img');
+            avatarPreview.className = 'rp-card-avatar-preview';
+            rpSetAvatarSrc(avatarPreview, card.id, card.has_avatar);
+            const avatarPicker = document.createElement('input');
+            avatarPicker.type = 'file';
+            avatarPicker.accept = 'image/*';
+            avatarPicker.style.display = 'none';
+            avatarPreview.addEventListener('click', () => avatarPicker.click());
+            avatarPicker.addEventListener('change', async () => {
+                const file = avatarPicker.files[0];
+                if (!file) return;
+                const formData = new FormData();
+                formData.append('file', file);
+                await fetch('/rp/cards/' + card.id + '/avatar', { method: 'PUT', body: formData });
+                avatarPreview.src = '/rp/cards/' + card.id + '/avatar?' + Date.now();
+                rpLoadCards();
+                avatarPicker.value = '';
+            });
+            form.appendChild(avatarPreview);
+            form.appendChild(avatarPicker);
+        }
+
+        // Form fields
+        const fields = [
+            { key: 'name', label: 'Name', type: 'input', value: cardData.name || (card ? card.name : '') },
+            { key: 'description', label: 'Description', type: 'textarea', rows: 4, value: cardData.description || '' },
+            { key: 'personality', label: 'Personality', type: 'textarea', rows: 3, value: cardData.personality || '' },
+            { key: 'first_mes', label: 'First Message', type: 'textarea', rows: 3, value: cardData.first_mes || '' },
+            { key: 'mes_example', label: 'Example Messages', type: 'textarea', rows: 3, value: cardData.mes_example || '' },
+            { key: 'scenario', label: 'Scenario', type: 'textarea', rows: 2, value: cardData.scenario || '' },
+            { key: 'tags', label: 'Tags', type: 'input', value: (cardData.tags || []).join(', ') },
+        ];
+
+        const inputs = {};
+        fields.forEach(f => {
+            const fieldDiv = el('div', { class: 'rp-form-field' });
+            fieldDiv.appendChild(el('label', {}, f.label));
+            let input;
+            if (f.type === 'textarea') {
+                input = document.createElement('textarea');
+                input.rows = f.rows;
+            } else {
+                input = document.createElement('input');
+                input.type = 'text';
+            }
+            input.value = f.value;
+            fieldDiv.appendChild(input);
+            inputs[f.key] = input;
+
+            // Extract scenario button for scenario field
+            if (f.key === 'scenario' && card && cardData.scenario) {
+                const extractBtn = el('button', { class: 'rp-form-inline-btn' }, 'Extract as Scenario');
+                extractBtn.addEventListener('click', async () => {
+                    try {
+                        const scenario = await rpApi('POST', '/rp/cards/' + card.id + '/extract-scenario');
+                        rpLoadScenarios();
+                        extractBtn.textContent = 'Created: ' + scenario.name;
+                    } catch (e) {
+                        extractBtn.textContent = 'Error: ' + e.message;
+                    }
+                });
+                fieldDiv.appendChild(extractBtn);
+            }
+            form.appendChild(fieldDiv);
+        });
+
+        // Actions
+        const actions = el('div', { class: 'rp-form-actions' });
+
+        if (card) {
+            const exportBtn = el('button', {}, 'Export PNG');
+            exportBtn.addEventListener('click', () => window.open('/rp/cards/' + card.id + '/export', '_blank'));
+            actions.appendChild(exportBtn);
+
+            const deleteBtn = el('button', { class: 'rp-form-delete' }, 'Delete');
+            deleteBtn.addEventListener('click', () => {
+                confirmAction(deleteBtn, async () => {
+                    await rpApi('DELETE', '/rp/cards/' + card.id);
+                    rpLoadCards();
+                    rpCenter.closeTab('card', card.id);
+                });
+            });
+            actions.appendChild(deleteBtn);
+        }
+
+        const saveBtn = el('button', {}, 'Save');
+        saveBtn.addEventListener('click', async () => {
+            const name = inputs.name.value.trim();
+            if (!name) return;
+
+            const tagsRaw = inputs.tags.value.trim();
+            const tags = tagsRaw ? tagsRaw.split(',').map(t => t.trim()).filter(Boolean) : [];
+
+            const newCardData = {
+                data: {
+                    name,
+                    description: inputs.description.value,
+                    personality: inputs.personality.value,
+                    first_mes: inputs.first_mes.value,
+                    mes_example: inputs.mes_example.value,
+                    scenario: inputs.scenario.value,
+                    tags,
+                },
+            };
+
+            try {
+                if (cardId) {
+                    await rpApi('PUT', '/rp/cards/' + cardId, { name, card_data: newCardData });
+                } else {
+                    const created = await rpApi('POST', '/rp/cards', { name, card_data: newCardData });
+                    rpCenter.closeTab('card', null);
+                    rpCenter.openTab('card', created.id);
+                }
+                rpLoadCards();
+            } catch (e) {
+                saveBtn.textContent = 'Error: ' + e.message;
+                setTimeout(() => { saveBtn.textContent = 'Save'; }, 2000);
+            }
+        });
+        actions.appendChild(saveBtn);
+
+        const cancelBtn = el('button', {}, 'Cancel');
+        cancelBtn.addEventListener('click', () => rpCenter.closeTab('card', cardId));
+        actions.appendChild(cancelBtn);
+
+        form.appendChild(actions);
+        container.appendChild(form);
+    },
+
+    // --- Card Generator ---
+
+    renderGenerator(container) {
+        container.textContent = '';
+        const form = el('div', { class: 'rp-form' });
+        form.appendChild(el('div', { class: 'rp-form-title' }, 'Generate Card'));
+
+        // Step 1: description + model + generate button
+        const step1 = el('div', { id: 'rp-card-gen-step1' });
+
+        const descField = el('div', { class: 'rp-form-field' });
+        descField.appendChild(el('label', {}, 'Describe the character'));
+        const descInput = document.createElement('textarea');
+        descInput.rows = 4;
+        descInput.placeholder = 'A mysterious elven sorceress who...';
+        descField.appendChild(descInput);
+        step1.appendChild(descField);
+
+        const modelField = el('div', { class: 'rp-form-field' });
+        modelField.appendChild(el('label', {}, 'Model'));
+        const modelSelect = document.createElement('select');
+        rpPopulateModelSelect(modelSelect);
+        modelField.appendChild(modelSelect);
+        step1.appendChild(modelField);
+
+        const genActions = el('div', { class: 'rp-form-actions' });
+        const genBtn = el('button', {}, 'Generate');
+        const status = el('div', { class: 'rp-form-status' });
+        genActions.appendChild(genBtn);
+        genActions.appendChild(status);
+        step1.appendChild(genActions);
+
+        // Step 2: field review
+        const step2 = el('div', { id: 'rp-card-gen-step2' });
+        step2.style.display = 'none';
+
+        form.appendChild(step1);
+        form.appendChild(step2);
+        container.appendChild(form);
+
+        let cardGenCard = null;
+        let selectedModel = '';
+
+        const rpCardGenFieldDefs = [
+            { key: 'name', label: 'Name', rows: 1 },
+            { key: 'description', label: 'Description', rows: 4 },
+            { key: 'personality', label: 'Personality', rows: 3 },
+            { key: 'first_mes', label: 'First Message', rows: 3 },
+            { key: 'mes_example', label: 'Example Messages', rows: 3 },
+            { key: 'scenario', label: 'Scenario', rows: 2 },
+            { key: 'tags', label: 'Tags', rows: 1 },
+        ];
+
+        genBtn.addEventListener('click', async () => {
+            const desc = descInput.value.trim();
+            if (!desc) return;
+            selectedModel = modelSelect.value;
+            genBtn.disabled = true;
+            status.textContent = 'Generating...';
+            try {
+                const resp = await rpApi('POST', '/rp/cards/generate', { description: desc, model: selectedModel });
+                if (resp.error) {
+                    status.textContent = 'Error: ' + resp.error;
+                } else {
+                    cardGenCard = resp.card;
+                    renderStep2();
+                    step1.style.display = 'none';
+                    step2.style.display = '';
+                    status.textContent = '';
+                }
+            } catch (e) {
+                status.textContent = 'Failed: ' + e.message;
+            }
+            genBtn.disabled = false;
+        });
+
+        function syncFieldsToCard() {
+            rpCardGenFieldDefs.forEach(def => {
+                const ta = document.getElementById('rpCardGen_' + def.key);
+                if (ta) {
+                    if (def.key === 'tags') {
+                        cardGenCard[def.key] = ta.value.split(',').map(t => t.trim());
+                    } else {
+                        cardGenCard[def.key] = ta.value;
+                    }
+                }
+            });
+        }
+
+        function renderStep2() {
+            step2.textContent = '';
+            step2.appendChild(el('div', { class: 'rp-form-title' }, 'Review & Edit'));
+
+            rpCardGenFieldDefs.forEach(def => {
+                let val = cardGenCard[def.key] || '';
+                if (def.key === 'tags' && Array.isArray(val)) val = val.join(', ');
+
+                const fieldDiv = el('div', { class: 'rp-form-field' });
+                const header = el('div', { class: 'rp-card-gen-field-header' });
+                header.appendChild(el('label', {}, def.label));
+
+                const regenBtn = el('button', {}, 'Regenerate');
+                regenBtn.addEventListener('click', () => {
+                    const instrDiv = document.getElementById('rpCardGenInstr_' + def.key);
+                    instrDiv.classList.toggle('open');
+                });
+                header.appendChild(regenBtn);
+                fieldDiv.appendChild(header);
+
+                const ta = document.createElement('textarea');
+                ta.id = 'rpCardGen_' + def.key;
+                ta.rows = def.rows;
+                ta.value = val;
+                fieldDiv.appendChild(ta);
+
+                // Instructions row for regenerate
+                const instrDiv = el('div', { class: 'rp-card-gen-field-instructions', id: 'rpCardGenInstr_' + def.key });
+                const instrInput = document.createElement('input');
+                instrInput.type = 'text';
+                instrInput.placeholder = 'Instructions (optional)';
+                const instrGo = el('button', {}, 'Go');
+                instrGo.addEventListener('click', async () => {
+                    syncFieldsToCard();
+                    instrGo.disabled = true;
+                    regenBtn.textContent = '...';
+                    try {
+                        const resp = await rpApi('POST', '/rp/cards/generate-field', {
+                            card: cardGenCard,
+                            field: def.key,
+                            instructions: instrInput.value.trim(),
+                            model: selectedModel,
+                        });
+                        cardGenCard[def.key] = resp.value;
+                        ta.value = Array.isArray(resp.value) ? resp.value.join(', ') : resp.value;
+                    } catch {
+                        regenBtn.textContent = 'Failed';
+                        setTimeout(() => { regenBtn.textContent = 'Regenerate'; }, 2000);
+                    }
+                    instrGo.disabled = false;
+                    regenBtn.textContent = 'Regenerate';
+                });
+                instrDiv.appendChild(instrInput);
+                instrDiv.appendChild(instrGo);
+                fieldDiv.appendChild(instrDiv);
+
+                step2.appendChild(fieldDiv);
+            });
+
+            const step2Actions = el('div', { class: 'rp-form-actions' });
+            const backBtn = el('button', {}, 'Back');
+            backBtn.addEventListener('click', () => {
+                step1.style.display = '';
+                step2.style.display = 'none';
+            });
+            const createBtn = el('button', {}, 'Create Card');
+            createBtn.addEventListener('click', async () => {
+                syncFieldsToCard();
+                const c = cardGenCard;
+                const data = {
+                    name: c.name || 'Untitled',
+                    card_data: {
+                        data: {
+                            name: c.name || 'Untitled',
+                            description: c.description || '',
+                            personality: c.personality || '',
+                            first_mes: c.first_mes || '',
+                            mes_example: c.mes_example || '',
+                            scenario: c.scenario || '',
+                            tags: c.tags || [],
+                        },
+                    },
+                };
+                try {
+                    await rpApi('POST', '/rp/cards', data);
+                    rpLoadCards();
+                    rpCenter.closeTab('card-gen', 'generator');
+                } catch (e) {
+                    createBtn.textContent = 'Failed: ' + e.message;
+                    setTimeout(() => { createBtn.textContent = 'Create Card'; }, 2000);
+                }
+            });
+            step2Actions.appendChild(backBtn);
+            step2Actions.appendChild(createBtn);
+            step2.appendChild(step2Actions);
+        }
+    },
+};
+
 // ===== App (tabs, polling, master tab) =====
 
 const app = {
