@@ -163,7 +163,8 @@
       "WebFetch(domain:docs.google.com)",
       "WebFetch(domain:www.chub.ai)",
       "WebFetch(domain:booru.plus)",
-      "WebFetch(domain:paste.moe)"
+      "WebFetch(domain:paste.moe)",
+      "Bash(PYTHONPATH=. python -m pytest projects/rp/tests/test_fewshot.py -v)"
     ]
   },
   "hooks": {
