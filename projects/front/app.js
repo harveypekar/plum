@@ -1567,6 +1567,146 @@ function rpFormField(label, type, value, rows, hint) {
     return { container, input };
 }
 
+// ===== RP: New Chat Modal =====
+
+const rpNewChatModal = {
+    async open() {
+        await Promise.all([rpLoadModels(), rpLoadCards(), rpLoadScenarios()]);
+
+        const last = rpState.conversations.length > 0 ? rpState.conversations[0] : null;
+
+        // Build modal overlay
+        const overlay = el('div', { class: 'rp-modal', id: 'rp-new-chat-modal' });
+        const content = el('div', { class: 'rp-modal-content' });
+        content.appendChild(el('div', { class: 'rp-form-title' }, 'New Chat'));
+
+        // Your Character
+        const userField = el('div', { class: 'rp-form-field' });
+        userField.appendChild(el('label', {}, 'Your Character'));
+        const userSelect = document.createElement('select');
+        rpState.cards.forEach(card => {
+            const cardData = card.card_data.data || card.card_data;
+            const opt = document.createElement('option');
+            opt.value = card.id;
+            opt.textContent = cardData.name || card.name;
+            if (last && card.id === last.user_card_id) opt.selected = true;
+            userSelect.appendChild(opt);
+        });
+        userField.appendChild(userSelect);
+        content.appendChild(userField);
+
+        // AI Character
+        const aiField = el('div', { class: 'rp-form-field' });
+        aiField.appendChild(el('label', {}, 'AI Character'));
+        const aiSelect = document.createElement('select');
+        rpState.cards.forEach(card => {
+            const cardData = card.card_data.data || card.card_data;
+            const opt = document.createElement('option');
+            opt.value = card.id;
+            opt.textContent = cardData.name || card.name;
+            if (last && card.id === last.ai_card_id) opt.selected = true;
+            aiSelect.appendChild(opt);
+        });
+        aiField.appendChild(aiSelect);
+        content.appendChild(aiField);
+
+        // Scenario (optional)
+        const scenarioField = el('div', { class: 'rp-form-field' });
+        scenarioField.appendChild(el('label', {}, 'Scenario (optional)'));
+        const scenarioSelect = document.createElement('select');
+        const noneOpt = document.createElement('option');
+        noneOpt.value = '';
+        noneOpt.textContent = 'None';
+        scenarioSelect.appendChild(noneOpt);
+        rpState.scenarios.forEach(s => {
+            const opt = document.createElement('option');
+            opt.value = s.id;
+            opt.textContent = s.name;
+            if (last && s.id === last.scenario_id) opt.selected = true;
+            scenarioSelect.appendChild(opt);
+        });
+        scenarioField.appendChild(scenarioSelect);
+        content.appendChild(scenarioField);
+
+        // Model
+        const modelField = el('div', { class: 'rp-form-field' });
+        modelField.appendChild(el('label', {}, 'Model'));
+        const modelSelect = document.createElement('select');
+        rpPopulateModelSelect(modelSelect, last ? last.model : undefined);
+        modelField.appendChild(modelSelect);
+        content.appendChild(modelField);
+
+        // Actions
+        const actions = el('div', { class: 'rp-form-actions' });
+        const createBtn = el('button', {}, 'Start Chat');
+        createBtn.addEventListener('click', () => this.create(
+            parseInt(userSelect.value),
+            parseInt(aiSelect.value),
+            scenarioSelect.value ? parseInt(scenarioSelect.value) : null,
+            modelSelect.value
+        ));
+        const cancelBtn = el('button', {}, 'Cancel');
+        cancelBtn.addEventListener('click', () => this.close());
+        actions.appendChild(createBtn);
+        actions.appendChild(cancelBtn);
+        content.appendChild(actions);
+
+        overlay.appendChild(content);
+
+        // Close on backdrop click
+        overlay.addEventListener('click', e => {
+            if (e.target === overlay) this.close();
+        });
+
+        document.body.appendChild(overlay);
+    },
+
+    async create(userCardId, aiCardId, scenarioId, model) {
+        if (!userCardId || !aiCardId || !model) return;
+
+        this.close();
+
+        // Show timer in center
+        const contentArea = rpCenter.contentArea;
+        if (contentArea) {
+            contentArea.textContent = '';
+            const timerStart = Date.now();
+            const timerEl = el('div', { class: 'rp-placeholder' });
+            const timerText = el('div', {}, 'Generating opening scene... 0s');
+            timerEl.appendChild(timerText);
+            contentArea.appendChild(timerEl);
+            const timerInterval = setInterval(() => {
+                timerText.textContent = 'Generating opening scene... ' +
+                    Math.floor((Date.now() - timerStart) / 1000) + 's';
+            }, 1000);
+
+            try {
+                const conv = await rpApi('POST', '/rp/conversations', {
+                    user_card_id: userCardId,
+                    ai_card_id: aiCardId,
+                    scenario_id: scenarioId,
+                    model: model,
+                });
+                clearInterval(timerInterval);
+                await rpLoadConversations();
+                rpCenter.openTab('chat', conv.id);
+            } catch (e) {
+                clearInterval(timerInterval);
+                contentArea.textContent = '';
+                contentArea.appendChild(el('div', { class: 'rp-error' }, 'Error creating conversation: ' + e.message));
+            }
+        }
+    },
+
+    close() {
+        const modal = document.getElementById('rp-new-chat-modal');
+        if (modal) modal.remove();
+    },
+};
+
+// Wire "New" button from browser panel
+rpState.on('new-chat-requested', () => rpNewChatModal.open());
+
 // ===== App (tabs, polling, master tab) =====
 
 const app = {
