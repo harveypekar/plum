@@ -713,19 +713,30 @@ body {
 .rp-modal {
     position: fixed;
     top: 0; left: 0; right: 0; bottom: 0;
-    background: rgba(0, 0, 0, 0.8);
+    background: rgba(0, 0, 0, 0.7);
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 300;
+    z-index: 1000;
 }
 
-.rp-modal > div {
+.rp-modal > div,
+.rp-modal-content {
     background: var(--accent-bg);
     border: 2px solid var(--accent);
     padding: 20px;
     min-width: 400px;
     max-width: 600px;
+}
+
+.rp-modal-content select {
+    width: 100%;
+    padding: 6px 8px;
+    background: var(--accent-bg);
+    color: var(--accent);
+    border: 1px solid var(--accent-dim);
+    font-family: monospace;
+    font-size: 13px;
 }
 
 .dialogue-quote-user {
