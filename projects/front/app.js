@@ -94,6 +94,148 @@ function el(tag, attrs, children) {
 }
 
 
+// ===== RP: State & Event Bus =====
+
+const rpState = {
+    cards: [],
+    scenarios: [],
+    conversations: [],
+    models: [],
+    openTabs: [],    // {type: 'chat'|'card'|'scenario', id: number}
+    activeTab: null,
+    _listeners: {},
+
+    on(event, fn) {
+        (this._listeners[event] ||= []).push(fn);
+    },
+    off(event, fn) {
+        const arr = this._listeners[event];
+        if (arr) this._listeners[event] = arr.filter(f => f !== fn);
+    },
+    emit(event, data) {
+        (this._listeners[event] || []).forEach(fn => fn(data));
+    },
+};
+
+async function rpApi(method, path, body) {
+    const opts = { method };
+    if (body !== undefined) {
+        opts.headers = { 'Content-Type': 'application/json' };
+        opts.body = JSON.stringify(body);
+    }
+    const res = await fetch(path, opts);
+    if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || res.statusText);
+    }
+    if (res.status === 204) return null;
+    return res.json();
+}
+
+// ===== RP: Model Helpers =====
+
+const rpModelTags = {
+    "lumimaid": ["roleplay", "uncensored"],
+    "daturacookie": ["roleplay", "uncensored", "small"],
+    "cydonia": ["roleplay", "uncensored"],
+    "nevoria": ["roleplay", "uncensored"],
+    "mag-mell": ["roleplay"],
+    "dolphin": ["instruct", "uncensored", "small"],
+    "qwen2.5": ["instruct"],
+    "qwen3": ["instruct"],
+    "qwen:": ["instruct", "small"],
+    "llama3": ["instruct"],
+};
+
+function rpModelGetTags(name) {
+    const lower = name.toLowerCase();
+    for (const pattern in rpModelTags) {
+        if (lower.indexOf(pattern) !== -1) return rpModelTags[pattern];
+    }
+    return [];
+}
+
+function rpModelLabel(m) {
+    let label = m.alias ? m.alias + ' (' + m.name + ')' : m.name;
+    const parts = [];
+    if (m.parameter_size) parts.push(m.parameter_size);
+    if (m.quantization_level) parts.push(m.quantization_level);
+    const tags = rpModelGetTags(m.name);
+    if (tags.length > 0) parts.push(tags.join(', '));
+    if (parts.length > 0) label += ' — ' + parts.join(' · ');
+    return label;
+}
+
+function rpModelSupportsThink(modelValue) {
+    const m = rpState.models.find(x => (x.alias || x.name) === modelValue);
+    return m ? !!m.supports_think : false;
+}
+
+function rpPopulateModelSelect(selectEl, selectedValue) {
+    while (selectEl.options.length > 0) selectEl.remove(0);
+    for (const m of rpState.models) {
+        const opt = document.createElement('option');
+        opt.value = m.alias || m.name;
+        opt.textContent = rpModelLabel(m);
+        if (opt.value === selectedValue) opt.selected = true;
+        selectEl.appendChild(opt);
+    }
+}
+
+// ===== RP: Data Loading & Utilities =====
+
+async function rpLoadCards() {
+    try { rpState.cards = await rpApi('GET', '/rp/cards'); } catch {}
+    rpState.emit('cards-changed');
+}
+async function rpLoadScenarios() {
+    try { rpState.scenarios = await rpApi('GET', '/rp/scenarios'); } catch {}
+    rpState.emit('scenarios-changed');
+}
+async function rpLoadConversations() {
+    try { rpState.conversations = await rpApi('GET', '/rp/conversations'); } catch {}
+    rpState.emit('convs-changed');
+}
+async function rpLoadModels() {
+    try {
+        const data = await rpApi('GET', '/health');
+        rpState.models = data.available_models || [];
+    } catch {}
+}
+
+function rpTimeAgo(dateStr) {
+    const d = new Date(dateStr);
+    const now = new Date();
+    const diff = (now - d) / 1000;
+    if (diff < 60) return 'just now';
+    if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+    if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+    return Math.floor(diff / 86400) + 'd ago';
+}
+
+function confirmAction(btn, onConfirm) {
+    if (btn.dataset.confirming) return;
+    btn.dataset.confirming = '1';
+    const orig = btn.textContent;
+    const origClass = btn.className;
+    btn.textContent = 'Sure?';
+    btn.className = (origClass ? origClass + ' ' : '') + 'confirming';
+    const reset = () => {
+        delete btn.dataset.confirming;
+        btn.textContent = orig;
+        btn.className = origClass;
+        document.removeEventListener('click', outsideClick, true);
+    };
+    const outsideClick = (e) => { if (!btn.contains(e.target)) reset(); };
+    setTimeout(() => document.addEventListener('click', outsideClick, true), 0);
+    btn.addEventListener('click', function handler() {
+        btn.removeEventListener('click', handler);
+        reset();
+        onConfirm();
+    }, { once: true });
+}
+
+
 // ===== App (tabs, polling, master tab) =====
 
 const app = {
