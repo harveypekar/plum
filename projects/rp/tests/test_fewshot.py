@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from projects.aiserver.ollama import OllamaClient, OllamaError
 import projects.rp.db as db
+from projects.rp.fewshot import get_fewshot_messages
 
 
 def test_embed_returns_vector():
@@ -202,3 +203,93 @@ def test_count_fewshot_examples_zero():
         result = asyncio.run(db.count_fewshot_examples())
 
     assert result == 0
+
+
+# -- fewshot.py: get_fewshot_messages --
+
+
+def _make_ollama(embedding=None):
+    """Return a mock OllamaClient with embed() as an AsyncMock."""
+    ollama = AsyncMock()
+    ollama.embed = AsyncMock(return_value=embedding or [0.1, 0.2, 0.3])
+    return ollama
+
+
+def test_get_fewshot_messages_returns_pairs():
+    """get_fewshot_messages() returns correct user/assistant message pairs."""
+    ollama = _make_ollama()
+    messages = [
+        {"role": "user", "content": "Hello there"},
+        {"role": "assistant", "content": "Greetings, traveller"},
+    ]
+    examples = [
+        {"user_message": "Good day", "assistant_message": "Good day to you too"},
+        {"user_message": "Farewell", "assistant_message": "Until we meet again"},
+    ]
+
+    with patch("projects.rp.db.search_fewshot_examples", AsyncMock(return_value=examples)):
+        result = asyncio.run(get_fewshot_messages(ollama, messages))
+
+    assert result == [
+        {"role": "user", "content": "Good day"},
+        {"role": "assistant", "content": "Good day to you too"},
+        {"role": "user", "content": "Farewell"},
+        {"role": "assistant", "content": "Until we meet again"},
+    ]
+
+
+def test_get_fewshot_messages_too_few_messages():
+    """get_fewshot_messages() returns [] when conversation has fewer than 2 messages."""
+    ollama = _make_ollama()
+
+    result_zero = asyncio.run(get_fewshot_messages(ollama, []))
+    result_one = asyncio.run(get_fewshot_messages(ollama, [{"role": "user", "content": "hi"}]))
+
+    assert result_zero == []
+    assert result_one == []
+    ollama.embed.assert_not_called()
+
+
+def test_get_fewshot_messages_no_results():
+    """get_fewshot_messages() returns [] when DB returns no examples."""
+    ollama = _make_ollama()
+    messages = [
+        {"role": "user", "content": "Hello"},
+        {"role": "assistant", "content": "Hi"},
+    ]
+
+    with patch("projects.rp.db.search_fewshot_examples", AsyncMock(return_value=[])):
+        result = asyncio.run(get_fewshot_messages(ollama, messages))
+
+    assert result == []
+
+
+def test_get_fewshot_messages_error_returns_empty():
+    """get_fewshot_messages() returns [] and does not propagate when embed() raises."""
+    ollama = AsyncMock()
+    ollama.embed = AsyncMock(side_effect=RuntimeError("Ollama is down"))
+    messages = [
+        {"role": "user", "content": "Hello"},
+        {"role": "assistant", "content": "Hi"},
+    ]
+
+    result = asyncio.run(get_fewshot_messages(ollama, messages))
+
+    assert result == []
+
+
+def test_get_fewshot_messages_extracts_correct_context():
+    """get_fewshot_messages() passes the last user + assistant messages to embed()."""
+    ollama = _make_ollama()
+    messages = [
+        {"role": "user", "content": "First user message"},
+        {"role": "assistant", "content": "First assistant response"},
+        {"role": "user", "content": "Second user message"},
+        {"role": "assistant", "content": "Second assistant response"},
+    ]
+
+    with patch("projects.rp.db.search_fewshot_examples", AsyncMock(return_value=[])):
+        asyncio.run(get_fewshot_messages(ollama, messages))
+
+    expected_summary = "Second user message\nSecond assistant response"
+    ollama.embed.assert_called_once_with("nomic-embed-text", expected_summary)
