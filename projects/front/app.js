@@ -149,12 +149,121 @@ const PANELS = {
     'rp-scene-state': {
         id: 'rp-scene-state',
         title: 'Scene State',
-        render() { return el('div', { id: 'rp-scene-state-root' }, 'Loading...'); },
+        render() {
+            const root = el('div', { id: 'rp-scene-state-root' });
+            const textarea = document.createElement('textarea');
+            textarea.className = 'rp-scene-state-area';
+            textarea.placeholder = 'No active conversation';
+            textarea.disabled = true;
+            root.appendChild(textarea);
+
+            const actions = el('div', { class: 'rp-form-actions' });
+            const saveBtn = el('button', {}, 'Save');
+            saveBtn.disabled = true;
+            saveBtn.addEventListener('click', async () => {
+                const tab = rpState.activeTab;
+                if (!tab || tab.type !== 'chat') return;
+                await rpApi('PUT', '/rp/conversations/' + tab.id + '/scene-state', {
+                    scene_state: textarea.value,
+                });
+            });
+            const refreshBtn = el('button', {}, 'Auto-generate');
+            refreshBtn.disabled = true;
+            refreshBtn.addEventListener('click', async () => {
+                const tab = rpState.activeTab;
+                if (!tab || tab.type !== 'chat') return;
+                refreshBtn.disabled = true;
+                refreshBtn.textContent = 'Generating...';
+                try {
+                    await rpApi('POST', '/rp/conversations/' + tab.id + '/refresh-scene-state');
+                    const detail = await rpApi('GET', '/rp/conversations/' + tab.id);
+                    textarea.value = detail.conversation.scene_state || '';
+                } catch {}
+                refreshBtn.disabled = false;
+                refreshBtn.textContent = 'Auto-generate';
+            });
+            actions.appendChild(saveBtn);
+            actions.appendChild(refreshBtn);
+            root.appendChild(actions);
+
+            // Update when active chat changes
+            const update = (data) => {
+                const tab = rpState.activeTab;
+                if (tab && tab.type === 'chat') {
+                    textarea.disabled = false;
+                    saveBtn.disabled = false;
+                    refreshBtn.disabled = false;
+                    if (data && data.detail) {
+                        textarea.value = data.detail.conversation.scene_state || '';
+                    }
+                } else {
+                    textarea.disabled = true;
+                    textarea.value = '';
+                    textarea.placeholder = 'No active conversation';
+                    saveBtn.disabled = true;
+                    refreshBtn.disabled = true;
+                }
+            };
+
+            rpState.on('conv-message', update);
+            rpState.on('tab-closed', update);
+
+            return root;
+        },
     },
     'rp-under-hood': {
         id: 'rp-under-hood',
         title: 'Under the Hood',
-        render() { return el('div', { id: 'rp-under-hood-root' }, 'Loading...'); },
+        render() {
+            const root = el('div', { id: 'rp-under-hood-root' });
+
+            // Sub-tabs
+            const tabs = el('div', { class: 'rp-under-hood-tabs' });
+            const panes = {};
+            const tabNames = ['System Prompt', 'User Prompt', 'Raw Response'];
+            const paneKeys = ['system', 'user', 'raw'];
+
+            tabNames.forEach((name, i) => {
+                const btn = el('button', { class: 'rp-under-hood-tab' + (i === 0 ? ' active' : '') }, name);
+                btn.addEventListener('click', () => {
+                    tabs.querySelectorAll('.rp-under-hood-tab').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    Object.values(panes).forEach(p => p.style.display = 'none');
+                    panes[paneKeys[i]].style.display = '';
+                });
+                tabs.appendChild(btn);
+            });
+            root.appendChild(tabs);
+
+            // Panes
+            paneKeys.forEach((key, i) => {
+                const pane = el('pre', { class: 'rp-under-hood-pre' }, 'No data yet.');
+                pane.id = 'rp-under-hood-' + key;
+                if (i > 0) pane.style.display = 'none';
+                panes[key] = pane;
+                root.appendChild(pane);
+            });
+
+            // Update on messages
+            rpState.on('conv-message', data => {
+                if (data.type === 'debug') {
+                    panes.system.textContent = data.debug_prompt || '(empty)';
+                    panes.user.textContent = data.debug_user_prompt || '(empty)';
+                } else if (data.type === 'done' && data.chunk) {
+                    panes.raw.textContent = JSON.stringify(data.chunk, null, 2);
+                } else if (data.type === 'load' && data.detail) {
+                    const msgs = data.detail.messages || [];
+                    const lastAi = [...msgs].reverse().find(m => m.role === 'assistant');
+                    if (lastAi && lastAi.raw_response) {
+                        panes.raw.textContent = JSON.stringify(lastAi.raw_response, null, 2);
+                    } else {
+                        panes.raw.textContent = 'No data yet.';
+                    }
+                }
+            });
+
+            return root;
+        },
     },
 };
 
