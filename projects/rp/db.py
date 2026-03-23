@@ -352,3 +352,44 @@ async def set_cached_first_message(combo_hash: str, card_hash: str, scenario_has
         "ON CONFLICT (combo_hash) DO UPDATE SET card_hash=$2, scenario_hash=$3, content=$5, created_at=NOW()",
         combo_hash, card_hash, scenario_hash, model, content,
     )
+
+
+# -- Few-shot Examples --
+
+async def search_fewshot_examples(embedding: list[float], limit: int = 2) -> list[dict]:
+    """Return the closest few-shot examples by cosine similarity."""
+    pool = await get_pool()
+    embedding_str = "[" + ",".join(str(f) for f in embedding) + "]"
+    rows = await pool.fetch(
+        "SELECT id, scene_context, user_message, assistant_message, token_estimate, "
+        "1 - (embedding <=> $1::vector) as similarity "
+        "FROM rp_fewshot_examples WHERE active "
+        "ORDER BY embedding <=> $1::vector LIMIT $2",
+        embedding_str, limit,
+    )
+    return [dict(r) for r in rows]
+
+
+async def add_fewshot_example(scene_context: str, user_message: str,
+                               assistant_message: str, embedding: list[float],
+                               token_estimate: int) -> dict:
+    """Insert a new few-shot example and return the created row."""
+    pool = await get_pool()
+    embedding_str = "[" + ",".join(str(f) for f in embedding) + "]"
+    row = await pool.fetchrow(
+        "INSERT INTO rp_fewshot_examples "
+        "(scene_context, user_message, assistant_message, embedding, token_estimate) "
+        "VALUES ($1, $2, $3, $4::vector, $5) "
+        "RETURNING id, scene_context, user_message, assistant_message, "
+        "token_estimate, active, created_at::text",
+        scene_context, user_message, assistant_message, embedding_str, token_estimate,
+    )
+    return dict(row)
+
+
+async def count_fewshot_examples() -> int:
+    """Return the count of active few-shot examples."""
+    pool = await get_pool()
+    return await pool.fetchval(
+        "SELECT COUNT(*) FROM rp_fewshot_examples WHERE active"
+    )
