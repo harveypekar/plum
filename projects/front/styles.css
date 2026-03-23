@@ -355,11 +355,93 @@ body {
     cursor: pointer;
     border: 1px solid transparent;
     font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
 
 .rp-browser-item:hover {
     background: var(--accent-dark);
     border-color: var(--accent-dim);
+}
+
+.rp-browser-tab {
+    background: var(--accent-bg);
+    color: var(--accent);
+    border: 1px solid var(--accent-dim);
+    border-bottom: none;
+    padding: 4px 10px;
+    font-family: monospace;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.rp-browser-tab:hover { background: var(--accent-dark); }
+.rp-browser-tab.active { background: var(--accent-dark); border-color: var(--accent); }
+
+.rp-browser-actions {
+    display: flex;
+    gap: 4px;
+    padding: 4px;
+}
+
+.rp-browser-actions button {
+    background: var(--accent-bg);
+    color: var(--accent);
+    border: 1px solid var(--accent-dim);
+    padding: 3px 8px;
+    font-family: monospace;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.rp-browser-actions button:hover { background: var(--accent-dark); }
+
+.rp-card-avatar-small {
+    width: 28px;
+    height: 28px;
+    border-radius: 4px;
+    object-fit: cover;
+    flex-shrink: 0;
+}
+
+.rp-drop-zone {
+    margin: 4px;
+    padding: 12px 8px;
+    border: 2px dashed var(--accent-dim);
+    text-align: center;
+    font-size: 12px;
+    cursor: pointer;
+    color: var(--accent);
+    opacity: 0.7;
+}
+
+.rp-drop-zone:hover { opacity: 1; border-color: var(--accent); }
+.rp-drop-zone.dragover { background: var(--accent-dark); border-color: var(--accent); opacity: 1; }
+
+.rp-browser-item-name {
+    font-size: 14px;
+    font-weight: bold;
+}
+
+.rp-browser-item-date {
+    font-size: 11px;
+    opacity: 0.6;
+}
+
+.rp-browser-item-delete {
+    margin-left: auto;
+    font-size: 12px;
+    opacity: 0.4;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.rp-browser-item-delete:hover { opacity: 1; color: #f44; }
+
+.confirming {
+    color: #f44 !important;
+    border-color: #f44 !important;
 }
 
 .rp-center-tabs {
