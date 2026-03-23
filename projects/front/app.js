@@ -442,6 +442,120 @@ async function rpImportCardPng(file) {
 }
 
 
+// ===== RP: Center (Tab Manager) =====
+
+const rpCenter = {
+    container: null,
+    tabBar: null,
+    contentArea: null,
+
+    render() {
+        const root = el('div', { class: 'rp-center' });
+        this.container = root;
+        this.tabBar = el('div', { class: 'rp-center-tabs' });
+        this.contentArea = el('div', { class: 'rp-center-content' });
+        root.appendChild(this.tabBar);
+        root.appendChild(this.contentArea);
+        this.renderTabs();
+        this.renderContent();
+        return root;
+    },
+
+    renderTabs() {
+        this.tabBar.textContent = '';
+        rpState.openTabs.forEach(t => {
+            const label = this.getTabLabel(t.type, t.id);
+            const tab = el('div', {
+                class: 'rp-center-tab' + (rpState.activeTab === t ? ' active' : ''),
+            });
+            tab.appendChild(el('span', {}, label));
+            const closeBtn = el('span', { class: 'rp-center-tab-close' }, '\u2715');
+            closeBtn.addEventListener('click', (e) => { e.stopPropagation(); this.closeTab(t.type, t.id); });
+            tab.appendChild(closeBtn);
+            tab.addEventListener('click', () => {
+                rpState.activeTab = t;
+                this.renderTabs();
+                this.renderContent();
+            });
+            this.tabBar.appendChild(tab);
+        });
+    },
+
+    getTabLabel(type, id) {
+        if (type === 'chat') {
+            const conv = rpState.conversations.find(c => c.id === id);
+            if (conv) {
+                const aiCard = rpState.cards.find(c => c.id === conv.ai_card_id);
+                const aiData = aiCard ? (aiCard.card_data.data || aiCard.card_data) : null;
+                return aiData ? aiData.name : 'Chat #' + id;
+            }
+            return 'Chat #' + id;
+        }
+        if (type === 'card') {
+            if (id === null) return 'New Card';
+            const card = rpState.cards.find(c => c.id === id);
+            const data = card ? (card.card_data.data || card.card_data) : null;
+            return data ? data.name : 'Card #' + id;
+        }
+        if (type === 'scenario') {
+            if (id === null) return 'New Scenario';
+            const s = rpState.scenarios.find(x => x.id === id);
+            return s ? s.name : 'Scenario #' + id;
+        }
+        return 'Tab';
+    },
+
+    renderContent() {
+        this.contentArea.textContent = '';
+        const tab = rpState.activeTab;
+        if (!tab) {
+            this.contentArea.appendChild(el('div', { class: 'rp-placeholder' }, 'Select an item from the browser'));
+            return;
+        }
+        if (tab.type === 'chat') {
+            if (typeof rpChat !== 'undefined') rpChat.render(this.contentArea, tab.id);
+            else this.contentArea.appendChild(el('div', { class: 'rp-placeholder' }, 'Chat view (coming soon)'));
+        } else if (tab.type === 'card') {
+            if (typeof rpCards !== 'undefined') rpCards.renderEditor(this.contentArea, tab.id);
+            else this.contentArea.appendChild(el('div', { class: 'rp-placeholder' }, 'Card editor (coming soon)'));
+        } else if (tab.type === 'scenario') {
+            if (typeof rpScenarios !== 'undefined') rpScenarios.renderEditor(this.contentArea, tab.id);
+            else this.contentArea.appendChild(el('div', { class: 'rp-placeholder' }, 'Scenario editor (coming soon)'));
+        } else if (tab.type === 'card-gen') {
+            if (typeof rpCards !== 'undefined') rpCards.renderGenerator(this.contentArea);
+            else this.contentArea.appendChild(el('div', { class: 'rp-placeholder' }, 'Card generator (coming soon)'));
+        }
+    },
+
+    openTab(type, id) {
+        let existing = rpState.openTabs.find(t => t.type === type && t.id === id);
+        if (!existing) {
+            existing = { type, id };
+            rpState.openTabs.push(existing);
+        }
+        rpState.activeTab = existing;
+        this.renderTabs();
+        this.renderContent();
+    },
+
+    closeTab(type, id) {
+        rpState.openTabs = rpState.openTabs.filter(t => !(t.type === type && t.id === id));
+        if (rpState.activeTab && rpState.activeTab.type === type && rpState.activeTab.id === id) {
+            rpState.activeTab = rpState.openTabs.length > 0 ? rpState.openTabs[rpState.openTabs.length - 1] : null;
+        }
+        rpState.emit('tab-closed', { type, id });
+        this.renderTabs();
+        this.renderContent();
+    },
+};
+
+// Wire events to center
+rpState.on('conv-opened', id => rpCenter.openTab('chat', id));
+rpState.on('card-opened', id => rpCenter.openTab('card', id));
+rpState.on('scenario-opened', id => rpCenter.openTab('scenario', id));
+rpState.on('card-generate-requested', () => rpCenter.openTab('card-gen', 'generator'));
+
+
 // ===== App (tabs, polling, master tab) =====
 
 const app = {

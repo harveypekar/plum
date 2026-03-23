@@ -472,13 +472,35 @@ body {
 .rp-center-tab:hover { background: var(--accent-dark); }
 .rp-center-tab.active { background: var(--accent-dark); border-color: var(--accent); }
 
-.rp-center-tab .close {
+.rp-center-tab-close {
     font-size: 12px;
-    opacity: 0.6;
+    opacity: 0.4;
     cursor: pointer;
+    margin-left: 2px;
 }
 
-.rp-center-tab .close:hover { opacity: 1; }
+.rp-center-tab-close:hover { opacity: 1; color: #f44; }
+
+.rp-center {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.rp-center-content {
+    flex: 1;
+    overflow: hidden;
+    min-height: 0;
+}
+
+.rp-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    font-size: 16px;
+    opacity: 0.5;
+}
 
 .rp-chat-container {
     display: flex;
