@@ -118,7 +118,7 @@ def test_search_fewshot_examples_returns_list():
 
     with patch.object(db, "get_pool", AsyncMock(return_value=mock_pool)):
         embedding = [0.1, 0.2, 0.3]
-        result = asyncio.run(db.search_fewshot_examples(embedding, limit=1))
+        result = asyncio.run(db.search_fewshot_examples(embedding, card_id=5, limit=1))
 
     assert result == [row_dict]
     mock_pool.fetch.assert_called_once()
@@ -126,6 +126,7 @@ def test_search_fewshot_examples_returns_list():
     # Embedding should be passed as a string
     assert call_args[0][1] == "[0.1,0.2,0.3]"
     assert call_args[0][2] == 1
+    assert call_args[0][3] == 5
 
 
 def test_search_fewshot_examples_embedding_format():
@@ -133,11 +134,12 @@ def test_search_fewshot_examples_embedding_format():
     mock_pool = _make_pool(fetch_return=[])
 
     with patch.object(db, "get_pool", AsyncMock(return_value=mock_pool)):
-        asyncio.run(db.search_fewshot_examples([1.0, -0.5, 0.0], limit=2))
+        asyncio.run(db.search_fewshot_examples([1.0, -0.5, 0.0], card_id=3, limit=2))
 
     call_args = mock_pool.fetch.call_args[0]
     assert call_args[1] == "[1.0,-0.5,0.0]"
     assert call_args[2] == 2
+    assert call_args[3] == 3
 
 
 def test_add_fewshot_example_returns_dict():
@@ -152,18 +154,22 @@ def test_add_fewshot_example_returns_dict():
 
     with patch.object(db, "get_pool", AsyncMock(return_value=mock_pool)):
         result = asyncio.run(db.add_fewshot_example(
+            card_id=5,
             scene_context="forest",
             user_message="hello",
             assistant_message="world",
             embedding=[0.1, 0.2],
+            model="qwen3:8b",
             token_estimate=100,
         ))
 
     assert result == fake_row
     mock_pool.fetchrow.assert_called_once()
     call_args = mock_pool.fetchrow.call_args[0]
-    # 4th positional arg (index 4) is the embedding string
-    assert call_args[4] == "[0.1,0.2]"
+    # 1st positional arg is card_id, 5th is the embedding string
+    assert call_args[1] == 5
+    assert call_args[5] == "[0.1,0.2]"
+    assert call_args[6] == "qwen3:8b"
 
 
 def test_add_fewshot_example_embedding_format():
@@ -176,10 +182,14 @@ def test_add_fewshot_example_embedding_format():
     mock_pool = _make_pool(fetchrow_return=fake_row)
 
     with patch.object(db, "get_pool", AsyncMock(return_value=mock_pool)):
-        asyncio.run(db.add_fewshot_example("s", "u", "a", [0.5, 0.25, 0.75], 0))
+        asyncio.run(db.add_fewshot_example(
+            card_id=1, scene_context="s", user_message="u",
+            assistant_message="a", embedding=[0.5, 0.25, 0.75],
+            model="test", token_estimate=0,
+        ))
 
     call_args = mock_pool.fetchrow.call_args[0]
-    assert call_args[4] == "[0.5,0.25,0.75]"
+    assert call_args[5] == "[0.5,0.25,0.75]"
 
 
 def test_count_fewshot_examples_returns_int():
@@ -192,6 +202,20 @@ def test_count_fewshot_examples_returns_int():
     assert result == 7
     mock_pool.fetchval.assert_called_once_with(
         "SELECT COUNT(*) FROM rp_fewshot_examples WHERE active"
+    )
+
+
+def test_count_fewshot_examples_with_card_id():
+    """count_fewshot_examples(card_id) filters by card."""
+    mock_pool = _make_pool(fetchval_return=3)
+
+    with patch.object(db, "get_pool", AsyncMock(return_value=mock_pool)):
+        result = asyncio.run(db.count_fewshot_examples(card_id=5))
+
+    assert result == 3
+    mock_pool.fetchval.assert_called_once_with(
+        "SELECT COUNT(*) FROM rp_fewshot_examples WHERE active AND card_id = $1",
+        5,
     )
 
 
@@ -228,7 +252,7 @@ def test_get_fewshot_messages_returns_pairs():
     ]
 
     with patch("projects.rp.db.search_fewshot_examples", AsyncMock(return_value=examples)):
-        result = asyncio.run(get_fewshot_messages(ollama, messages))
+        result = asyncio.run(get_fewshot_messages(ollama, messages, card_id=5))
 
     assert result == [
         {"role": "user", "content": "Good day"},
@@ -238,12 +262,26 @@ def test_get_fewshot_messages_returns_pairs():
     ]
 
 
+def test_get_fewshot_messages_no_card_id():
+    """get_fewshot_messages() returns [] when card_id is None."""
+    ollama = _make_ollama()
+    messages = [
+        {"role": "user", "content": "Hello"},
+        {"role": "assistant", "content": "Hi"},
+    ]
+
+    result = asyncio.run(get_fewshot_messages(ollama, messages, card_id=None))
+
+    assert result == []
+    ollama.embed.assert_not_called()
+
+
 def test_get_fewshot_messages_too_few_messages():
     """get_fewshot_messages() returns [] when conversation has fewer than 2 messages."""
     ollama = _make_ollama()
 
-    result_zero = asyncio.run(get_fewshot_messages(ollama, []))
-    result_one = asyncio.run(get_fewshot_messages(ollama, [{"role": "user", "content": "hi"}]))
+    result_zero = asyncio.run(get_fewshot_messages(ollama, [], card_id=5))
+    result_one = asyncio.run(get_fewshot_messages(ollama, [{"role": "user", "content": "hi"}], card_id=5))
 
     assert result_zero == []
     assert result_one == []
@@ -259,7 +297,7 @@ def test_get_fewshot_messages_no_results():
     ]
 
     with patch("projects.rp.db.search_fewshot_examples", AsyncMock(return_value=[])):
-        result = asyncio.run(get_fewshot_messages(ollama, messages))
+        result = asyncio.run(get_fewshot_messages(ollama, messages, card_id=5))
 
     assert result == []
 
@@ -273,7 +311,7 @@ def test_get_fewshot_messages_error_returns_empty():
         {"role": "assistant", "content": "Hi"},
     ]
 
-    result = asyncio.run(get_fewshot_messages(ollama, messages))
+    result = asyncio.run(get_fewshot_messages(ollama, messages, card_id=5))
 
     assert result == []
 
@@ -289,7 +327,7 @@ def test_get_fewshot_messages_extracts_correct_context():
     ]
 
     with patch("projects.rp.db.search_fewshot_examples", AsyncMock(return_value=[])):
-        asyncio.run(get_fewshot_messages(ollama, messages))
+        asyncio.run(get_fewshot_messages(ollama, messages, card_id=5))
 
     expected_summary = "Second user message\nSecond assistant response"
     ollama.embed.assert_called_once_with("nomic-embed-text", expected_summary)

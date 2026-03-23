@@ -7,14 +7,15 @@ _log = logging.getLogger(__name__)
 EMBED_MODEL = "nomic-embed-text"
 
 
-async def get_fewshot_messages(ollama, messages: list[dict]) -> list[dict]:
+async def get_fewshot_messages(ollama, messages: list[dict],
+                               card_id: int | None = None) -> list[dict]:
     """Retrieve few-shot example messages based on vector similarity to the current conversation.
 
     Returns a flat list of alternating user/assistant message dicts, or [] on
     any failure (never blocks RP generation).
     """
     try:
-        if len(messages) < 2:
+        if len(messages) < 2 or card_id is None:
             return []
 
         last_user = next(
@@ -31,7 +32,7 @@ async def get_fewshot_messages(ollama, messages: list[dict]) -> list[dict]:
 
         embedding = await ollama.embed(EMBED_MODEL, scene_summary)
 
-        examples = await db.search_fewshot_examples(embedding, limit=2)
+        examples = await db.search_fewshot_examples(embedding, card_id, limit=2)
 
         if not examples:
             return []
