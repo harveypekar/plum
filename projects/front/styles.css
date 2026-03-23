@@ -1,3 +1,17 @@
+:root {
+    --accent: #0f0;
+    --accent-bg: #001a00;
+    --accent-dark: #002200;
+    --accent-dim: #003300;
+}
+
+.theme-amber {
+    --accent: #ffbf00;
+    --accent-bg: #1a1200;
+    --accent-dark: #221900;
+    --accent-dim: #332600;
+}
+
 * {
     margin: 0;
     padding: 0;
@@ -6,7 +20,7 @@
 
 body {
     background: #000;
-    color: #0f0;
+    color: var(--accent);
     font-family: monospace;
     font-size: 18px;
     line-height: 1.4;
@@ -21,14 +35,14 @@ body {
     display: flex;
     gap: 20px;
     margin-bottom: 20px;
-    border-bottom: 3px solid #0f0;
+    border-bottom: 3px solid var(--accent);
     padding-bottom: 10px;
 }
 
 .tab-btn {
     background: #000;
-    color: #0f0;
-    border: 2px solid #0f0;
+    color: var(--accent);
+    border: 2px solid var(--accent);
     padding: 10px 20px;
     font-size: 18px;
     font-family: monospace;
@@ -36,8 +50,8 @@ body {
     font-weight: bold;
 }
 
-.tab-btn:hover { background: #0f0; color: #000; }
-.tab-btn.active { background: #0f0; color: #000; }
+.tab-btn:hover { background: var(--accent); color: #000; }
+.tab-btn.active { background: var(--accent); color: #000; }
 
 .tab-content { display: none; }
 .tab-content.active { display: block; height: calc(100vh - 100px); }
@@ -51,9 +65,9 @@ body {
 }
 
 .service-card {
-    border: 3px solid #0f0;
+    border: 3px solid var(--accent);
     padding: 20px;
-    background: #001a00;
+    background: var(--accent-bg);
 }
 
 .service-card.stopped { border-color: #f00; }
@@ -69,13 +83,13 @@ body {
     margin-bottom: 15px;
 }
 
-.status-running { color: #0f0; }
+.status-running { color: var(--accent); }
 .status-stopped { color: #f00; }
 .status-unknown { color: #888; }
 
 .restart-btn,
 .inline-restart-btn {
-    background: #0f0;
+    background: var(--accent);
     color: #000;
     border: none;
     padding: 5px 10px;
@@ -91,7 +105,7 @@ body {
 
 .logs-section {
     margin-top: 15px;
-    border-top: 2px solid #0f0;
+    border-top: 2px solid var(--accent);
     padding-top: 10px;
 }
 
@@ -102,7 +116,7 @@ body {
 
 .logs {
     background: #000;
-    color: #0f0;
+    color: var(--accent);
     padding: 10px;
     height: 150px;
     overflow-y: auto;
@@ -137,14 +151,14 @@ body {
 
 /* Resize handles */
 .dock-handle {
-    background: #003300;
+    background: var(--accent-dim);
     z-index: 10;
     flex-shrink: 0;
 }
 
 .dock-handle-h { cursor: row-resize; height: 4px; }
 .dock-handle-v { cursor: col-resize; width: 4px; }
-.dock-handle:hover, .dock-handle.dragging { background: #0f0; }
+.dock-handle:hover, .dock-handle.dragging { background: var(--accent); }
 
 /* Middle row */
 .dock-middle {
@@ -155,8 +169,8 @@ body {
 
 /* Panel */
 .dock-panel {
-    background: #001a00;
-    border: 2px solid #0f0;
+    background: var(--accent-bg);
+    border: 2px solid var(--accent);
     display: flex;
     flex-direction: column;
     min-height: 0;
@@ -171,8 +185,8 @@ body {
     justify-content: space-between;
     align-items: center;
     padding: 4px 8px;
-    background: #002200;
-    border-bottom: 1px solid #0f0;
+    background: var(--accent-dark);
+    border-bottom: 1px solid var(--accent);
     flex-shrink: 0;
     user-select: none;
     cursor: grab;
@@ -193,8 +207,8 @@ body {
 
 .dock-toggle {
     background: none;
-    border: 1px solid #0f0;
-    color: #0f0;
+    border: 1px solid var(--accent);
+    color: var(--accent);
     font-family: monospace;
     font-size: 14px;
     width: 22px;
@@ -206,7 +220,7 @@ body {
     line-height: 1;
 }
 
-.dock-toggle:hover { background: #0f0; color: #000; }
+.dock-toggle:hover { background: var(--accent); color: #000; }
 
 .dock-panel-body {
     flex: 1;
@@ -223,8 +237,8 @@ body {
     min-height: 0;
     min-width: 0;
     overflow: hidden;
-    border: 2px solid #0f0;
-    background: #001a00;
+    border: 2px solid var(--accent);
+    background: var(--accent-bg);
     position: relative;
 }
 
@@ -274,15 +288,23 @@ body {
     background: rgba(0, 255, 0, 0.08);
 }
 
+.theme-amber .dock-drop-overlay.active .dock-drop-zone {
+    background: rgba(255, 191, 0, 0.08);
+}
+
 .dock-drop-zone.hover {
     background: rgba(0, 255, 0, 0.25);
-    border-color: #0f0;
+    border-color: var(--accent);
+}
+
+.theme-amber .dock-drop-zone.hover {
+    background: rgba(255, 191, 0, 0.25);
 }
 
 .dock-drop-zone-label {
     font-size: 14px;
     font-weight: bold;
-    color: #0f0;
+    color: var(--accent);
     text-transform: uppercase;
     opacity: 0;
     transition: opacity 0.15s;
@@ -300,8 +322,8 @@ body {
     position: fixed;
     z-index: 200;
     pointer-events: none;
-    background: #001a00;
-    border: 2px solid #0f0;
+    background: var(--accent-bg);
+    border: 2px solid var(--accent);
     padding: 4px 12px;
     font-size: 14px;
     font-weight: bold;
@@ -311,6 +333,655 @@ body {
 
 /* Iframe blocking during drag */
 #dock-layout.dragging iframe { pointer-events: none; }
+
+/* ===== RP-Specific Styles ===== */
+
+.rp-browser-tabs {
+    display: flex;
+    gap: 2px;
+    padding: 4px 4px 0;
+    background: var(--accent-dark);
+    border-bottom: 1px solid var(--accent);
+}
+
+.rp-browser-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 4px;
+}
+
+.rp-browser-item {
+    padding: 6px 8px;
+    cursor: pointer;
+    border: 1px solid transparent;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.rp-browser-item:hover {
+    background: var(--accent-dark);
+    border-color: var(--accent-dim);
+}
+
+.rp-browser-tab {
+    background: var(--accent-bg);
+    color: var(--accent);
+    border: 1px solid var(--accent-dim);
+    border-bottom: none;
+    padding: 4px 10px;
+    font-family: monospace;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.rp-browser-tab:hover { background: var(--accent-dark); }
+.rp-browser-tab.active { background: var(--accent-dark); border-color: var(--accent); }
+
+.rp-browser-actions {
+    display: flex;
+    gap: 4px;
+    padding: 4px;
+}
+
+.rp-browser-actions button {
+    background: var(--accent-bg);
+    color: var(--accent);
+    border: 1px solid var(--accent-dim);
+    padding: 3px 8px;
+    font-family: monospace;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.rp-browser-actions button:hover { background: var(--accent-dark); }
+
+.rp-card-avatar-small {
+    width: 28px;
+    height: 28px;
+    border-radius: 4px;
+    object-fit: cover;
+    flex-shrink: 0;
+}
+
+.rp-drop-zone {
+    margin: 4px;
+    padding: 12px 8px;
+    border: 2px dashed var(--accent-dim);
+    text-align: center;
+    font-size: 12px;
+    cursor: pointer;
+    color: var(--accent);
+    opacity: 0.7;
+}
+
+.rp-drop-zone:hover { opacity: 1; border-color: var(--accent); }
+.rp-drop-zone.dragover { background: var(--accent-dark); border-color: var(--accent); opacity: 1; }
+
+.rp-browser-item-name {
+    font-size: 14px;
+    font-weight: bold;
+}
+
+.rp-browser-item-date {
+    font-size: 11px;
+    opacity: 0.6;
+}
+
+.rp-browser-item-delete {
+    margin-left: auto;
+    font-size: 12px;
+    opacity: 0.4;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.rp-browser-item-delete:hover { opacity: 1; color: #f44; }
+
+.confirming {
+    color: #f44 !important;
+    border-color: #f44 !important;
+}
+
+.rp-center-tabs {
+    display: flex;
+    gap: 2px;
+    padding: 4px 4px 0;
+    background: var(--accent-dark);
+    border-bottom: 1px solid var(--accent);
+    overflow-x: auto;
+    flex-shrink: 0;
+}
+
+.rp-center-tab {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    background: var(--accent-bg);
+    border: 1px solid var(--accent-dim);
+    border-bottom: none;
+    color: var(--accent);
+    font-family: monospace;
+    font-size: 13px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.rp-center-tab:hover { background: var(--accent-dark); }
+.rp-center-tab.active { background: var(--accent-dark); border-color: var(--accent); }
+
+.rp-center-tab-close {
+    font-size: 12px;
+    opacity: 0.4;
+    cursor: pointer;
+    margin-left: 2px;
+}
+
+.rp-center-tab-close:hover { opacity: 1; color: #f44; }
+
+.rp-center {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.rp-center-content {
+    flex: 1;
+    overflow: hidden;
+    min-height: 0;
+}
+
+.rp-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    font-size: 16px;
+    opacity: 0.5;
+}
+
+.rp-chat-container {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.rp-chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px;
+    min-height: 0;
+}
+
+.rp-avatar-strip {
+    width: 60px;
+    flex-shrink: 0;
+    background: var(--accent-dark);
+    border-left: 1px solid var(--accent-dim);
+    overflow-y: auto;
+    padding: 4px;
+}
+
+.rp-msg {
+    margin-bottom: 12px;
+    padding: 4px 8px;
+}
+
+.rp-msg.user {
+    text-align: left;
+}
+
+.rp-msg.assistant {
+    text-align: right;
+}
+
+.rp-input-area {
+    display: flex;
+    gap: 6px;
+    padding: 8px;
+    border-top: 1px solid var(--accent);
+    background: var(--accent-dark);
+    flex-shrink: 0;
+}
+
+.rp-input-area textarea {
+    flex: 1;
+    background: #000;
+    color: var(--accent);
+    border: 1px solid var(--accent-dim);
+    font-family: monospace;
+    font-size: 14px;
+    padding: 6px;
+    resize: none;
+}
+
+.rp-input-area button {
+    background: var(--accent);
+    color: #000;
+    border: none;
+    padding: 6px 12px;
+    font-family: monospace;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.rp-input-area button:hover { opacity: 0.8; }
+
+.rp-form {
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    overflow-y: auto;
+    height: 100%;
+}
+
+.rp-form-title {
+    font-size: 18px;
+    font-weight: bold;
+    margin-bottom: 12px;
+    text-transform: uppercase;
+}
+
+.rp-card-avatar-preview {
+    width: 80px;
+    height: 80px;
+    border-radius: 8px;
+    object-fit: cover;
+    cursor: pointer;
+    border: 2px solid var(--accent-dim);
+    margin-bottom: 12px;
+}
+
+.rp-form-field {
+    margin-bottom: 12px;
+}
+
+.rp-form label,
+.rp-form-field label {
+    display: block;
+    font-size: 12px;
+    font-weight: bold;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    opacity: 0.7;
+}
+
+.rp-form input,
+.rp-form textarea,
+.rp-form select,
+.rp-form-field textarea,
+.rp-form-field input,
+.rp-form-field select {
+    width: 100%;
+    background: var(--accent-bg);
+    color: var(--accent);
+    border: 1px solid var(--accent-dim);
+    padding: 6px 8px;
+    font-family: monospace;
+    font-size: 14px;
+    resize: vertical;
+}
+
+.rp-form-inline-btn {
+    margin-top: 4px;
+    font-size: 12px;
+    background: none;
+    color: var(--accent);
+    border: 1px solid var(--accent-dim);
+    padding: 2px 8px;
+    font-family: monospace;
+    cursor: pointer;
+}
+
+.rp-form-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 16px;
+    flex-wrap: wrap;
+}
+
+.rp-form-actions button {
+    background: none;
+    color: var(--accent);
+    border: 1px solid var(--accent-dim);
+    padding: 6px 14px;
+    font-family: monospace;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.rp-form-actions button:hover {
+    background: var(--accent-bg);
+}
+
+.rp-form-delete {
+    color: #f44 !important;
+    border-color: #f44 !important;
+}
+
+.rp-form-status {
+    font-size: 12px;
+    opacity: 0.7;
+    line-height: 28px;
+}
+
+.rp-card-gen-field-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+}
+
+.rp-card-gen-field-header button {
+    background: none;
+    color: var(--accent);
+    border: 1px solid var(--accent-dim);
+    padding: 2px 8px;
+    font-family: monospace;
+    font-size: 11px;
+    cursor: pointer;
+}
+
+.rp-card-gen-field-instructions {
+    display: none;
+    gap: 4px;
+    margin-top: 4px;
+}
+
+.rp-card-gen-field-instructions.open {
+    display: flex;
+}
+
+.rp-card-gen-field-instructions input {
+    flex: 1;
+}
+
+.rp-card-gen-field-instructions button {
+    background: none;
+    color: var(--accent);
+    border: 1px solid var(--accent-dim);
+    padding: 2px 8px;
+    font-family: monospace;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.rp-modal {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.rp-modal > div,
+.rp-modal-content {
+    background: var(--accent-bg);
+    border: 2px solid var(--accent);
+    padding: 20px;
+    min-width: 400px;
+    max-width: 600px;
+}
+
+.rp-modal-content select {
+    width: 100%;
+    padding: 6px 8px;
+    background: var(--accent-bg);
+    color: var(--accent);
+    border: 1px solid var(--accent-dim);
+    font-family: monospace;
+    font-size: 13px;
+}
+
+.dialogue-quote-user {
+    color: var(--accent);
+    font-style: italic;
+}
+
+.dialogue-quote-assistant {
+    color: var(--accent);
+    opacity: 0.85;
+    font-style: italic;
+}
+
+.rp-chat-wrapper {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.rp-chat-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--accent);
+    flex-shrink: 0;
+}
+
+.rp-chat-header-name {
+    font-size: 16px;
+    font-weight: bold;
+}
+
+.rp-chat-header-meta {
+    font-size: 12px;
+    opacity: 0.6;
+}
+
+.rp-chat-actions {
+    display: flex;
+    gap: 4px;
+    margin-left: auto;
+}
+
+.rp-chat-actions button {
+    background: var(--accent-bg);
+    color: var(--accent);
+    border: 1px solid var(--accent-dim);
+    padding: 3px 8px;
+    font-family: monospace;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.rp-chat-actions button:hover { background: var(--accent-dark); }
+
+.rp-msg-bubble {
+    display: inline-block;
+    max-width: 90%;
+    padding: 8px 12px;
+    border: 1px solid var(--accent-dim);
+    background: var(--accent-bg);
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    font-size: 14px;
+    line-height: 1.5;
+    text-align: left;
+}
+
+.rp-msg-hover-actions {
+    display: none;
+    gap: 4px;
+    margin-top: 4px;
+}
+
+.rp-msg:hover .rp-msg-hover-actions { display: flex; }
+
+.rp-msg-hover-actions button {
+    background: var(--accent-bg);
+    color: var(--accent);
+    border: 1px solid var(--accent-dim);
+    padding: 2px 6px;
+    font-family: monospace;
+    font-size: 11px;
+    cursor: pointer;
+}
+
+.rp-msg-hover-actions button:hover { background: var(--accent-dark); }
+
+.rp-msg-sequence {
+    font-size: 10px;
+    opacity: 0.3;
+    margin-top: 2px;
+}
+
+.rp-msg-edit-textarea {
+    display: block;
+    width: 100%;
+    max-width: 90%;
+    padding: 8px 12px;
+    background: var(--accent-bg);
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    font-family: monospace;
+    font-size: 14px;
+    line-height: 1.5;
+    resize: vertical;
+    min-height: 80px;
+    white-space: pre-wrap;
+}
+
+.rp-chat-banner {
+    padding: 8px;
+    border: 1px solid var(--accent-dim);
+    margin-bottom: 12px;
+    font-style: italic;
+    opacity: 0.8;
+}
+
+.rp-chat-banner-label {
+    font-size: 11px;
+    font-weight: bold;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+}
+
+.rp-avatar-img {
+    width: 50px;
+    height: 50px;
+    border-radius: 8px;
+    object-fit: cover;
+    margin-bottom: 4px;
+}
+
+.rp-msg-thinking {
+    margin-bottom: 4px;
+}
+
+.rp-msg-thinking-toggle {
+    font-size: 12px;
+    cursor: pointer;
+    opacity: 0.6;
+}
+
+.rp-msg-thinking-toggle:hover { opacity: 1; }
+
+.rp-msg-thinking-content {
+    font-size: 12px;
+    opacity: 0.5;
+    white-space: pre-wrap;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.rp-msg-thinking-content.collapsed { display: none; }
+
+.streaming-cursor::after {
+    content: '';
+    display: inline-block;
+    width: 8px;
+    height: 1em;
+    background: var(--accent);
+    animation: blink-cursor 0.7s step-end infinite;
+    vertical-align: text-bottom;
+}
+
+@keyframes blink-cursor {
+    50% { opacity: 0; }
+}
+
+.rp-error {
+    color: #f44;
+    font-size: 13px;
+    padding: 4px 8px;
+}
+
+.rp-form-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.rp-form-hint {
+    font-size: 11px;
+    opacity: 0.6;
+}
+
+.rp-form-numeric-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 8px;
+}
+
+.rp-form-numeric-row input {
+    width: 100%;
+}
+
+/* Scene State Panel */
+.rp-scene-state-area {
+    width: 100%;
+    height: 80px;
+    background: var(--accent-bg);
+    color: var(--accent);
+    border: 1px solid var(--accent-dim);
+    padding: 6px 8px;
+    font-family: monospace;
+    font-size: 13px;
+    resize: vertical;
+}
+
+/* Under the Hood Panel */
+.rp-under-hood-tabs {
+    display: flex;
+    gap: 2px;
+    margin-bottom: 4px;
+}
+
+.rp-under-hood-tab {
+    padding: 2px 8px;
+    font-size: 11px;
+    background: transparent;
+    color: var(--accent);
+    border: 1px solid var(--accent-dim);
+    cursor: pointer;
+    opacity: 0.6;
+}
+
+.rp-under-hood-tab:hover { opacity: 0.8; }
+.rp-under-hood-tab.active {
+    opacity: 1;
+    border-color: var(--accent);
+    background: var(--accent-dark);
+}
+
+.rp-under-hood-pre {
+    font-size: 12px;
+    white-space: pre-wrap;
+    word-break: break-all;
+    overflow-y: auto;
+    max-height: 300px;
+    color: var(--accent);
+    opacity: 0.8;
+    margin: 0;
+    padding: 4px;
+}
 
 /* Responsive */
 @media (max-width: 1200px) {
