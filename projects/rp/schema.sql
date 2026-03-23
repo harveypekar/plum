@@ -45,6 +45,12 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_column THEN NULL;
 END $$;
 
+-- Migration: track which message the scene state was last generated from
+DO $$ BEGIN
+    ALTER TABLE rp_conversations ADD COLUMN scene_state_msg_id INTEGER DEFAULT NULL;
+EXCEPTION WHEN duplicate_column THEN NULL;
+END $$;
+
 CREATE TABLE IF NOT EXISTS rp_messages (
     id              SERIAL PRIMARY KEY,
     conversation_id INTEGER NOT NULL REFERENCES rp_conversations(id) ON DELETE CASCADE,
