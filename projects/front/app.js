@@ -51,7 +51,100 @@ const PANELS = {
     'rp-browser': {
         id: 'rp-browser',
         title: 'RP Browser',
-        render() { return el('div', { id: 'rp-browser-root' }, 'Loading...'); },
+        render() {
+            const root = el('div', { id: 'rp-browser-root' });
+
+            // Tab bar
+            const tabs = el('div', { class: 'rp-browser-tabs' });
+            const tabNames = ['Chats', 'Cards', 'Scenarios'];
+            const lists = {};
+
+            tabNames.forEach(name => {
+                const btn = el('button', { class: 'rp-browser-tab' + (name === 'Chats' ? ' active' : '') }, name);
+                btn.addEventListener('click', () => {
+                    tabs.querySelectorAll('.rp-browser-tab').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    Object.values(lists).forEach(l => l.style.display = 'none');
+                    lists[name].style.display = '';
+                });
+                tabs.appendChild(btn);
+            });
+            root.appendChild(tabs);
+
+            // Chats list
+            const chatsContainer = el('div', {});
+            const chatsActions = el('div', { class: 'rp-browser-actions' });
+            const newChatBtn = el('button', {}, '+ New');
+            newChatBtn.addEventListener('click', () => rpState.emit('new-chat-requested'));
+            chatsActions.appendChild(newChatBtn);
+            chatsContainer.appendChild(chatsActions);
+            const chatsList = el('div', { class: 'rp-browser-list', id: 'rp-chats-list' });
+            chatsContainer.appendChild(chatsList);
+            lists['Chats'] = chatsContainer;
+            root.appendChild(chatsContainer);
+
+            // Cards list
+            const cardsContainer = el('div', {});
+            cardsContainer.style.display = 'none';
+
+            // Drop zone for SillyTavern PNG import
+            const dropZone = el('div', { class: 'rp-drop-zone' }, 'Drop SillyTavern PNG here or click to import');
+            const filePicker = document.createElement('input');
+            filePicker.type = 'file';
+            filePicker.accept = '.png';
+            filePicker.style.display = 'none';
+            dropZone.addEventListener('click', () => filePicker.click());
+            dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+            dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+            dropZone.addEventListener('drop', e => {
+                e.preventDefault();
+                dropZone.classList.remove('dragover');
+                if (e.dataTransfer.files.length > 0) rpImportCardPng(e.dataTransfer.files[0]);
+            });
+            filePicker.addEventListener('change', () => {
+                if (filePicker.files.length > 0) rpImportCardPng(filePicker.files[0]);
+                filePicker.value = '';
+            });
+            cardsContainer.appendChild(dropZone);
+
+            const cardsActions = el('div', { class: 'rp-browser-actions' });
+            const newCardBtn = el('button', {}, '+ New Card');
+            newCardBtn.addEventListener('click', () => rpState.emit('card-opened', null));
+            const genCardBtn = el('button', {}, 'Generate');
+            genCardBtn.addEventListener('click', () => rpState.emit('card-generate-requested'));
+            cardsActions.appendChild(newCardBtn);
+            cardsActions.appendChild(genCardBtn);
+            cardsContainer.appendChild(cardsActions);
+            const cardsList = el('div', { class: 'rp-browser-list', id: 'rp-cards-list' });
+            cardsContainer.appendChild(cardsList);
+            lists['Cards'] = cardsContainer;
+            root.appendChild(cardsContainer);
+
+            // Scenarios list
+            const scenariosContainer = el('div', {});
+            scenariosContainer.style.display = 'none';
+            const scenariosActions = el('div', { class: 'rp-browser-actions' });
+            const newScenarioBtn = el('button', {}, '+ New Scenario');
+            newScenarioBtn.addEventListener('click', () => rpState.emit('scenario-opened', null));
+            scenariosActions.appendChild(newScenarioBtn);
+            scenariosContainer.appendChild(scenariosActions);
+            const scenariosList = el('div', { class: 'rp-browser-list', id: 'rp-scenarios-list' });
+            scenariosContainer.appendChild(scenariosList);
+            lists['Scenarios'] = scenariosContainer;
+            root.appendChild(scenariosContainer);
+
+            // Render list contents
+            rpRenderChatsList(chatsList);
+            rpRenderCardsList(cardsList);
+            rpRenderScenariosList(scenariosList);
+
+            // Listen for changes
+            rpState.on('convs-changed', () => rpRenderChatsList(chatsList));
+            rpState.on('cards-changed', () => rpRenderCardsList(cardsList));
+            rpState.on('scenarios-changed', () => rpRenderScenariosList(scenariosList));
+
+            return root;
+        },
     },
     'rp-scene-state': {
         id: 'rp-scene-state',
@@ -233,6 +326,119 @@ function confirmAction(btn, onConfirm) {
         reset();
         onConfirm();
     }, { once: true });
+}
+
+
+// ===== RP: List Rendering =====
+
+function rpRenderChatsList(container) {
+    container.textContent = '';
+    for (const c of rpState.conversations) {
+        const aiCard = rpState.cards.find(card => card.id === c.ai_card_id);
+        const aiData = aiCard ? (aiCard.card_data.data || aiCard.card_data) : null;
+        const name = aiData ? aiData.name : 'Conv #' + c.id;
+
+        const item = el('div', { class: 'rp-browser-item' });
+        const info = el('div', {});
+        info.appendChild(el('div', { class: 'rp-browser-item-name' }, name));
+        info.appendChild(el('div', { class: 'rp-browser-item-date' }, rpTimeAgo(c.updated_at)));
+        item.appendChild(info);
+
+        const del = el('span', { class: 'rp-browser-item-delete' }, '\u2715');
+        del.addEventListener('click', e => {
+            e.stopPropagation();
+            confirmAction(del, async () => {
+                await rpApi('DELETE', '/rp/conversations/' + c.id);
+                rpLoadConversations();
+            });
+        });
+        item.appendChild(del);
+
+        item.addEventListener('click', () => rpState.emit('conv-opened', c.id));
+        container.appendChild(item);
+    }
+    if (rpState.conversations.length === 0) {
+        container.appendChild(el('div', { class: 'rp-browser-item' }, 'No conversations'));
+    }
+}
+
+function rpRenderCardsList(container) {
+    container.textContent = '';
+    for (const card of rpState.cards) {
+        const cardData = card.card_data.data || card.card_data;
+        const item = el('div', { class: 'rp-browser-item' });
+
+        const avatar = document.createElement('img');
+        avatar.className = 'rp-card-avatar-small';
+        avatar.alt = '';
+        if (card.has_avatar) {
+            avatar.src = '/rp/cards/' + card.id + '/avatar';
+        } else {
+            avatar.style.background = 'var(--accent-dim)';
+        }
+        item.appendChild(avatar);
+
+        item.appendChild(el('span', {}, cardData.name || card.name));
+
+        const del = el('span', { class: 'rp-browser-item-delete' }, '\u2715');
+        del.addEventListener('click', e => {
+            e.stopPropagation();
+            confirmAction(del, async () => {
+                await rpApi('DELETE', '/rp/cards/' + card.id);
+                rpLoadCards();
+            });
+        });
+        item.appendChild(del);
+
+        item.addEventListener('click', () => rpState.emit('card-opened', card.id));
+        container.appendChild(item);
+    }
+    if (rpState.cards.length === 0) {
+        container.appendChild(el('div', { class: 'rp-browser-item' }, 'No cards'));
+    }
+}
+
+function rpRenderScenariosList(container) {
+    container.textContent = '';
+    for (const s of rpState.scenarios) {
+        const item = el('div', { class: 'rp-browser-item' });
+        const info = el('div', {});
+        info.appendChild(el('div', { class: 'rp-browser-item-name' }, s.name));
+        if (s.description) {
+            const desc = s.description.substring(0, 80) + (s.description.length > 80 ? '...' : '');
+            info.appendChild(el('div', { class: 'rp-browser-item-date' }, desc));
+        }
+        item.appendChild(info);
+
+        const del = el('span', { class: 'rp-browser-item-delete' }, '\u2715');
+        del.addEventListener('click', e => {
+            e.stopPropagation();
+            confirmAction(del, async () => {
+                await rpApi('DELETE', '/rp/scenarios/' + s.id);
+                rpLoadScenarios();
+            });
+        });
+        item.appendChild(del);
+
+        item.addEventListener('click', () => rpState.emit('scenario-opened', s.id));
+        container.appendChild(item);
+    }
+    if (rpState.scenarios.length === 0) {
+        container.appendChild(el('div', { class: 'rp-browser-item' }, 'No scenarios'));
+    }
+}
+
+async function rpImportCardPng(file) {
+    const formData = new FormData();
+    formData.append('file', file);
+    try {
+        const resp = await fetch('/rp/cards/import', { method: 'POST', body: formData });
+        if (!resp.ok) throw new Error(await resp.text());
+        await resp.json();
+        rpLoadCards();
+    } catch (e) {
+        console.error('Import failed:', e.message);
+    }
 }
 
 
