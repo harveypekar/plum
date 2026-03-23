@@ -695,7 +695,7 @@ def setup(app: FastAPI, ollama, resolve_model=None):
             )
 
         # Vector-matched fewshot examples: inject style-similar examples
-        fewshot_msgs = await get_fewshot_messages(_ollama, ctx["messages"])
+        fewshot_msgs = await get_fewshot_messages(_ollama, ctx["messages"], card_id=conv["ai_card_id"])
         if fewshot_msgs and ctx["messages"]:
             _log.info("Injecting %d fewshot examples (vector-matched)", len(fewshot_msgs) // 2)
             # Prepend after greeting (messages[0]), before real conversation
