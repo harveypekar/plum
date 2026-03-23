@@ -526,24 +526,16 @@ body {
 }
 
 .rp-msg {
-    margin-bottom: 8px;
-    padding: 6px 10px;
-    border-radius: 4px;
-    font-size: 15px;
-    line-height: 1.5;
-    max-width: 85%;
+    margin-bottom: 12px;
+    padding: 4px 8px;
 }
 
 .rp-msg.user {
-    margin-left: auto;
-    background: var(--accent-dark);
-    border: 1px solid var(--accent-dim);
+    text-align: left;
 }
 
 .rp-msg.assistant {
-    margin-right: auto;
-    background: var(--accent-bg);
-    border: 1px solid var(--accent-dim);
+    text-align: right;
 }
 
 .rp-input-area {
@@ -631,7 +623,151 @@ body {
     font-style: italic;
 }
 
-.streaming-cursor {
+.rp-chat-wrapper {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.rp-chat-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--accent);
+    flex-shrink: 0;
+}
+
+.rp-chat-header-name {
+    font-size: 16px;
+    font-weight: bold;
+}
+
+.rp-chat-header-meta {
+    font-size: 12px;
+    opacity: 0.6;
+}
+
+.rp-chat-actions {
+    display: flex;
+    gap: 4px;
+    margin-left: auto;
+}
+
+.rp-chat-actions button {
+    background: var(--accent-bg);
+    color: var(--accent);
+    border: 1px solid var(--accent-dim);
+    padding: 3px 8px;
+    font-family: monospace;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.rp-chat-actions button:hover { background: var(--accent-dark); }
+
+.rp-msg-bubble {
+    display: inline-block;
+    max-width: 90%;
+    padding: 8px 12px;
+    border: 1px solid var(--accent-dim);
+    background: var(--accent-bg);
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    font-size: 14px;
+    line-height: 1.5;
+    text-align: left;
+}
+
+.rp-msg-hover-actions {
+    display: none;
+    gap: 4px;
+    margin-top: 4px;
+}
+
+.rp-msg:hover .rp-msg-hover-actions { display: flex; }
+
+.rp-msg-hover-actions button {
+    background: var(--accent-bg);
+    color: var(--accent);
+    border: 1px solid var(--accent-dim);
+    padding: 2px 6px;
+    font-family: monospace;
+    font-size: 11px;
+    cursor: pointer;
+}
+
+.rp-msg-hover-actions button:hover { background: var(--accent-dark); }
+
+.rp-msg-sequence {
+    font-size: 10px;
+    opacity: 0.3;
+    margin-top: 2px;
+}
+
+.rp-msg-edit-textarea {
+    display: block;
+    width: 100%;
+    max-width: 90%;
+    padding: 8px 12px;
+    background: var(--accent-bg);
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    font-family: monospace;
+    font-size: 14px;
+    line-height: 1.5;
+    resize: vertical;
+    min-height: 80px;
+    white-space: pre-wrap;
+}
+
+.rp-chat-banner {
+    padding: 8px;
+    border: 1px solid var(--accent-dim);
+    margin-bottom: 12px;
+    font-style: italic;
+    opacity: 0.8;
+}
+
+.rp-chat-banner-label {
+    font-size: 11px;
+    font-weight: bold;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+}
+
+.rp-avatar-img {
+    width: 50px;
+    height: 50px;
+    border-radius: 8px;
+    object-fit: cover;
+    margin-bottom: 4px;
+}
+
+.rp-msg-thinking {
+    margin-bottom: 4px;
+}
+
+.rp-msg-thinking-toggle {
+    font-size: 12px;
+    cursor: pointer;
+    opacity: 0.6;
+}
+
+.rp-msg-thinking-toggle:hover { opacity: 1; }
+
+.rp-msg-thinking-content {
+    font-size: 12px;
+    opacity: 0.5;
+    white-space: pre-wrap;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.rp-msg-thinking-content.collapsed { display: none; }
+
+.streaming-cursor::after {
+    content: '';
     display: inline-block;
     width: 8px;
     height: 1em;

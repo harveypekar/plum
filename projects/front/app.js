@@ -555,6 +555,484 @@ rpState.on('card-opened', id => rpCenter.openTab('card', id));
 rpState.on('scenario-opened', id => rpCenter.openTab('scenario', id));
 rpState.on('card-generate-requested', () => rpCenter.openTab('card-gen', 'generator'));
 
+// ===== RP: Chat Helpers =====
+
+function rpRenderDialogue(bubble, content, role) {
+    const quoteClass = role === 'user' ? 'dialogue-quote-user' : 'dialogue-quote-assistant';
+    const regex = /"([^"]+)"/g;
+    let lastIndex = 0;
+    let match;
+    while ((match = regex.exec(content)) !== null) {
+        if (match.index > lastIndex) {
+            bubble.appendChild(document.createTextNode(content.slice(lastIndex, match.index)));
+        }
+        const span = document.createElement('span');
+        span.className = quoteClass;
+        span.textContent = '\u201C' + match[1] + '\u201D';
+        bubble.appendChild(span);
+        lastIndex = regex.lastIndex;
+    }
+    if (lastIndex < content.length) {
+        bubble.appendChild(document.createTextNode(content.slice(lastIndex)));
+    }
+    if (lastIndex === 0) {
+        bubble.textContent = content;
+    }
+}
+
+function rpSetAvatarSrc(img, cardId, hasAvatar) {
+    if (hasAvatar) {
+        img.src = '/rp/cards/' + cardId + '/avatar';
+    } else {
+        img.style.background = 'var(--accent-dim)';
+    }
+}
+
+// ===== RP: Chat =====
+
+const rpChat = {
+    convId: null,
+    convDetail: null,
+    isStreaming: false,
+    abortController: null,
+    autoMode: false,
+    messagesContainer: null,
+
+    async render(container, convId) {
+        this.convId = convId;
+        container.textContent = '';
+
+        // Load conversation detail
+        try {
+            this.convDetail = await rpApi('GET', '/rp/conversations/' + convId);
+        } catch (e) {
+            container.appendChild(el('div', { class: 'rp-error' }, 'Failed to load conversation: ' + e.message));
+            return;
+        }
+
+        const detail = this.convDetail;
+        const { conversation, user_card, ai_card, scenario, messages } = detail;
+        const aiData = ai_card.card_data.data || ai_card.card_data;
+
+        // Build layout: header + body (messages + avatar strip) + input
+        const wrapper = el('div', { class: 'rp-chat-wrapper' });
+
+        // Header
+        const header = el('div', { class: 'rp-chat-header' });
+        const headerName = el('div', { class: 'rp-chat-header-name' }, aiData.name || ai_card.name);
+        const headerMeta = el('div', { class: 'rp-chat-header-meta' },
+            conversation.model + (scenario ? ' | ' + scenario.name : ''));
+        header.appendChild(headerName);
+        header.appendChild(headerMeta);
+
+        // Action buttons
+        const actions = el('div', { class: 'rp-chat-actions' });
+        const continueBtn = el('button', {}, 'Continue');
+        continueBtn.addEventListener('click', () => this.continueConversation());
+        const regenBtn = el('button', {}, 'Regenerate');
+        regenBtn.addEventListener('click', () => this.regenerateResponse());
+        const restartBtn = el('button', {}, 'Restart');
+        restartBtn.addEventListener('click', () => {
+            confirmAction(restartBtn, () => this.restartConversation());
+        });
+        const autoBtn = el('button', {}, 'Auto');
+        autoBtn.id = 'rp-auto-btn';
+        autoBtn.addEventListener('click', () => this.toggleAutoMode());
+        actions.appendChild(continueBtn);
+        actions.appendChild(regenBtn);
+        actions.appendChild(restartBtn);
+        actions.appendChild(autoBtn);
+        header.appendChild(actions);
+        wrapper.appendChild(header);
+
+        // Body: messages + avatar strip
+        const body = el('div', { class: 'rp-chat-container' });
+
+        // Messages
+        const msgs = el('div', { class: 'rp-chat-messages' });
+        this.messagesContainer = msgs;
+
+        // Scenario banner
+        if (scenario && scenario.description) {
+            const banner = el('div', { class: 'rp-chat-banner' });
+            banner.appendChild(el('div', { class: 'rp-chat-banner-label' }, 'Scenario'));
+            const bannerText = el('span', {});
+            rpRenderDialogue(bannerText, scenario.description, 'assistant');
+            banner.appendChild(bannerText);
+            msgs.appendChild(banner);
+        }
+
+        // Render existing messages
+        for (let i = 0; i < messages.length; i++) {
+            this.appendMessageBubble(msgs, messages[i], user_card, ai_card, i);
+        }
+        body.appendChild(msgs);
+
+        // Avatar strip
+        const strip = el('div', { class: 'rp-avatar-strip' });
+        const userAvatar = document.createElement('img');
+        userAvatar.className = 'rp-avatar-img';
+        rpSetAvatarSrc(userAvatar, user_card.id, user_card.has_avatar);
+        const aiAvatar = document.createElement('img');
+        aiAvatar.className = 'rp-avatar-img';
+        rpSetAvatarSrc(aiAvatar, ai_card.id, ai_card.has_avatar);
+        strip.appendChild(userAvatar);
+        strip.appendChild(aiAvatar);
+        body.appendChild(strip);
+        wrapper.appendChild(body);
+
+        // Input area
+        const inputArea = el('div', { class: 'rp-input-area' });
+        const textarea = document.createElement('textarea');
+        textarea.id = 'rp-chat-input';
+        textarea.placeholder = 'Type a message...';
+        textarea.rows = 2;
+        textarea.addEventListener('input', () => {
+            textarea.style.height = 'auto';
+            textarea.style.height = Math.min(textarea.scrollHeight, 150) + 'px';
+        });
+        textarea.addEventListener('keydown', e => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                this.sendMessage();
+            }
+        });
+
+        const sendBtn = el('button', { id: 'rp-send-btn' }, 'Send');
+        sendBtn.addEventListener('click', () => this.sendMessage());
+        const stopBtn = el('button', { id: 'rp-stop-btn' }, 'Stop');
+        stopBtn.style.display = 'none';
+        stopBtn.addEventListener('click', () => {
+            this.autoMode = false;
+            this.updateAutoBtn();
+            if (this.abortController) this.abortController.abort();
+        });
+
+        inputArea.appendChild(textarea);
+        inputArea.appendChild(sendBtn);
+        inputArea.appendChild(stopBtn);
+        wrapper.appendChild(inputArea);
+
+        container.appendChild(wrapper);
+
+        // Scroll to bottom
+        msgs.scrollTop = msgs.scrollHeight;
+
+        // Emit for debug panels
+        rpState.emit('conv-message', { detail, type: 'load' });
+    },
+
+    appendMessageBubble(container, msg, userCard, aiCard, msgIndex) {
+        const isUser = msg.role === 'user';
+        const wrapper = el('div', { class: 'rp-msg ' + msg.role });
+
+        const bubble = el('div', { class: 'rp-msg-bubble' });
+        rpRenderDialogue(bubble, msg.content, msg.role);
+        wrapper.appendChild(bubble);
+
+        // Hover actions
+        const actions = el('div', { class: 'rp-msg-hover-actions' });
+        const editBtn = el('button', {}, 'Edit');
+        editBtn.addEventListener('click', () => this.startEditMessage(msg, bubble));
+        const delBtn = el('button', {}, 'Del');
+        delBtn.addEventListener('click', () => {
+            confirmAction(delBtn, async () => {
+                await rpApi('DELETE', '/rp/messages/' + msg.id);
+                rpCenter.renderContent();
+            });
+        });
+        const copyBtn = el('button', {}, 'Copy');
+        copyBtn.addEventListener('click', () => navigator.clipboard.writeText(msg.content));
+        actions.appendChild(editBtn);
+        actions.appendChild(delBtn);
+        actions.appendChild(copyBtn);
+        wrapper.appendChild(actions);
+
+        // Message number
+        if (msgIndex !== undefined) {
+            wrapper.appendChild(el('div', { class: 'rp-msg-sequence' }, '#' + (msgIndex + 1)));
+        }
+
+        container.appendChild(wrapper);
+        return { wrapper, bubble };
+    },
+
+    startEditMessage(msg, bubble) {
+        const ta = document.createElement('textarea');
+        ta.className = 'rp-msg-edit-textarea';
+        ta.value = msg.content;
+        bubble.replaceWith(ta);
+        ta.style.height = 'auto';
+        ta.style.height = ta.scrollHeight + 'px';
+        ta.addEventListener('input', () => {
+            ta.style.height = 'auto';
+            ta.style.height = ta.scrollHeight + 'px';
+        });
+        ta.focus();
+
+        const save = async () => {
+            const newContent = ta.value.trim();
+            if (newContent && newContent !== msg.content) {
+                await rpApi('PUT', '/rp/messages/' + msg.id, { content: newContent });
+            }
+            rpCenter.renderContent();
+        };
+
+        ta.addEventListener('blur', save);
+        ta.addEventListener('keydown', e => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                ta.blur();
+            }
+            if (e.key === 'Escape') {
+                ta.removeEventListener('blur', save);
+                rpCenter.renderContent();
+            }
+        });
+    },
+
+    // --- Streaming ---
+
+    async sendMessage() {
+        const input = document.getElementById('rp-chat-input');
+        const content = input.value.trim();
+        if (!content || !this.convId || this.isStreaming) return;
+
+        input.value = '';
+        input.style.height = 'auto';
+        this.setStreaming(true);
+
+        // Append user bubble immediately
+        const container = this.messagesContainer;
+        const userMsg = { id: null, role: 'user', content };
+        this.appendMessageBubble(container, userMsg, this.convDetail.user_card, this.convDetail.ai_card);
+        container.scrollTop = container.scrollHeight;
+
+        const hadError = await this.streamResponse(
+            '/rp/conversations/' + this.convId + '/message',
+            { content }, container);
+
+        this.setStreaming(false);
+        if (!hadError) rpCenter.renderContent();
+    },
+
+    async continueConversation() {
+        if (!this.convId || this.isStreaming) return;
+        this.setStreaming(true);
+        const container = this.messagesContainer;
+        const hadError = await this.streamResponse(
+            '/rp/conversations/' + this.convId + '/continue', undefined, container);
+        this.setStreaming(false);
+        if (!hadError) rpCenter.renderContent();
+    },
+
+    async regenerateResponse() {
+        if (!this.convId || this.isStreaming) return;
+        this.setStreaming(true);
+
+        // Remove last AI message from DOM
+        const container = this.messagesContainer;
+        const allMsgs = container.querySelectorAll('.rp-msg.assistant');
+        if (allMsgs.length > 0) allMsgs[allMsgs.length - 1].remove();
+
+        const hadError = await this.streamResponse(
+            '/rp/conversations/' + this.convId + '/regenerate', undefined, container);
+        this.setStreaming(false);
+        if (!hadError) rpCenter.renderContent();
+    },
+
+    async restartConversation() {
+        if (!this.convId || this.isStreaming) return;
+        const container = this.messagesContainer;
+        container.textContent = '';
+        const timerStart = Date.now();
+        const timerEl = el('div', { class: 'rp-placeholder' });
+        const timerText = el('div', {}, 'Generating opening scene... 0s');
+        timerEl.appendChild(timerText);
+        container.appendChild(timerEl);
+        const timerInterval = setInterval(() => {
+            timerText.textContent = 'Generating opening scene... ' +
+                Math.floor((Date.now() - timerStart) / 1000) + 's';
+        }, 1000);
+        try {
+            await rpApi('POST', '/rp/conversations/' + this.convId + '/restart');
+        } catch {}
+        clearInterval(timerInterval);
+        rpCenter.renderContent();
+    },
+
+    toggleAutoMode() {
+        if (!this.convId) return;
+        this.autoMode = !this.autoMode;
+        this.updateAutoBtn();
+        if (this.autoMode) this.autoReplyLoop();
+    },
+
+    updateAutoBtn() {
+        const btn = document.getElementById('rp-auto-btn');
+        if (!btn) return;
+        btn.textContent = this.autoMode ? 'Stop Auto' : 'Auto';
+        if (this.autoMode) {
+            btn.style.background = '#f44';
+            btn.style.color = '#fff';
+            btn.style.borderColor = '#f44';
+        } else {
+            btn.style.background = '';
+            btn.style.color = '';
+            btn.style.borderColor = '';
+        }
+    },
+
+    async autoReplyLoop() {
+        while (this.autoMode && this.convId && !this.isStreaming) {
+            this.setStreaming(true);
+            const container = this.messagesContainer;
+            const hadError = await this.streamResponse(
+                '/rp/conversations/' + this.convId + '/auto-reply',
+                undefined, container);
+            this.setStreaming(false);
+            if (hadError) {
+                this.autoMode = false;
+                this.updateAutoBtn();
+                break;
+            }
+            await new Promise(r => setTimeout(r, 500));
+        }
+        if (!this.autoMode) rpCenter.renderContent();
+    },
+
+    setStreaming(on) {
+        this.isStreaming = on;
+        const sendBtn = document.getElementById('rp-send-btn');
+        const stopBtn = document.getElementById('rp-stop-btn');
+        if (sendBtn) sendBtn.style.display = on ? 'none' : '';
+        if (stopBtn) stopBtn.style.display = on ? '' : 'none';
+    },
+
+    async streamResponse(url, body, container) {
+        this.abortController = new AbortController();
+        const opts = { method: 'POST', signal: this.abortController.signal };
+        if (body !== undefined) {
+            opts.headers = { 'Content-Type': 'application/json' };
+            opts.body = JSON.stringify(body);
+        }
+
+        let streamRole = 'assistant';
+        const wrapper = el('div', { class: 'rp-msg ' + streamRole });
+        let thinkingSection = null;
+        let thinkingContent = null;
+        let hasThinking = false;
+        let hadError = false;
+
+        const bubble = el('div', { class: 'rp-msg-bubble streaming-cursor' });
+        const col = el('div', {});
+        col.appendChild(bubble);
+        wrapper.appendChild(col);
+        container.appendChild(wrapper);
+
+        try {
+            const resp = await fetch(url, opts);
+            const reader = resp.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop();
+
+                for (const line of lines) {
+                    if (!line.trim()) continue;
+                    const chunk = JSON.parse(line);
+
+                    if (chunk.debug_prompt !== undefined) {
+                        rpState.emit('conv-message', {
+                            type: 'debug',
+                            debug_prompt: chunk.debug_prompt,
+                            debug_user_prompt: chunk.debug_user_prompt,
+                        });
+                        // Handle auto_role
+                        if (chunk.auto_role && chunk.auto_role !== streamRole) {
+                            streamRole = chunk.auto_role;
+                            wrapper.className = 'rp-msg ' + streamRole;
+                        }
+                        continue;
+                    }
+
+                    if (chunk.error) {
+                        hadError = true;
+                        bubble.classList.remove('streaming-cursor');
+                        const errSpan = el('span', { class: 'rp-error' }, 'Error: ' + chunk.error);
+                        bubble.appendChild(errSpan);
+                        break;
+                    }
+
+                    if (chunk.thinking) {
+                        if (!hasThinking) {
+                            hasThinking = true;
+                            thinkingSection = el('div', { class: 'rp-msg-thinking' });
+                            const toggle = el('div', { class: 'rp-msg-thinking-toggle' }, 'Thinking...');
+                            toggle.addEventListener('click', () => {
+                                thinkingContent.classList.toggle('collapsed');
+                                toggle.textContent = thinkingContent.classList.contains('collapsed')
+                                    ? 'Show thinking' : 'Hide thinking';
+                            });
+                            thinkingSection.appendChild(toggle);
+                            thinkingContent = el('div', { class: 'rp-msg-thinking-content' });
+                            thinkingSection.appendChild(thinkingContent);
+                            col.insertBefore(thinkingSection, bubble);
+                        }
+                        thinkingContent.textContent += chunk.token;
+                    } else if (chunk.done) {
+                        bubble.classList.remove('streaming-cursor');
+                        const fullText = bubble.textContent;
+                        bubble.textContent = '';
+                        rpRenderDialogue(bubble, fullText, streamRole);
+                        if (thinkingContent) {
+                            const toggle = thinkingSection.querySelector('.rp-msg-thinking-toggle');
+                            toggle.textContent = 'Hide thinking';
+                        }
+                        rpState.emit('conv-message', { type: 'done', chunk });
+                    } else {
+                        bubble.textContent += chunk.token;
+                    }
+
+                    const atBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 60;
+                    if (atBottom) container.scrollTop = container.scrollHeight;
+                }
+            }
+        } catch (e) {
+            if (e.name === 'AbortError') {
+                const partialText = bubble.textContent.trim();
+                if (partialText && this.convId) {
+                    try {
+                        await fetch('/rp/conversations/' + this.convId + '/save-partial', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ content: partialText, role: streamRole }),
+                        });
+                    } catch {}
+                }
+                bubble.classList.remove('streaming-cursor');
+                if (partialText) {
+                    bubble.textContent = '';
+                    rpRenderDialogue(bubble, partialText, streamRole);
+                }
+            } else {
+                hadError = true;
+                bubble.classList.remove('streaming-cursor');
+                bubble.textContent += '\n[Stream error: ' + e.message + ']';
+            }
+        } finally {
+            bubble.classList.remove('streaming-cursor');
+            this.abortController = null;
+        }
+        return hadError;
+    },
+};
 
 // ===== App (tabs, polling, master tab) =====
 
