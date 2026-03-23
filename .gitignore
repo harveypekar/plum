@@ -30,6 +30,8 @@ build/
 .worktrees/
 .superpowers/brainstorm/
 
+projects/rp/comfyui
+
 # Backups & temp
 *.swp
 *.swo
