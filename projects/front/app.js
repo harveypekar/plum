@@ -1820,12 +1820,12 @@ rpState.on('new-chat-requested', () => rpNewChatModal.open());
 
 const app = {
     currentTab: 'master',
+    rpInitialized: false,
 
     init() {
         this.renderServiceCards();
         this.setupTabs();
         this.setupRestartButtons();
-        dock.init();
         this.startPolling();
     },
 
@@ -1869,9 +1869,19 @@ const app = {
         // Apply theme
         document.body.classList.toggle('theme-amber', tabName === 'rp');
 
-        // Switch dock layout when entering rp tab
+        // Initialize or switch dock layout for rp tab
         if (tabName === 'rp') {
-            dock.switchLayout(tabName);
+            if (!this.rpInitialized) {
+                this.rpInitialized = true;
+                dock.init();
+                // Load initial RP data
+                rpLoadCards();
+                rpLoadScenarios();
+                rpLoadConversations();
+                rpLoadModels();
+            } else {
+                dock.switchLayout(tabName);
+            }
         }
     },
 
@@ -2068,13 +2078,7 @@ const dock = {
 
         // Center
         const center = el('div', { class: 'dock-center' });
-        if (app.currentTab === 'rp' && typeof rpCenter !== 'undefined' && rpCenter && rpCenter.render) {
-            center.appendChild(rpCenter.render());
-        } else if (app.currentTab === 'rp') {
-            center.appendChild(el('div', { style: 'padding: 20px; color: var(--accent);' }, 'RP Center - Loading...'));
-        } else {
-            center.appendChild(el('iframe', { src: '/rp/', title: 'rp UI' }));
-        }
+        center.appendChild(rpCenter.render());
         // Drop overlay lives inside center
         center.appendChild(this.createDropOverlay());
         middle.appendChild(center);
