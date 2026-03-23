@@ -575,23 +575,139 @@ body {
     display: flex;
     flex-direction: column;
     gap: 10px;
+    overflow-y: auto;
+    height: 100%;
 }
 
-.rp-form label {
-    font-size: 13px;
+.rp-form-title {
+    font-size: 18px;
     font-weight: bold;
+    margin-bottom: 12px;
     text-transform: uppercase;
+}
+
+.rp-card-avatar-preview {
+    width: 80px;
+    height: 80px;
+    border-radius: 8px;
+    object-fit: cover;
+    cursor: pointer;
+    border: 2px solid var(--accent-dim);
+    margin-bottom: 12px;
+}
+
+.rp-form-field {
+    margin-bottom: 12px;
+}
+
+.rp-form label,
+.rp-form-field label {
+    display: block;
+    font-size: 12px;
+    font-weight: bold;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    opacity: 0.7;
 }
 
 .rp-form input,
 .rp-form textarea,
-.rp-form select {
-    background: #000;
+.rp-form select,
+.rp-form-field textarea,
+.rp-form-field input,
+.rp-form-field select {
+    width: 100%;
+    background: var(--accent-bg);
     color: var(--accent);
     border: 1px solid var(--accent-dim);
+    padding: 6px 8px;
     font-family: monospace;
     font-size: 14px;
-    padding: 6px;
+    resize: vertical;
+}
+
+.rp-form-inline-btn {
+    margin-top: 4px;
+    font-size: 12px;
+    background: none;
+    color: var(--accent);
+    border: 1px solid var(--accent-dim);
+    padding: 2px 8px;
+    font-family: monospace;
+    cursor: pointer;
+}
+
+.rp-form-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 16px;
+    flex-wrap: wrap;
+}
+
+.rp-form-actions button {
+    background: none;
+    color: var(--accent);
+    border: 1px solid var(--accent-dim);
+    padding: 6px 14px;
+    font-family: monospace;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.rp-form-actions button:hover {
+    background: var(--accent-bg);
+}
+
+.rp-form-delete {
+    color: #f44 !important;
+    border-color: #f44 !important;
+}
+
+.rp-form-status {
+    font-size: 12px;
+    opacity: 0.7;
+    line-height: 28px;
+}
+
+.rp-card-gen-field-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+}
+
+.rp-card-gen-field-header button {
+    background: none;
+    color: var(--accent);
+    border: 1px solid var(--accent-dim);
+    padding: 2px 8px;
+    font-family: monospace;
+    font-size: 11px;
+    cursor: pointer;
+}
+
+.rp-card-gen-field-instructions {
+    display: none;
+    gap: 4px;
+    margin-top: 4px;
+}
+
+.rp-card-gen-field-instructions.open {
+    display: flex;
+}
+
+.rp-card-gen-field-instructions input {
+    flex: 1;
+}
+
+.rp-card-gen-field-instructions button {
+    background: none;
+    color: var(--accent);
+    border: 1px solid var(--accent-dim);
+    padding: 2px 8px;
+    font-family: monospace;
+    font-size: 12px;
+    cursor: pointer;
 }
 
 .rp-modal {
