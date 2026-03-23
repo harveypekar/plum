@@ -1659,6 +1659,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from google_backup.services.contacts import ContactsService
+from google_backup.state import ServiceState
 
 
 def _mock_people_api(connections, next_sync_token="sync_abc"):
