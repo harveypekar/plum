@@ -61,6 +61,16 @@ async def get_card(card_id: int) -> dict | None:
     return dict(row) if row else None
 
 
+async def find_card_by_name(name: str) -> dict | None:
+    pool = await get_pool()
+    row = await pool.fetchrow(
+        "SELECT id, name, avatar IS NOT NULL as has_avatar, card_data, "
+        "created_at::text, updated_at::text FROM rp_character_cards WHERE name = $1",
+        name,
+    )
+    return dict(row) if row else None
+
+
 async def create_card(name: str, card_data: dict, avatar: bytes | None = None) -> dict:
     pool = await get_pool()
     row = await pool.fetchrow(
@@ -132,6 +142,16 @@ async def get_scenario(scenario_id: int) -> dict | None:
     return dict(row) if row else None
 
 
+async def find_scenario_by_name(name: str) -> dict | None:
+    pool = await get_pool()
+    row = await pool.fetchrow(
+        "SELECT id, name, description, first_message, settings, "
+        "created_at::text, updated_at::text FROM rp_scenarios WHERE name = $1",
+        name,
+    )
+    return dict(row) if row else None
+
+
 async def create_scenario(name: str, description: str, settings: dict,
                            first_message: str = "") -> dict:
     pool = await get_pool()
@@ -184,7 +204,7 @@ async def create_conversation(user_card_id: int, ai_card_id: int,
     row = await pool.fetchrow(
         "INSERT INTO rp_conversations (user_card_id, ai_card_id, scenario_id, model) "
         "VALUES ($1, $2, $3, $4) RETURNING id, user_card_id, ai_card_id, scenario_id, "
-        "model, scene_state, created_at::text, updated_at::text",
+        "model, scene_state, scene_state_msg_id, created_at::text, updated_at::text",
         user_card_id, ai_card_id, scenario_id, model,
     )
     return dict(row)
@@ -193,19 +213,25 @@ async def create_conversation(user_card_id: int, ai_card_id: int,
 async def get_conversation(conv_id: int) -> dict | None:
     pool = await get_pool()
     row = await pool.fetchrow(
-        "SELECT id, user_card_id, ai_card_id, scenario_id, model, scene_state, "
+        "SELECT id, user_card_id, ai_card_id, scenario_id, model, scene_state, scene_state_msg_id, "
         "created_at::text, updated_at::text FROM rp_conversations WHERE id = $1",
         conv_id,
     )
     return dict(row) if row else None
 
 
-async def update_scene_state(conv_id: int, scene_state: str) -> bool:
+async def update_scene_state(conv_id: int, scene_state: str, msg_id: int | None = None) -> bool:
     pool = await get_pool()
-    result = await pool.execute(
-        "UPDATE rp_conversations SET scene_state=$2, updated_at=NOW() WHERE id=$1",
-        conv_id, scene_state,
-    )
+    if msg_id is not None:
+        result = await pool.execute(
+            "UPDATE rp_conversations SET scene_state=$2, scene_state_msg_id=$3, updated_at=NOW() WHERE id=$1",
+            conv_id, scene_state, msg_id,
+        )
+    else:
+        result = await pool.execute(
+            "UPDATE rp_conversations SET scene_state=$2, updated_at=NOW() WHERE id=$1",
+            conv_id, scene_state,
+        )
     return result == "UPDATE 1"
 
 

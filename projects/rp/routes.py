@@ -1,7 +1,6 @@
 import asyncio
 import json
 import logging
-
 from fastapi import FastAPI, UploadFile, File, HTTPException, Request
 from fastapi.responses import Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -16,6 +15,9 @@ from .models import (
 )
 from .pipeline import create_default_pipeline
 from .mcp_client import get_router as get_mcp_router
+from .research import research_dispatch
+
+_log = logging.getLogger(__name__)
 
 _log = logging.getLogger(__name__)
 
@@ -63,12 +65,21 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         except ValueError as e:
             raise HTTPException(400, str(e))
         name = extract_name(card_data)
-        card = await db.create_card(name, card_data, avatar=avatar)
+        # Check for existing card with same name
+        existing = await db.find_card_by_name(name)
+        if existing:
+            # Update the existing card instead of creating a duplicate
+            card = await db.update_card(existing["id"], name, card_data, avatar=avatar)
+        else:
+            card = await db.create_card(name, card_data, avatar=avatar)
         # Auto-extract scenario from card if present
         data = card_data.get("data", card_data)
         scenario_text = data.get("scenario", "")
         if scenario_text.strip():
-            await db.create_scenario(name + " — Scenario", scenario_text, {})
+            scenario_name = name + " — Scenario"
+            existing_scenario = await db.find_scenario_by_name(scenario_name)
+            if not existing_scenario:
+                await db.create_scenario(scenario_name, scenario_text, {})
         return card
 
     @app.get("/rp/cards/{card_id}", response_model=CardResponse)
@@ -294,6 +305,14 @@ def setup(app: FastAPI, ollama, resolve_model=None):
 
         if first_mes:
             await db.add_message(result["id"], "assistant", first_mes)
+            # Initial scene state from first message + scenario + card context
+            ai_data = ai_card["card_data"].get("data", ai_card["card_data"])
+            user_data = user_card["card_data"].get("data", user_card["card_data"])
+            scenario_desc = (scenario or {}).get("description", "")
+            asyncio.create_task(_auto_update_scene_state(
+                result["id"], model,
+                ai_data.get("name", "Character"), user_data.get("name", "User"),
+                ai_data.get("description", ""), scenario_desc))
         return result
 
     @app.get("/rp/conversations/{conv_id}", response_model=ConversationDetailResponse)
@@ -335,6 +354,14 @@ def setup(app: FastAPI, ollama, resolve_model=None):
 
         if first_mes:
             await db.add_message(conv_id, "assistant", first_mes)
+            # Initial scene state from first message + scenario + card context
+            ai_data = ai_card["card_data"].get("data", ai_card["card_data"])
+            user_data = user_card["card_data"].get("data", user_card["card_data"])
+            scenario_desc = (scenario or {}).get("description", "")
+            asyncio.create_task(_auto_update_scene_state(
+                conv_id, model,
+                ai_data.get("name", "Character"), user_data.get("name", "User"),
+                ai_data.get("description", ""), scenario_desc))
         return {"ok": True}
 
     @app.put("/rp/conversations/{conv_id}/scene-state")
@@ -348,21 +375,33 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         conv = await db.get_conversation(conv_id)
         if not conv:
             raise HTTPException(404, "Conversation not found")
-        messages = await db.get_messages(conv_id)
-        msg_list = [{"role": m["role"], "content": m["content"]} for m in messages]
+        all_msgs = await db.get_messages(conv_id)
         model = _resolve_model(conv["model"])
         previous_state = conv.get("scene_state", "")
+        last_msg_id = conv.get("scene_state_msg_id")
+        # Use messages since last scene state generation
+        if last_msg_id is not None:
+            new_msgs = [m for m in all_msgs if m["id"] > last_msg_id]
+        else:
+            new_msgs = all_msgs
+        if not new_msgs:
+            new_msgs = all_msgs
+        latest_msg_id = new_msgs[-1]["id"] if new_msgs else None
+        msg_list = [{"role": m["role"], "content": m["content"]} for m in new_msgs]
         ai_card = await db.get_card(conv["ai_card_id"])
         user_card = await db.get_card(conv["user_card_id"])
         ai_data = ai_card.get("card_data", {}).get("data", ai_card.get("card_data", {}))
         user_data = user_card.get("card_data", {}).get("data", user_card.get("card_data", {}))
+        scenario = await db.get_scenario(conv["scenario_id"]) if conv.get("scenario_id") else None
+        scenario_desc = (scenario or {}).get("description", "")
         clean = await _generate_scene_state(
             model, msg_list, previous_state,
             ai_name=ai_data.get("name", "Character"),
             user_name=user_data.get("name", "User"),
-            ai_personality=ai_data.get("description", "")
+            ai_personality=ai_data.get("description", ""),
+            scenario_context=scenario_desc
         )
-        await db.update_scene_state(conv_id, clean)
+        await db.update_scene_state(conv_id, clean, latest_msg_id)
         return {"scene_state": clean}
 
     # -- Chat --
@@ -410,29 +449,40 @@ def setup(app: FastAPI, ollama, resolve_model=None):
 
     async def _get_or_generate_first_message(conv, ai_card, user_card, scenario, model):
         """Check cache, return if fresh, otherwise generate and cache."""
+        ai_data = ai_card["card_data"].get("data", ai_card["card_data"])
+        user_data = user_card["card_data"].get("data", user_card["card_data"])
+        char_name = ai_data.get("name", "Character")
+        user_name = user_data.get("name", "User")
+
+        def _replace_vars(text):
+            return (text
+                    .replace("{{user}}", user_name).replace("{{char}}", char_name)
+                    .replace("${user}", user_name).replace("${char}", char_name))
+
+        # If scenario or card has a pre-written first message, use it directly
+        scenario_first = (scenario or {}).get("first_message", "").strip()
+        card_first = ai_data.get("first_mes", "").strip()
+        if scenario_first:
+            return _replace_vars(scenario_first)
+        if card_first:
+            return _replace_vars(card_first)
+
+        # Otherwise, check cache then generate
         card_hash = db.compute_card_hash(ai_card)
         scenario_hash = db.compute_scenario_hash(scenario)
         combo_hash = db.compute_combo_hash(card_hash, scenario_hash, model)
 
-        # Check cache
         cached = await db.get_cached_first_message(combo_hash, card_hash, scenario_hash)
         if cached:
             _log.info("First message cache hit for combo %s", combo_hash)
             return cached
 
-        # Generate
         try:
             first_mes = await _generate_first_message(conv, ai_card, user_card, scenario)
         except Exception as e:
-            _log.warning("Failed to generate first message, falling back to card: %s", e)
-            ai_data = ai_card["card_data"].get("data", ai_card["card_data"])
-            user_data = user_card["card_data"].get("data", user_card["card_data"])
-            first_mes = (scenario or {}).get("first_message", "") or ai_data.get("first_mes", "")
-            first_mes = first_mes.replace("${user}", user_data.get("name", "User"))
-            first_mes = first_mes.replace("${char}", ai_data.get("name", "Character"))
-            return first_mes
+            _log.warning("Failed to generate first message: %s", e)
+            return ""
 
-        # Cache the result
         await db.set_cached_first_message(combo_hash, card_hash, scenario_hash, model, first_mes)
         _log.info("First message cached for combo %s", combo_hash)
         return first_mes
@@ -525,20 +575,61 @@ def setup(app: FastAPI, ollama, resolve_model=None):
     _log = logging.getLogger("rp.routes")
 
     _scene_state_model = "q25"
-    _scene_state_window = 8
 
     def _build_scene_state_prompt(messages: list[dict], previous_state: str = "",
                                    ai_name: str = "Character", user_name: str = "User",
-                                   ai_personality: str = "") -> str:
-        from .scene_state import build_scene_state_prompt
-        recent = messages[-_scene_state_window:]
-        return build_scene_state_prompt(recent, previous_state, ai_name, user_name,
-                                         ai_personality)
+                                   ai_personality: str = "",
+                                   scenario_context: str = "") -> str:
+        history = "\n".join(f"{m['role']}: {m['content']}" for m in messages)
+        prev_section = ""
+        if previous_state.strip():
+            prev_section = (
+                "PREVIOUS SCENE STATE (carry forward anything not contradicted by new messages):\n"
+                f"{previous_state.strip()}\n\n"
+            )
+        personality_hint = ""
+        if ai_personality:
+            short = ai_personality[:200].rsplit(" ", 1)[0]
+            personality_hint = f"{ai_name}'s personality: {short}\n\n"
+        scenario_section = ""
+        if scenario_context.strip():
+            scenario_section = f"Scenario context: {scenario_context.strip()}\n\n"
+        initial = not previous_state.strip() and len(messages) <= 1
+        if initial:
+            instruction = (
+                "This is the opening of a new scene. Establish the INITIAL scene state "
+                "based on the scenario context and first message below.\n\n"
+            )
+        else:
+            instruction = (
+                "Below are the most recent messages. UPDATE the scene state based on what changed.\n"
+                "Keep everything from the previous state that still holds true. "
+                "Only change what the new messages contradict or add.\n\n"
+            )
+        return (
+            f"{prev_section}"
+            f"{personality_hint}"
+            f"{scenario_section}"
+            f"{instruction}"
+            f"Characters: {ai_name} (AI) and {user_name} (user).\n\n"
+            "Format — one short line per category:\n"
+            "Location: (where are they right now)\n"
+            f"Clothing: (what {ai_name} and {user_name} are currently wearing RIGHT NOW — track removals: if a character undressed, they are naked, not still wearing the old clothes. Write 'naked' or 'nude' when appropriate)\n"
+            "Restraints: (describe the specific tie/pattern AND what it practically limits — e.g. 'wrists behind back — no free hand use' — or 'none')\n"
+            "Position: (posture, who is where, physical contact)\n"
+            "Props: (objects currently in play)\n"
+            "Mood: (emotional atmosphere right now)\n"
+            "ONLY state facts explicitly shown or described in the messages. Do NOT invent or assume details not present.\n"
+            "If clothing is not mentioned, write 'not described' — do NOT guess.\n"
+            "No narration, no story, no explanation. Just the current facts.\n\n"
+            f"Recent messages:\n{history}"
+        )
 
     async def _generate_scene_state(model: str, messages: list[dict], previous_state: str = "",
                                      ai_name: str = "Character", user_name: str = "User",
-                                     ai_personality: str = "") -> str:
-        prompt = _build_scene_state_prompt(messages, previous_state, ai_name, user_name, ai_personality)
+                                     ai_personality: str = "",
+                                     scenario_context: str = "") -> str:
+        prompt = _build_scene_state_prompt(messages, previous_state, ai_name, user_name, ai_personality, scenario_context)
         summary_model = _resolve_model(_scene_state_model) if _resolve_model else model
         from .scene_state import clean_scene_state_response
         result = await _ollama.generate(
@@ -548,16 +639,32 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         )
         return clean_scene_state_response(result)
 
-    async def _auto_update_scene_state(conv_id: int, model: str, messages: list[dict],
+    async def _auto_update_scene_state(conv_id: int, model: str,
                                         ai_name: str = "Character", user_name: str = "User",
-                                        ai_personality: str = ""):
-        """Background task: ask LLM to summarize current scene state."""
+                                        ai_personality: str = "",
+                                        scenario_context: str = ""):
+        """Background task: generate scene state from previous state + new messages."""
         try:
             conv = await db.get_conversation(conv_id)
-            previous_state = conv.get("scene_state", "") if conv else ""
-            clean = await _generate_scene_state(model, messages, previous_state,
-                                                ai_name, user_name, ai_personality)
-            await db.update_scene_state(conv_id, clean)
+            if not conv:
+                return
+            previous_state = conv.get("scene_state", "")
+            last_msg_id = conv.get("scene_state_msg_id")
+            all_msgs = await db.get_messages(conv_id)
+            if not all_msgs:
+                return
+            # Slice to only messages since last scene state generation
+            if last_msg_id is not None:
+                new_msgs = [m for m in all_msgs if m["id"] > last_msg_id]
+            else:
+                new_msgs = all_msgs
+            if not new_msgs:
+                return
+            latest_msg_id = new_msgs[-1]["id"]
+            msg_list = [{"role": m["role"], "content": m["content"]} for m in new_msgs]
+            clean = await _generate_scene_state(model, msg_list, previous_state,
+                                                ai_name, user_name, ai_personality, scenario_context)
+            await db.update_scene_state(conv_id, clean, latest_msg_id)
         except Exception as e:
             _log.warning("Scene state auto-update failed: %s", e)
 
@@ -576,6 +683,17 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         scenario = ctx.get("scenario") or {}
         settings = scenario.get("settings", {})
         ollama_options = _build_ollama_options(settings)
+
+        # Two-model research dispatch: check if user message needs factual lookup
+        research = await research_dispatch(_ollama, req.content)
+        if research:
+            _log.info("Injecting research into context (%d chars)", len(research))
+            ctx["post_prompt"] = (
+                ctx.get("post_prompt", "")
+                + "\n\n[Research notes — weave these facts naturally if relevant, "
+                + "don't quote them verbatim or mention looking anything up]\n"
+                + research
+            )
 
         chat_messages = _build_chat_messages(ctx)
         user_name = _get_user_name(ctx)
@@ -639,8 +757,7 @@ def setup(app: FastAPI, ollama, resolve_model=None):
                 post_ctx = await _pipeline.run_post(post_ctx)
                 await db.add_message(conv_id, "assistant", post_ctx["response"], raw_response=raw)
                 # Update scene state in background
-                updated_msgs = ctx["messages"] + [{"role": "assistant", "content": post_ctx["response"]}]
-                asyncio.create_task(_auto_update_scene_state(conv_id, model, updated_msgs,
+                asyncio.create_task(_auto_update_scene_state(conv_id, model,
                                                 _get_ai_name(ctx), _get_user_name(ctx), _get_ai_personality(ctx)))
             except Exception as e:
                 yield json.dumps({"error": f"Failed to save response: {e}", "done": True}) + "\n"
@@ -722,8 +839,7 @@ def setup(app: FastAPI, ollama, resolve_model=None):
                 post_ctx = await _pipeline.run_post(post_ctx)
                 await db.add_message(conv_id, "assistant", post_ctx["response"], raw_response=raw)
                 # Update scene state in background
-                updated_msgs = ctx["messages"] + [{"role": "assistant", "content": post_ctx["response"]}]
-                asyncio.create_task(_auto_update_scene_state(conv_id, model, updated_msgs,
+                asyncio.create_task(_auto_update_scene_state(conv_id, model,
                                                 _get_ai_name(ctx), _get_user_name(ctx), _get_ai_personality(ctx)))
             except Exception as e:
                 yield json.dumps({"error": f"Failed to save response: {e}", "done": True}) + "\n"
@@ -775,8 +891,7 @@ def setup(app: FastAPI, ollama, resolve_model=None):
                 post_ctx = await _pipeline.run_post(post_ctx)
                 await db.add_message(conv_id, "assistant", post_ctx["response"], raw_response=raw)
                 # Update scene state in background
-                updated_msgs = ctx["messages"] + [{"role": "assistant", "content": post_ctx["response"]}]
-                asyncio.create_task(_auto_update_scene_state(conv_id, model, updated_msgs,
+                asyncio.create_task(_auto_update_scene_state(conv_id, model,
                                                 _get_ai_name(ctx), _get_user_name(ctx), _get_ai_personality(ctx)))
             except Exception as e:
                 yield json.dumps({"error": f"Failed to save response: {e}", "done": True}) + "\n"
@@ -877,9 +992,7 @@ def setup(app: FastAPI, ollama, resolve_model=None):
                 post_ctx = await _pipeline.run_post(post_ctx)
                 await db.add_message(conv_id, save_role, post_ctx["response"], raw_response=raw)
                 # Update scene state in background
-                updated_msgs = [{"role": m["role"], "content": m["content"]} for m in messages]
-                updated_msgs.append({"role": save_role, "content": post_ctx["response"]})
-                asyncio.create_task(_auto_update_scene_state(conv_id, model, updated_msgs,
+                asyncio.create_task(_auto_update_scene_state(conv_id, model,
                                                 _get_ai_name(ctx), _get_user_name(ctx), _get_ai_personality(ctx)))
             except Exception as e:
                 yield json.dumps({"error": f"Failed to save response: {e}", "done": True}) + "\n"

@@ -66,15 +66,31 @@ def expand_variables(ctx: dict) -> dict:
 DEFAULT_PROMPT_TEMPLATE = """## system
 {{#scenario}}Scenario: {{scenario}}
 
-{{/scenario}}{{#description}}Character: {{description}}
+{{/scenario}}--- {{char}} (you write as this character) ---
+{{#description}}{{description}}
 
 {{/description}}{{#personality}}Personality: {{personality}}
 
 {{/personality}}{{#mes_example}}Example dialogue:
-{{mes_example}}{{/mes_example}}
+{{mes_example}}
+
+{{/mes_example}}--- {{user}} (do NOT mix their traits with {{char}}'s) ---
+{{#user_description}}{{user_description}}
+
+{{/user_description}}{{#user_personality}}Personality: {{user_personality}}
+
+{{/user_personality}}
 
 ## post
-Write only {{char}}'s next response. Stay in character. Do not narrate {{user}}'s actions."""
+Write only {{char}}'s next response. Stay in character. Do not narrate {{user}}'s actions.
+Each character has distinct physical traits — use the correct details for the correct person. Do not blend or swap attributes between {{char}} and {{user}}.
+Vary response length to match the beat — a gut-punch moment can be two lines; a vulnerable confession can breathe longer. Don't default to the same length every time.
+Describe bodies naturally when clothing state calls for it — anatomy is not inherently sexual. If a character is undressed, describe what is visible: shape, skin, scars, weight, muscle, breasts, everything. Avoidance is more conspicuous than honesty.
+Honor the scene state constraints — if {{char}} is nonverbal or near-mute, replace speech with physical expression and sensory detail: touch, gesture, posture shifts, proximity, textures, smells, temperature, sounds. Characters always participate; they just shift channels from words to body and senses.
+Emotions don't reset between messages. If {{char}} was crying, grieving, or in crisis earlier, that bleeds through — sudden silence, laughing too hard at nothing, flinching at a memory, losing focus. Recovery takes the whole conversation, not two exchanges.
+{{char}} is NOT a mirror. Do not just reflect praise or affection back at {{user}}. {{char}} has their own perspective, their own unrelated thoughts, things they want to bring up. Deflect, change the subject, sit with it awkwardly — don't just echo kindness back.
+Vary the shape of responses. Not every message needs dialogue + action + inner thought. Sometimes just action. Sometimes just words. Sometimes silence. A single sentence is fine if that's the beat.
+When {{user}} is vulnerable, {{char}} does NOT respond like a therapist. Real people fumble, project, say the wrong thing, sit in uncomfortable silence. Emotional conversations are messy, not eloquent."""
 
 
 def _split_template(template: str) -> tuple[str, str]:

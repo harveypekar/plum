@@ -172,6 +172,37 @@ class OllamaClient:
                 tokens.append(chunk["token"])
         return "".join(tokens)
 
+    async def chat(
+        self,
+        model: str,
+        messages: list[dict],
+        tools: list[dict] | None = None,
+        think: bool = False,
+    ) -> dict:
+        """Non-streaming chat call. Returns the full Ollama response dict.
+
+        Supports native tool calling via the tools parameter.
+        """
+        body: dict = {
+            "model": model,
+            "messages": messages,
+            "stream": False,
+        }
+        if tools:
+            body["tools"] = tools
+        if think:
+            body["think"] = True
+        try:
+            async with httpx.AsyncClient(timeout=120.0) as client:
+                resp = await client.post(f"{self.base_url}/api/chat", json=body)
+                if resp.status_code != 200:
+                    raise OllamaError(f"Ollama returned {resp.status_code}: {resp.text}")
+                return resp.json()
+        except httpx.ConnectError:
+            raise OllamaError(f"Cannot connect to Ollama at {self.base_url}")
+        except httpx.HTTPError as e:
+            raise OllamaError(f"HTTP error communicating with Ollama: {e}") from e
+
     async def is_available(self) -> bool:
         """Check if Ollama is reachable."""
         try:
