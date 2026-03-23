@@ -252,6 +252,23 @@ class OllamaClient:
             pass
         return []
 
+    async def embed(self, model: str, text: str) -> list[float]:
+        """Get embedding vector for text via Ollama /api/embed."""
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                resp = await client.post(
+                    f"{self.base_url}/api/embed",
+                    json={"model": model, "input": text},
+                )
+                if resp.status_code != 200:
+                    raise OllamaError(f"Ollama embed returned {resp.status_code}: {resp.text}")
+                data = resp.json()
+                return data["embeddings"][0]
+        except httpx.ConnectError:
+            raise OllamaError(f"Cannot connect to Ollama at {self.base_url}")
+        except httpx.HTTPError as e:
+            raise OllamaError(f"HTTP error communicating with Ollama: {e}") from e
+
     @staticmethod
     def count_tokens(text: str) -> int:
         """Estimate token count (~4 chars per token)."""

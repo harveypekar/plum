@@ -352,3 +352,51 @@ async def set_cached_first_message(combo_hash: str, card_hash: str, scenario_has
         "ON CONFLICT (combo_hash) DO UPDATE SET card_hash=$2, scenario_hash=$3, content=$5, created_at=NOW()",
         combo_hash, card_hash, scenario_hash, model, content,
     )
+
+
+# -- Few-shot Examples --
+
+async def search_fewshot_examples(embedding: list[float], card_id: int,
+                                   limit: int = 2) -> list[dict]:
+    """Return the closest few-shot examples for a card by cosine similarity."""
+    pool = await get_pool()
+    embedding_str = "[" + ",".join(str(f) for f in embedding) + "]"
+    rows = await pool.fetch(
+        "SELECT id, scene_context, user_message, assistant_message, token_estimate, "
+        "1 - (embedding <=> $1::vector) as similarity "
+        "FROM rp_fewshot_examples WHERE active AND card_id = $3 "
+        "ORDER BY embedding <=> $1::vector LIMIT $2",
+        embedding_str, limit, card_id,
+    )
+    return [dict(r) for r in rows]
+
+
+async def add_fewshot_example(card_id: int, scene_context: str, user_message: str,
+                               assistant_message: str, embedding: list[float],
+                               model: str, token_estimate: int) -> dict:
+    """Insert a new few-shot example and return the created row."""
+    pool = await get_pool()
+    embedding_str = "[" + ",".join(str(f) for f in embedding) + "]"
+    row = await pool.fetchrow(
+        "INSERT INTO rp_fewshot_examples "
+        "(card_id, scene_context, user_message, assistant_message, embedding, model, token_estimate) "
+        "VALUES ($1, $2, $3, $4, $5::vector, $6, $7) "
+        "RETURNING id, card_id, scene_context, user_message, assistant_message, "
+        "model, token_estimate, active, created_at::text",
+        card_id, scene_context, user_message, assistant_message, embedding_str,
+        model, token_estimate,
+    )
+    return dict(row)
+
+
+async def count_fewshot_examples(card_id: int | None = None) -> int:
+    """Return the count of active few-shot examples, optionally filtered by card."""
+    pool = await get_pool()
+    if card_id is not None:
+        return await pool.fetchval(
+            "SELECT COUNT(*) FROM rp_fewshot_examples WHERE active AND card_id = $1",
+            card_id,
+        )
+    return await pool.fetchval(
+        "SELECT COUNT(*) FROM rp_fewshot_examples WHERE active"
+    )
