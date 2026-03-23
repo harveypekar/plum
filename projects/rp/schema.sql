@@ -1,6 +1,8 @@
 -- RP: Roleplay chat tables
 -- Run against the shared PostgreSQL instance (projects/db)
 
+CREATE EXTENSION IF NOT EXISTS vector;
+
 CREATE TABLE IF NOT EXISTS rp_character_cards (
     id              SERIAL PRIMARY KEY,
     name            TEXT NOT NULL,
@@ -74,3 +76,32 @@ CREATE TABLE IF NOT EXISTS rp_first_message_cache (
 );
 
 CREATE INDEX IF NOT EXISTS idx_rp_fmc_combo ON rp_first_message_cache(combo_hash);
+
+CREATE TABLE IF NOT EXISTS rp_fewshot_examples (
+    id              SERIAL PRIMARY KEY,
+    card_id         INTEGER REFERENCES rp_character_cards(id) ON DELETE CASCADE,
+    scene_context   TEXT NOT NULL,
+    user_message    TEXT NOT NULL,
+    assistant_message TEXT NOT NULL,
+    embedding       vector(768) NOT NULL,
+    model           TEXT NOT NULL DEFAULT '',
+    token_estimate  INTEGER NOT NULL DEFAULT 0,
+    active          BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at      TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Migration: add card_id if missing
+DO $$ BEGIN
+    ALTER TABLE rp_fewshot_examples ADD COLUMN card_id INTEGER REFERENCES rp_character_cards(id) ON DELETE CASCADE;
+EXCEPTION WHEN duplicate_column THEN NULL;
+END $$;
+
+-- Migration: add model if missing
+DO $$ BEGIN
+    ALTER TABLE rp_fewshot_examples ADD COLUMN model TEXT NOT NULL DEFAULT '';
+EXCEPTION WHEN duplicate_column THEN NULL;
+END $$;
+
+CREATE INDEX IF NOT EXISTS idx_rp_fewshot_embedding
+    ON rp_fewshot_examples USING hnsw (embedding vector_cosine_ops)
+    WHERE active;
