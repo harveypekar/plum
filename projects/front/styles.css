@@ -934,6 +934,55 @@ body {
     width: 100%;
 }
 
+/* Scene State Panel */
+.rp-scene-state-area {
+    width: 100%;
+    height: 80px;
+    background: var(--accent-bg);
+    color: var(--accent);
+    border: 1px solid var(--accent-dim);
+    padding: 6px 8px;
+    font-family: monospace;
+    font-size: 13px;
+    resize: vertical;
+}
+
+/* Under the Hood Panel */
+.rp-under-hood-tabs {
+    display: flex;
+    gap: 2px;
+    margin-bottom: 4px;
+}
+
+.rp-under-hood-tab {
+    padding: 2px 8px;
+    font-size: 11px;
+    background: transparent;
+    color: var(--accent);
+    border: 1px solid var(--accent-dim);
+    cursor: pointer;
+    opacity: 0.6;
+}
+
+.rp-under-hood-tab:hover { opacity: 0.8; }
+.rp-under-hood-tab.active {
+    opacity: 1;
+    border-color: var(--accent);
+    background: var(--accent-dark);
+}
+
+.rp-under-hood-pre {
+    font-size: 12px;
+    white-space: pre-wrap;
+    word-break: break-all;
+    overflow-y: auto;
+    max-height: 300px;
+    color: var(--accent);
+    opacity: 0.8;
+    margin: 0;
+    padding: 4px;
+}
+
 /* Responsive */
 @media (max-width: 1200px) {
     .dock-slot-west, .dock-slot-east { display: none !important; }
