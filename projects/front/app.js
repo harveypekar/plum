@@ -1375,6 +1375,198 @@ const rpCards = {
     },
 };
 
+// ===== RP: Scenarios =====
+
+const rpScenarios = {
+    async renderEditor(container, scenarioId) {
+        container.textContent = '';
+        let scenario = null;
+
+        if (scenarioId !== null) {
+            try {
+                scenario = rpState.scenarios.find(s => s.id === scenarioId);
+                if (!scenario) scenario = await rpApi('GET', '/rp/scenarios/' + scenarioId);
+            } catch (e) {
+                container.appendChild(el('div', { class: 'rp-error' }, 'Failed to load scenario: ' + e.message));
+                return;
+            }
+        }
+
+        const st = (scenario && scenario.settings) || {};
+        const form = el('div', { class: 'rp-form' });
+        form.appendChild(el('div', { class: 'rp-form-title' }, scenarioId ? 'Edit Scenario' : 'New Scenario'));
+
+        // Basic fields
+        const nameField = rpFormField('Name', 'input', scenario ? scenario.name : '');
+        const descField = rpFormField('Description', 'textarea', scenario ? scenario.description : '', 4,
+            'Supports ${user} and ${char} variables');
+        const firstMsgField = rpFormField('First Message', 'textarea', scenario ? (scenario.first_message || '') : '', 3);
+
+        form.appendChild(nameField.container);
+        form.appendChild(descField.container);
+        form.appendChild(firstMsgField.container);
+
+        // Model override
+        const modelFieldDiv = el('div', { class: 'rp-form-field' });
+        modelFieldDiv.appendChild(el('label', {}, 'Model Override'));
+        const modelSelect = document.createElement('select');
+        await rpLoadModels();
+        rpPopulateModelSelect(modelSelect, st.model || '');
+        // Add "use default" option at start
+        const defaultOpt = document.createElement('option');
+        defaultOpt.value = '';
+        defaultOpt.textContent = 'Use conversation default';
+        modelSelect.insertBefore(defaultOpt, modelSelect.firstChild);
+        if (!st.model) defaultOpt.selected = true;
+        modelFieldDiv.appendChild(modelSelect);
+        form.appendChild(modelFieldDiv);
+
+        // Context strategy
+        const ctxFieldDiv = el('div', { class: 'rp-form-field' });
+        ctxFieldDiv.appendChild(el('label', {}, 'Context Strategy'));
+        const ctxSelect = document.createElement('select');
+        ['sliding_window', 'full_context'].forEach(v => {
+            const opt = document.createElement('option');
+            opt.value = v;
+            opt.textContent = v;
+            if (st.context_strategy === v) opt.selected = true;
+            ctxSelect.appendChild(opt);
+        });
+        ctxFieldDiv.appendChild(ctxSelect);
+        form.appendChild(ctxFieldDiv);
+
+        // Think toggle
+        const thinkFieldDiv = el('div', { class: 'rp-form-field rp-form-row' });
+        const thinkCheckbox = document.createElement('input');
+        thinkCheckbox.type = 'checkbox';
+        thinkCheckbox.checked = !!st.think;
+        thinkFieldDiv.appendChild(thinkCheckbox);
+        thinkFieldDiv.appendChild(el('label', {}, 'Enable Thinking'));
+        const thinkHint = el('span', { class: 'rp-form-hint' });
+        const updateHint = () => {
+            const val = modelSelect.value;
+            if (!val) { thinkHint.textContent = ''; thinkCheckbox.disabled = false; return; }
+            if (rpModelSupportsThink(val)) {
+                thinkHint.textContent = 'supported by this model';
+                thinkHint.style.color = 'var(--accent)';
+                thinkCheckbox.disabled = false;
+            } else {
+                thinkHint.textContent = 'not supported by this model';
+                thinkHint.style.color = '';
+                thinkCheckbox.disabled = true;
+                thinkCheckbox.checked = false;
+            }
+        };
+        modelSelect.addEventListener('change', updateHint);
+        updateHint();
+        thinkFieldDiv.appendChild(thinkHint);
+        form.appendChild(thinkFieldDiv);
+
+        // Numeric settings
+        const numericFields = [
+            { key: 'repeat_penalty', label: 'Repeat Penalty', value: st.repeat_penalty },
+            { key: 'temperature', label: 'Temperature', value: st.temperature },
+            { key: 'min_p', label: 'Min-P', value: st.min_p },
+            { key: 'top_k', label: 'Top-K', value: st.top_k },
+            { key: 'repeat_last_n', label: 'Repeat Last N', value: st.repeat_last_n },
+        ];
+
+        const numericInputs = {};
+        const numericRow = el('div', { class: 'rp-form-numeric-row' });
+        numericFields.forEach(f => {
+            const fieldDiv = el('div', { class: 'rp-form-field' });
+            fieldDiv.appendChild(el('label', {}, f.label));
+            const input = document.createElement('input');
+            input.type = 'number';
+            input.step = 'any';
+            input.value = (f.value !== undefined && f.value !== null) ? f.value : '';
+            fieldDiv.appendChild(input);
+            numericInputs[f.key] = input;
+            numericRow.appendChild(fieldDiv);
+        });
+        form.appendChild(numericRow);
+
+        // Actions
+        const actions = el('div', { class: 'rp-form-actions' });
+
+        if (scenario) {
+            const deleteBtn = el('button', { class: 'rp-form-delete' }, 'Delete');
+            deleteBtn.addEventListener('click', () => {
+                confirmAction(deleteBtn, async () => {
+                    await rpApi('DELETE', '/rp/scenarios/' + scenario.id);
+                    rpLoadScenarios();
+                    rpCenter.closeTab('scenario', scenario.id);
+                });
+            });
+            actions.appendChild(deleteBtn);
+        }
+
+        const saveBtn = el('button', {}, 'Save');
+        saveBtn.addEventListener('click', async () => {
+            const name = nameField.input.value.trim();
+            if (!name) return;
+
+            const settings = { context_strategy: ctxSelect.value };
+            if (thinkCheckbox.checked) settings.think = true;
+            const modelOverride = modelSelect.value;
+            if (modelOverride) settings.model = modelOverride;
+
+            // Parse numeric fields
+            for (const [key, input] of Object.entries(numericInputs)) {
+                const val = key.includes('top_k') || key.includes('repeat_last_n')
+                    ? parseInt(input.value) : parseFloat(input.value);
+                if (!isNaN(val)) settings[key] = val;
+            }
+
+            const data = {
+                name,
+                description: descField.input.value,
+                first_message: firstMsgField.input.value,
+                settings,
+            };
+
+            try {
+                if (scenarioId) {
+                    await rpApi('PUT', '/rp/scenarios/' + scenarioId, data);
+                } else {
+                    const created = await rpApi('POST', '/rp/scenarios', data);
+                    rpCenter.closeTab('scenario', null);
+                    rpCenter.openTab('scenario', created.id);
+                }
+                rpLoadScenarios();
+            } catch (e) {
+                saveBtn.textContent = 'Error: ' + e.message;
+                setTimeout(() => { saveBtn.textContent = 'Save'; }, 2000);
+            }
+        });
+        actions.appendChild(saveBtn);
+
+        const cancelBtn = el('button', {}, 'Cancel');
+        cancelBtn.addEventListener('click', () => rpCenter.closeTab('scenario', scenarioId));
+        actions.appendChild(cancelBtn);
+
+        form.appendChild(actions);
+        container.appendChild(form);
+    },
+};
+
+// Helper to create form fields consistently
+function rpFormField(label, type, value, rows, hint) {
+    const container = el('div', { class: 'rp-form-field' });
+    container.appendChild(el('label', {}, label + (hint ? ' (' + hint + ')' : '')));
+    let input;
+    if (type === 'textarea') {
+        input = document.createElement('textarea');
+        if (rows) input.rows = rows;
+    } else {
+        input = document.createElement('input');
+        input.type = 'text';
+    }
+    input.value = value || '';
+    container.appendChild(input);
+    return { container, input };
+}
+
 // ===== App (tabs, polling, master tab) =====
 
 const app = {
