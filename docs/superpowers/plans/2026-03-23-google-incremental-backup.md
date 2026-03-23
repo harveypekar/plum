@@ -933,16 +933,18 @@ from unittest.mock import MagicMock, patch
 
 from google_backup.services.tasks import TasksService
 from google_backup.services.base import SyncResult
+from google_backup.state import ServiceState
 
 
 def _mock_tasks_api(task_lists, tasks_by_list):
     """Build a mock Google Tasks API service."""
     service = MagicMock()
 
-    # tasklists().list()
+    # tasklists().list() + pagination termination
     service.tasklists.return_value.list.return_value.execute.return_value = {
         "items": task_lists,
     }
+    service.tasklists.return_value.list_next.return_value = None
 
     def _tasks_list(tasklist, **kwargs):
         mock = MagicMock()
@@ -950,6 +952,7 @@ def _mock_tasks_api(task_lists, tasks_by_list):
         return mock
 
     service.tasks.return_value.list.side_effect = _tasks_list
+    service.tasks.return_value.list_next.return_value = None
     return service
 
 
@@ -963,12 +966,12 @@ def test_tasks_sync_creates_files(tmp_path):
     }
 
     mock_api = _mock_tasks_api(task_lists, tasks_by_list)
-    state_dir = tmp_path / "state"
+    state = ServiceState.load(tmp_path / "state", "tasks")
     backup_dir = tmp_path / "tasks"
 
     with patch("google_backup.services.tasks.build", return_value=mock_api):
         svc = TasksService()
-        result = svc.sync(MagicMock(), state_dir, backup_dir)
+        result = svc.sync(MagicMock(), state, backup_dir)
 
     assert result.items_synced == 2
     assert result.items_failed == 0
@@ -981,7 +984,7 @@ def test_tasks_sync_creates_files(tmp_path):
 
 def test_tasks_sync_removes_orphaned_files(tmp_path):
     """Tasks deleted on Google's side should be removed locally."""
-    state_dir = tmp_path / "state"
+    state = ServiceState.load(tmp_path / "state", "tasks")
     backup_dir = tmp_path / "tasks"
 
     # Pre-existing local file for a task that no longer exists
@@ -996,7 +999,7 @@ def test_tasks_sync_removes_orphaned_files(tmp_path):
 
     with patch("google_backup.services.tasks.build", return_value=mock_api):
         svc = TasksService()
-        result = svc.sync(MagicMock(), state_dir, backup_dir)
+        result = svc.sync(MagicMock(), state, backup_dir)
 
     assert result.items_synced == 1
     assert not (backup_dir / "list1" / "task_old.json").exists()
@@ -1145,37 +1148,38 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from google_backup.services.youtube import YouTubeService
+from google_backup.state import ServiceState
 
 
 def _mock_youtube_api(subscriptions, playlists, playlist_items, liked_videos):
     """Build a mock YouTube API service."""
     service = MagicMock()
 
-    # subscriptions().list()
+    # subscriptions().list() + pagination on resource
     sub_mock = MagicMock()
     sub_mock.execute.return_value = {"items": subscriptions}
-    sub_mock.list_next.return_value = None
     service.subscriptions.return_value.list.return_value = sub_mock
+    service.subscriptions.return_value.list_next.return_value = None
 
-    # playlists().list()
+    # playlists().list() + pagination on resource
     pl_mock = MagicMock()
     pl_mock.execute.return_value = {"items": playlists}
-    pl_mock.list_next.return_value = None
     service.playlists.return_value.list.return_value = pl_mock
+    service.playlists.return_value.list_next.return_value = None
 
-    # playlistItems().list()
+    # playlistItems().list() + pagination on resource
     def _playlist_items(playlistId, **kwargs):
         mock = MagicMock()
         mock.execute.return_value = {"items": playlist_items.get(playlistId, [])}
-        mock.list_next.return_value = None
         return mock
     service.playlistItems.return_value.list.side_effect = _playlist_items
+    service.playlistItems.return_value.list_next.return_value = None
 
-    # videos().list() for liked videos
+    # videos().list() + pagination on resource
     vid_mock = MagicMock()
     vid_mock.execute.return_value = {"items": liked_videos}
-    vid_mock.list_next.return_value = None
     service.videos.return_value.list.return_value = vid_mock
+    service.videos.return_value.list_next.return_value = None
 
     return service
 
@@ -1187,10 +1191,11 @@ def test_youtube_sync_creates_files(tmp_path):
     liked = [{"id": "vid2", "snippet": {"title": "Cool Video"}}]
 
     mock_api = _mock_youtube_api(subs, playlists, playlist_items, liked)
+    state = ServiceState.load(tmp_path / "state", "youtube")
 
     with patch("google_backup.services.youtube.build", return_value=mock_api):
         svc = YouTubeService()
-        result = svc.sync(MagicMock(), tmp_path / "state", tmp_path / "youtube")
+        result = svc.sync(MagicMock(), state, tmp_path / "youtube")
 
     assert result.items_synced > 0
     assert (tmp_path / "youtube" / "subscriptions.json").exists()
@@ -1212,12 +1217,13 @@ def test_youtube_logs_removed_subscriptions(tmp_path, caplog):
     # Current run has only one
     subs = [{"snippet": {"resourceId": {"channelId": "UC1"}, "title": "Channel One"}}]
     mock_api = _mock_youtube_api(subs, [], {}, [])
+    state = ServiceState.load(tmp_path / "state", "youtube")
 
     with patch("google_backup.services.youtube.build", return_value=mock_api):
         import logging
         with caplog.at_level(logging.INFO, logger="google_backup.services.youtube"):
             svc = YouTubeService()
-            svc.sync(MagicMock(), tmp_path / "state", backup_dir)
+            svc.sync(MagicMock(), state, backup_dir)
 
     assert any("Channel Two" in r.message for r in caplog.records)
 ```
@@ -1426,7 +1432,7 @@ def _mock_calendar_api(calendars, events_by_calendar, next_sync_token="token_abc
         "items": calendars,
     }
 
-    # events().list()
+    # events().list() + pagination termination on resource
     def _events_list(calendarId, **kwargs):
         mock = MagicMock()
         mock.execute.return_value = {
@@ -1436,6 +1442,7 @@ def _mock_calendar_api(calendars, events_by_calendar, next_sync_token="token_abc
         return mock
 
     service.events.return_value.list.side_effect = _events_list
+    service.events.return_value.list_next.return_value = None
     return service
 
 
@@ -1449,29 +1456,25 @@ def test_calendar_full_sync(tmp_path):
     }
 
     mock_api = _mock_calendar_api(calendars, events)
-    state_dir = tmp_path / "state"
+    state = ServiceState.load(tmp_path / "state", "calendar")
     backup_dir = tmp_path / "calendar"
 
     with patch("google_backup.services.calendar.build", return_value=mock_api):
         svc = CalendarService()
-        result = svc.sync(MagicMock(), state_dir, backup_dir)
+        result = svc.sync(MagicMock(), state, backup_dir)
 
     assert result.items_synced == 2
     assert (backup_dir / "primary" / "evt1.json").exists()
     data = json.loads((backup_dir / "primary" / "evt1.json").read_text())
     assert data["summary"] == "Meeting"
 
-    # Sync token should be stored
-    state = ServiceState.load(state_dir, "calendar")
+    # Sync token should be stored in the state object
     assert "primary" in state.data.get("sync_tokens", {})
 
 
 def test_calendar_incremental_sync(tmp_path):
     """When sync token exists, pass it to the API."""
-    state_dir = tmp_path / "state"
-    state_dir.mkdir(parents=True)
-    # Pre-set sync token from previous run
-    state = ServiceState.load(state_dir, "calendar")
+    state = ServiceState.load(tmp_path / "state", "calendar")
     state.data["sync_tokens"] = {"primary": "old_token"}
     state.data["calendars"] = ["primary"]
     state.save()
@@ -1484,7 +1487,7 @@ def test_calendar_incremental_sync(tmp_path):
 
     with patch("google_backup.services.calendar.build", return_value=mock_api):
         svc = CalendarService()
-        result = svc.sync(MagicMock(), state_dir, tmp_path / "calendar")
+        result = svc.sync(MagicMock(), state, tmp_path / "calendar")
 
     # Verify syncToken was passed
     call_kwargs = mock_api.events.return_value.list.call_args
@@ -1499,10 +1502,11 @@ def test_calendar_cancelled_event(tmp_path):
         "primary": [{"id": "evt_del", "status": "cancelled"}],
     }
     mock_api = _mock_calendar_api(calendars, events)
+    state = ServiceState.load(tmp_path / "state", "calendar")
 
     with patch("google_backup.services.calendar.build", return_value=mock_api):
         svc = CalendarService()
-        result = svc.sync(MagicMock(), tmp_path / "state", tmp_path / "calendar")
+        result = svc.sync(MagicMock(), state, tmp_path / "calendar")
 
     data = json.loads((tmp_path / "calendar" / "primary" / "evt_del.json").read_text())
     assert data["status"] == "cancelled"
@@ -1667,9 +1671,10 @@ def _mock_people_api(connections, next_sync_token="sync_abc"):
         "nextSyncToken": next_sync_token,
         "totalPeople": len(connections),
     }
-    mock_list.list_next.return_value = None
 
     service.people.return_value.connections.return_value.list.return_value = mock_list
+    # Pagination termination on the resource, not the request
+    service.people.return_value.connections.return_value.list_next.return_value = None
     return service
 
 
@@ -1687,10 +1692,11 @@ def test_contacts_full_sync(tmp_path):
     ]
 
     mock_api = _mock_people_api(connections)
+    state = ServiceState.load(tmp_path / "state", "contacts")
 
     with patch("google_backup.services.contacts.build", return_value=mock_api):
         svc = ContactsService()
-        result = svc.sync(MagicMock(), tmp_path / "state", tmp_path / "contacts")
+        result = svc.sync(MagicMock(), state, tmp_path / "contacts")
 
     assert result.items_synced == 2
     assert (tmp_path / "contacts" / "c123.vcf").exists()
@@ -1716,10 +1722,11 @@ def test_contacts_deleted_contact(tmp_path):
         },
     ]
     mock_api = _mock_people_api(connections)
+    state = ServiceState.load(tmp_path / "state", "contacts")
 
     with patch("google_backup.services.contacts.build", return_value=mock_api):
         svc = ContactsService()
-        result = svc.sync(MagicMock(), tmp_path / "state", backup_dir)
+        result = svc.sync(MagicMock(), state, backup_dir)
 
     # VCF should still exist
     assert (backup_dir / "c789.vcf").exists()
@@ -1917,7 +1924,7 @@ import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch, PropertyMock
 
-from google_backup.services.gmail import GmailService
+from google_backup.services.gmail import GmailService, CHECKPOINT_INTERVAL
 from google_backup.state import ServiceState
 
 
@@ -1982,10 +1989,11 @@ def test_gmail_full_sync(tmp_path):
     }
 
     mock_api = _mock_gmail_api(messages, details)
+    state = ServiceState.load(tmp_path / "state", "gmail")
 
     with patch("google_backup.services.gmail.build", return_value=mock_api):
         svc = GmailService()
-        result = svc.sync(MagicMock(), tmp_path / "state", tmp_path / "gmail")
+        result = svc.sync(MagicMock(), state, tmp_path / "gmail")
 
     assert result.items_synced == 2
     assert (tmp_path / "gmail" / "msg1" / "message.eml").exists()
@@ -1998,9 +2006,7 @@ def test_gmail_full_sync(tmp_path):
 
 def test_gmail_incremental_sync(tmp_path):
     """When historyId exists, use history API for incremental."""
-    state_dir = tmp_path / "state"
-    state_dir.mkdir(parents=True)
-    state = ServiceState.load(state_dir, "gmail")
+    state = ServiceState.load(tmp_path / "state", "gmail")
     state.data["history_id"] = "10000"
     state.save()
 
@@ -2024,7 +2030,7 @@ def test_gmail_incremental_sync(tmp_path):
 
     with patch("google_backup.services.gmail.build", return_value=mock_api):
         svc = GmailService()
-        result = svc.sync(MagicMock(), state_dir, tmp_path / "gmail")
+        result = svc.sync(MagicMock(), state, tmp_path / "gmail")
 
     assert result.items_synced == 1
     assert (tmp_path / "gmail" / "msg_new" / "message.eml").exists()
@@ -2038,9 +2044,7 @@ def test_gmail_deletion_marks_metadata(tmp_path):
     (msg_dir / "message.eml").write_text("From: old@test.com\nSubject: Old")
     (msg_dir / "metadata.json").write_text('{"id": "msg_del", "labelIds": ["INBOX"]}')
 
-    state_dir = tmp_path / "state"
-    state_dir.mkdir(parents=True)
-    state = ServiceState.load(state_dir, "gmail")
+    state = ServiceState.load(tmp_path / "state", "gmail")
     state.data["history_id"] = "10000"
     state.save()
 
@@ -2055,7 +2059,7 @@ def test_gmail_deletion_marks_metadata(tmp_path):
 
     with patch("google_backup.services.gmail.build", return_value=mock_api):
         svc = GmailService()
-        result = svc.sync(MagicMock(), state_dir, tmp_path / "gmail")
+        result = svc.sync(MagicMock(), state, tmp_path / "gmail")
 
     # EML should still exist
     assert (msg_dir / "message.eml").exists()
@@ -2298,6 +2302,7 @@ from unittest.mock import MagicMock, patch
 
 from google_backup.services.drive import DriveService
 from google_backup.state import ServiceState
+from google_backup.state import ServiceState
 
 
 def _mock_drive_api(files, start_page_token="token1", new_page_token="token2", changes=None):
@@ -2373,6 +2378,8 @@ def test_drive_full_sync(tmp_path):
 
     mock_api = _mock_drive_api(files)
 
+    state = ServiceState.load(tmp_path / "state", "drive")
+
     with patch("google_backup.services.drive.build", return_value=mock_api):
         with patch("google_backup.services.drive.MediaIoBaseDownload") as mock_dl:
             # Make download return immediately
@@ -2381,7 +2388,7 @@ def test_drive_full_sync(tmp_path):
             mock_dl.return_value = mock_dl_instance
 
             svc = DriveService()
-            result = svc.sync(MagicMock(), tmp_path / "state", tmp_path / "drive")
+            result = svc.sync(MagicMock(), state, tmp_path / "drive")
 
     assert result.items_synced == 2
     assert (tmp_path / "drive" / "by_id" / "file1" / "metadata.json").exists()
@@ -2398,9 +2405,11 @@ def test_drive_disk_limit_skips_sync(tmp_path):
     # Create a file to make the parent dir non-empty
     (backup_dir / "dummy").write_text("x" * 1024)
 
+    state = ServiceState.load(tmp_path / "state", "drive")
+
     with patch.dict(os.environ, {"GOOGLE_BACKUP_MAX_DISK_GB": "0"}):
         svc = DriveService()
-        result = svc.sync(MagicMock(), tmp_path / "state", backup_dir)
+        result = svc.sync(MagicMock(), state, backup_dir)
 
     assert result.items_synced == 0
 
@@ -2413,9 +2422,7 @@ def test_drive_trashed_file_keeps_local_copy(tmp_path):
     (by_id / "content.txt").write_text("important data")
     (by_id / "metadata.json").write_text('{"id": "file_trash", "name": "old.txt"}')
 
-    state_dir = tmp_path / "state"
-    state_dir.mkdir(parents=True)
-    state = ServiceState.load(state_dir, "drive")
+    state = ServiceState.load(tmp_path / "state", "drive")
     state.data["page_token"] = "old_token"
     state.save()
 
@@ -2430,7 +2437,7 @@ def test_drive_trashed_file_keeps_local_copy(tmp_path):
 
     with patch("google_backup.services.drive.build", return_value=mock_api):
         svc = DriveService()
-        result = svc.sync(MagicMock(), state_dir, tmp_path / "drive")
+        result = svc.sync(MagicMock(), state, tmp_path / "drive")
 
     # Local file should still exist
     assert (by_id / "content.txt").exists()
@@ -2519,7 +2526,7 @@ def _check_disk_limit(backup_root: Path) -> bool:
 @register
 class DriveService(BaseService):
     name = "drive"
-    scopes = ["https://www.googleapis.com/auth/drive.readonly"]
+    scopes = ("https://www.googleapis.com/auth/drive.readonly",)
 
     def sync(self, creds: Credentials, state: ServiceState, backup_dir: Path) -> SyncResult:
         start = time.time()
