@@ -162,3 +162,81 @@ These are part of Claude Code itself (not plugins):
 8. **`.env` edits are blocked** - edit that file manually outside Claude
 9. **Use `/simplify`** after writing a chunk of code to clean it up
 10. **Use `/hookify`** when Claude keeps making a mistake you want to prevent permanently
+
+---
+
+## Google Backup
+
+Automated incremental backup of Google account data to the local filesystem. Lives at `scripts/backup/google-backup/`.
+
+### Supported Services
+
+| Service | Sync Method | Output Format | Storage Layout |
+|---------|-------------|---------------|----------------|
+| Gmail | `historyId` incremental | EML + metadata JSON | `gmail/<msg_id>/message.eml` + `metadata.json` |
+| Calendar | `syncToken` incremental | JSON per event | `calendar/<cal_id>/<event_id>.json` |
+| Contacts | `syncToken` incremental | VCF + JSON | `contacts/<person_id>.vcf` + `.json` |
+| Drive | `changes.startPageToken` | Original files + metadata | `drive/by_id/<file_id>/` + `drive/tree/` symlinks |
+| Tasks | Full dump | JSON per task | `tasks/<list_id>/<task_id>.json` |
+| YouTube | Full dump | JSON collections | `youtube/subscriptions.json`, `liked_videos.json`, `playlists/` |
+
+### First-Time Setup
+
+**1. Google Cloud Project:**
+- Create project at https://console.cloud.google.com/
+- Enable APIs: Gmail, Calendar, People, Drive, Tasks, YouTube Data v3
+- Create OAuth 2.0 Desktop App credentials
+- Download the client secret JSON file
+
+**2. Configure `.env`:**
+```bash
+GOOGLE_BACKUP_CLIENT_SECRET=/path/to/client_secret.json
+GOOGLE_BACKUP_DIR=~/.backups/plum/google
+GOOGLE_BACKUP_MAX_DISK_GB=50  # optional safety limit
+```
+
+**3. Authorize:**
+```bash
+bash scripts/backup/google-backup/run.sh auth
+# Opens browser for OAuth2 consent — grant read-only access
+```
+
+### Usage
+
+```bash
+# Back up everything
+bash scripts/backup/google-backup/run.sh --all
+
+# Back up specific services
+bash scripts/backup/google-backup/run.sh --gmail --contacts
+
+# Check sync status
+bash scripts/backup/google-backup/run.sh --status
+```
+
+### Cron Integration
+
+```bash
+# Daily backup at 3am
+0 3 * * * bash /path/to/plum/scripts/backup/google-backup/run.sh --all
+```
+
+Logs go to `~/.logs/plum/google-backup/YYYY-MM-DD.log` via Plum's `logging.sh`.
+
+### How Incremental Sync Works
+
+- **First run**: Full download of all items. Gmail checkpoints every 500 messages for crash recovery.
+- **Subsequent runs**: Only fetches changes since the last sync token. Typically completes in seconds.
+- **Deleted items**: Never removed from backup. Metadata is marked with `"deleted": true` or `"trashed": true` — the original content (EML, VCF, files) is preserved.
+- **State files**: Stored at `$GOOGLE_BACKUP_DIR/state/<service>.json`. Delete a state file to force a full re-sync for that service.
+
+### Drive Backup Layout
+
+Drive uses a dual-directory approach:
+- **`drive/by_id/<file_id>/`** — canonical storage, one directory per file containing `metadata.json` + the actual file
+- **`drive/tree/`** — symlink tree mirroring your Google Drive folder structure, rebuilt after each sync
+- Google Docs/Sheets/Slides are exported as PDF
+
+### Disk Limit
+
+Set `GOOGLE_BACKUP_MAX_DISK_GB` in `.env` to cap total backup size. When exceeded, Drive sync (the largest service) is skipped. Other services continue normally. This is a safety stop, not auto-deletion — nothing is ever removed.
