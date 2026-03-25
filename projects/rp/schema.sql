@@ -105,3 +105,23 @@ END $$;
 CREATE INDEX IF NOT EXISTS idx_rp_fewshot_embedding
     ON rp_fewshot_examples USING hnsw (embedding vector_cosine_ops)
     WHERE active;
+
+CREATE TABLE IF NOT EXISTS rp_conversation_summaries (
+    id              SERIAL PRIMARY KEY,
+    conversation_id INTEGER NOT NULL REFERENCES rp_conversations(id) ON DELETE CASCADE,
+    summary         TEXT NOT NULL,
+    through_msg_id  INTEGER NOT NULL,
+    through_sequence INTEGER NOT NULL,
+    msg_count       INTEGER NOT NULL,
+    token_estimate  INTEGER NOT NULL,
+    created_at      TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_rp_summaries_conv
+    ON rp_conversation_summaries(conversation_id, through_sequence DESC);
+
+-- Migration: track which message the summary was last generated from
+DO $$ BEGIN
+    ALTER TABLE rp_conversations ADD COLUMN summary_msg_id INTEGER DEFAULT NULL;
+EXCEPTION WHEN duplicate_column THEN NULL;
+END $$;

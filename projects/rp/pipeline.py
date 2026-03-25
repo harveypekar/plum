@@ -164,11 +164,11 @@ def render_template(template: str, values: dict) -> str:
 def apply_context_strategy(ctx: dict) -> dict:
     """Fit messages within token budget using the active strategy."""
     settings = ctx.get("scenario", {}).get("settings", {})
-    strategy_name = settings.get("context_strategy", "sliding_window")
+    strategy_name = settings.get("context_strategy", "summary_buffer")
     max_tokens = settings.get("max_context_tokens", 6144)
 
     strategy = get_strategy(strategy_name)
-    ctx["messages"] = strategy.fit(ctx["messages"], max_tokens)
+    ctx["messages"] = strategy.fit(ctx["messages"], max_tokens, ctx=ctx)
     return ctx
 
 
