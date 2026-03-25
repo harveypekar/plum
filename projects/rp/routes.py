@@ -343,6 +343,7 @@ def setup(app: FastAPI, ollama, resolve_model=None):
             raise HTTPException(404, "Conversation not found")
         await db.delete_all_messages(conv_id)
         await db.update_scene_state(conv_id, "")
+        await db.delete_summaries(conv_id)
 
         ai_card = await db.get_card(conv["ai_card_id"])
         user_card = await db.get_card(conv["user_card_id"])
@@ -429,16 +430,31 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         if _template_path.exists():
             prompt_template = _template_path.read_text()
 
+        # Attach _sequence to each message so SummaryBuffer can filter
+        msg_list = []
+        for m in messages:
+            msg_list.append({
+                "role": m["role"], "content": m["content"],
+                "_sequence": m.get("sequence", 0),
+            })
+
         ctx = {
             "user_card": user_card,
             "ai_card": ai_card,
             "scenario": scenario,
-            "messages": [{"role": m["role"], "content": m["content"]} for m in messages],
+            "messages": msg_list,
             "system_prompt": "",
             "post_prompt": "",
             "scene_state": conv.get("scene_state", ""),
             "prompt_template": prompt_template,
         }
+
+        # Load rolling summary if available
+        summary_row = await db.get_latest_summary(conv["id"])
+        if summary_row:
+            ctx["_summary"] = summary_row["summary"]
+            ctx["_summary_through_sequence"] = summary_row["through_sequence"]
+
         return await _pipeline.run_pre(ctx)
 
     def _get_ai_name(ctx):
@@ -668,6 +684,78 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         except Exception as e:
             _log.warning("Scene state auto-update failed: %s", e)
 
+    _summary_model = "q25"
+    _summary_trigger_count = 6  # generate summary after this many unsummarized messages
+
+    async def _maybe_update_summary(conv_id: int, model: str):
+        """Background task: generate/update rolling summary if enough new messages exist."""
+        try:
+            all_msgs = await db.get_messages(conv_id)
+            if not all_msgs:
+                return
+
+            # Determine how many messages are unsummarized
+            summary_row = await db.get_latest_summary(conv_id)
+            if summary_row:
+                previous_summary = summary_row["summary"]
+                through_seq = summary_row["through_sequence"]
+                unsummarized = [m for m in all_msgs if m["sequence"] > through_seq]
+            else:
+                previous_summary = ""
+                through_seq = 0
+                unsummarized = all_msgs
+
+            if len(unsummarized) < _summary_trigger_count:
+                return
+
+            # Summarize everything except the most recent messages (keep those verbatim)
+            keep_recent = _summary_trigger_count
+            to_summarize = unsummarized[:-keep_recent] if len(unsummarized) > keep_recent else []
+            if not to_summarize:
+                return
+
+            # Include all previously unsummarized messages up to the cutoff
+            through_msg = to_summarize[-1]
+            msg_list = [{"role": m["role"], "content": m["content"]} for m in to_summarize]
+
+            # Get character context for the summary prompt
+            conv = await db.get_conversation(conv_id)
+            if not conv:
+                return
+            ai_card = await db.get_card(conv["ai_card_id"])
+            user_card = await db.get_card(conv["user_card_id"])
+            ai_data = (ai_card or {}).get("card_data", {}).get("data", (ai_card or {}).get("card_data", {}))
+            user_data = (user_card or {}).get("card_data", {}).get("data", (user_card or {}).get("card_data", {}))
+            char_name = ai_data.get("name", "Character")
+            user_name = user_data.get("name", "User")
+
+            from .summarize import build_summary_prompt, clean_summary_response
+            prompt = build_summary_prompt(
+                msg_list, previous_summary, char_name, user_name,
+                ai_personality=ai_data.get("description", ""),
+            )
+            summary_llm_model = _resolve_model(_summary_model) if _resolve_model else model
+            result = await _ollama.generate(
+                model=summary_llm_model, prompt=prompt,
+                system="Output only the story summary. No thinking, no preamble.",
+                options={"temperature": 0.3, "num_predict": 600, "think": False},
+            )
+            clean = clean_summary_response(result)
+            if not clean:
+                return
+
+            total_msg_count = (summary_row["msg_count"] if summary_row else 0) + len(to_summarize)
+            token_estimate = len(clean) // 4
+            await db.save_summary(
+                conv_id, clean, through_msg["id"], through_msg["sequence"],
+                total_msg_count, token_estimate,
+            )
+            await db.update_summary_msg_id(conv_id, through_msg["id"])
+            _log.info("Summary updated for conv %d (through seq %d, %d msgs total)",
+                      conv_id, through_msg["sequence"], total_msg_count)
+        except Exception as e:
+            _log.warning("Summary auto-update failed for conv %d: %s", conv_id, e)
+
     @app.post("/rp/conversations/{conv_id}/message")
     async def send_message(conv_id: int, req: SendMessageRequest):
         conv = await db.get_conversation(conv_id)
@@ -763,9 +851,10 @@ def setup(app: FastAPI, ollama, resolve_model=None):
                 post_ctx = {"response": final_text, "ai_name": _get_ai_name(ctx)}
                 post_ctx = await _pipeline.run_post(post_ctx)
                 await db.add_message(conv_id, "assistant", post_ctx["response"], raw_response=raw)
-                # Update scene state in background
+                # Update scene state and summary in background
                 asyncio.create_task(_auto_update_scene_state(conv_id, model,
                                                 _get_ai_name(ctx), _get_user_name(ctx), _get_ai_personality(ctx)))
+                asyncio.create_task(_maybe_update_summary(conv_id, model))
             except Exception as e:
                 yield json.dumps({"error": f"Failed to save response: {e}", "done": True}) + "\n"
 
@@ -845,9 +934,10 @@ def setup(app: FastAPI, ollama, resolve_model=None):
                 post_ctx = {"response": response_text, "ai_name": _get_ai_name(ctx)}
                 post_ctx = await _pipeline.run_post(post_ctx)
                 await db.add_message(conv_id, "assistant", post_ctx["response"], raw_response=raw)
-                # Update scene state in background
+                # Update scene state and summary in background
                 asyncio.create_task(_auto_update_scene_state(conv_id, model,
                                                 _get_ai_name(ctx), _get_user_name(ctx), _get_ai_personality(ctx)))
+                asyncio.create_task(_maybe_update_summary(conv_id, model))
             except Exception as e:
                 yield json.dumps({"error": f"Failed to save response: {e}", "done": True}) + "\n"
 
@@ -897,9 +987,10 @@ def setup(app: FastAPI, ollama, resolve_model=None):
                 post_ctx = {"response": response_text, "ai_name": _get_ai_name(ctx)}
                 post_ctx = await _pipeline.run_post(post_ctx)
                 await db.add_message(conv_id, "assistant", post_ctx["response"], raw_response=raw)
-                # Update scene state in background
+                # Update scene state and summary in background
                 asyncio.create_task(_auto_update_scene_state(conv_id, model,
                                                 _get_ai_name(ctx), _get_user_name(ctx), _get_ai_personality(ctx)))
+                asyncio.create_task(_maybe_update_summary(conv_id, model))
             except Exception as e:
                 yield json.dumps({"error": f"Failed to save response: {e}", "done": True}) + "\n"
 
@@ -998,9 +1089,10 @@ def setup(app: FastAPI, ollama, resolve_model=None):
                 post_ctx = {"response": response_text, "ai_name": _get_ai_name(ctx)}
                 post_ctx = await _pipeline.run_post(post_ctx)
                 await db.add_message(conv_id, save_role, post_ctx["response"], raw_response=raw)
-                # Update scene state in background
+                # Update scene state and summary in background
                 asyncio.create_task(_auto_update_scene_state(conv_id, model,
                                                 _get_ai_name(ctx), _get_user_name(ctx), _get_ai_personality(ctx)))
+                asyncio.create_task(_maybe_update_summary(conv_id, model))
             except Exception as e:
                 yield json.dumps({"error": f"Failed to save response: {e}", "done": True}) + "\n"
 
