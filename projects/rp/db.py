@@ -204,7 +204,7 @@ async def create_conversation(user_card_id: int, ai_card_id: int,
     row = await pool.fetchrow(
         "INSERT INTO rp_conversations (user_card_id, ai_card_id, scenario_id, model) "
         "VALUES ($1, $2, $3, $4) RETURNING id, user_card_id, ai_card_id, scenario_id, "
-        "model, scene_state, scene_state_msg_id, created_at::text, updated_at::text",
+        "model, scene_state, scene_state_msg_id, summary_msg_id, created_at::text, updated_at::text",
         user_card_id, ai_card_id, scenario_id, model,
     )
     return dict(row)
@@ -214,7 +214,7 @@ async def get_conversation(conv_id: int) -> dict | None:
     pool = await get_pool()
     row = await pool.fetchrow(
         "SELECT id, user_card_id, ai_card_id, scenario_id, model, scene_state, scene_state_msg_id, "
-        "created_at::text, updated_at::text FROM rp_conversations WHERE id = $1",
+        "summary_msg_id, created_at::text, updated_at::text FROM rp_conversations WHERE id = $1",
         conv_id,
     )
     return dict(row) if row else None
@@ -387,6 +387,58 @@ async def add_fewshot_example(card_id: int, scene_context: str, user_message: st
         model, token_estimate,
     )
     return dict(row)
+
+
+# -- Conversation Summaries --
+
+async def get_latest_summary(conv_id: int) -> dict | None:
+    """Return the most recent summary for a conversation."""
+    pool = await get_pool()
+    row = await pool.fetchrow(
+        "SELECT id, conversation_id, summary, through_msg_id, through_sequence, "
+        "msg_count, token_estimate, created_at::text "
+        "FROM rp_conversation_summaries "
+        "WHERE conversation_id = $1 ORDER BY through_sequence DESC LIMIT 1",
+        conv_id,
+    )
+    return dict(row) if row else None
+
+
+async def save_summary(conv_id: int, summary: str, through_msg_id: int,
+                       through_sequence: int, msg_count: int,
+                       token_estimate: int) -> dict:
+    """Insert a new summary row."""
+    pool = await get_pool()
+    row = await pool.fetchrow(
+        "INSERT INTO rp_conversation_summaries "
+        "(conversation_id, summary, through_msg_id, through_sequence, msg_count, token_estimate) "
+        "VALUES ($1, $2, $3, $4, $5, $6) "
+        "RETURNING id, conversation_id, summary, through_msg_id, through_sequence, "
+        "msg_count, token_estimate, created_at::text",
+        conv_id, summary, through_msg_id, through_sequence, msg_count, token_estimate,
+    )
+    return dict(row)
+
+
+async def delete_summaries(conv_id: int):
+    """Delete all summaries for a conversation (used on restart)."""
+    pool = await get_pool()
+    await pool.execute(
+        "DELETE FROM rp_conversation_summaries WHERE conversation_id = $1", conv_id
+    )
+    await pool.execute(
+        "UPDATE rp_conversations SET summary_msg_id = NULL WHERE id = $1", conv_id
+    )
+
+
+async def update_summary_msg_id(conv_id: int, msg_id: int) -> bool:
+    """Update the summary tracking column on the conversation."""
+    pool = await get_pool()
+    result = await pool.execute(
+        "UPDATE rp_conversations SET summary_msg_id=$2, updated_at=NOW() WHERE id=$1",
+        conv_id, msg_id,
+    )
+    return result == "UPDATE 1"
 
 
 async def count_fewshot_examples(card_id: int | None = None) -> int:
