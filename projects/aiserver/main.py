@@ -1,8 +1,6 @@
 import asyncio
 import importlib
 import json
-import os
-import signal
 import subprocess
 import sys
 import time
@@ -11,6 +9,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
+from dotenv import load_dotenv
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -18,7 +17,6 @@ from fastapi.staticfiles import StaticFiles
 from config import Config
 from models import (
     DefaultsResponse,
-    GenerateOptions,
     GenerateRequest,
     HealthResponse,
     ModelInfo,
@@ -26,6 +24,7 @@ from models import (
 )
 from ollama import OllamaClient, OllamaError
 
+load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
 config = Config()
 ollama = OllamaClient(base_url=config.ollama_url)

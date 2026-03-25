@@ -17,7 +17,7 @@ async def get_pool() -> asyncpg.Pool:
     global _pool
     if _pool is None:
         _pool = await asyncpg.create_pool(
-            os.environ.get("DATABASE_URL", "postgresql://localhost/plum"),
+            os.environ.get("DATABASE_URL", "postgresql://plum@localhost:5432/plum"),
             min_size=1,
             max_size=5,
             init=_init_connection,
