@@ -14,5 +14,17 @@ services:
       interval: 3s
       retries: 10
 
+  backup-watcher:
+    image: pgvector/pgvector:pg16
+    entrypoint: ["bash", "/scripts/backup-watcher.sh"]
+    volumes:
+      - ./projects/db/backup-watcher.sh:/scripts/backup-watcher.sh:ro
+      - ./projects/db/backups:/backups
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
 volumes:
   pgdata:
