@@ -15,7 +15,7 @@ sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
 FORBIDDEN_FILES = [
     (r'(^|/)\.env$', '.env file'),
-    (r'(^|/)\.env\.', '.env variant'),
+    (r'(^|/)\.env\.(?!example$)', '.env variant'),
     (r'\.key$', 'private key'),
     (r'\.pem$', 'certificate/key'),
     (r'(^|/)secrets/', 'secrets directory'),
