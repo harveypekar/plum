@@ -405,7 +405,7 @@ def setup(app: FastAPI, ollama, resolve_model=None):
 
     # -- Chat --
 
-    _chat_defaults = {"num_predict": 768, "temperature": 1.05, "repeat_penalty": 1.08, "min_p": 0.1}
+    _chat_defaults = {"num_predict": 600, "temperature": 1.05, "repeat_penalty": 1.12, "min_p": 0.1}
 
     def _build_ollama_options(settings: dict) -> dict:
         """Build ollama options from scenario settings with sensible defaults."""
@@ -618,6 +618,7 @@ def setup(app: FastAPI, ollama, resolve_model=None):
             "Position: (posture, who is where, physical contact)\n"
             "Props: (objects currently in play)\n"
             "Mood: (emotional atmosphere right now)\n"
+            f"Arc: (where is {ai_name} emotionally RIGHT NOW — still guarded? cautiously opening up? fully vulnerable? pulling back? Don't project ahead, just describe this moment)\n"
             "ONLY state facts explicitly shown or described in the messages. Do NOT invent or assume details not present.\n"
             "If clothing is not mentioned, write 'not described' — do NOT guess.\n"
             "No narration, no story, no explanation. Just the current facts.\n\n"
@@ -634,7 +635,7 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         result = await _ollama.generate(
             model=summary_model, prompt=prompt,
             system="Output only the scene state summary. No thinking, no preamble.",
-            options={"temperature": 0.2, "num_predict": 200, "think": False},
+            options={"temperature": 0.2, "num_predict": 250, "think": False},
         )
         return clean_scene_state_response(result)
 

@@ -66,7 +66,7 @@ def expand_variables(ctx: dict) -> dict:
 DEFAULT_PROMPT_TEMPLATE = """## system
 {{#scenario}}Scenario: {{scenario}}
 
-{{/scenario}}--- {{char}} (you write as this character) ---
+{{/scenario}}--- {{char}} (you write as this character — do NOT give {{char}} any of {{user}}'s physical traits, piercings, tattoos, or attributes) ---
 {{#description}}{{description}}
 
 {{/description}}{{#personality}}Personality: {{personality}}
@@ -77,7 +77,9 @@ DEFAULT_PROMPT_TEMPLATE = """## system
 {{/mes_example}}--- {{user}} (do NOT mix their traits with {{char}}'s) ---
 {{#user_description}}{{user_description}}
 
-{{/user_description}}{{#user_personality}}Personality: {{user_personality}}
+{{/user_description}}{{#user_pronouns}}{{user}}'s pronouns: {{user_pronouns}}
+{{/user_pronouns}}{{#char_pronouns}}{{char}}'s pronouns: {{char_pronouns}}
+{{/char_pronouns}}{{#user_personality}}Personality: {{user_personality}}
 
 {{/user_personality}}
 
@@ -132,6 +134,8 @@ def assemble_prompt(ctx: dict) -> dict:
         "char": ai_data.get("name", "Character"),
         "user": user_data.get("name", "User"),
         "user_description": user_data.get("description", ""),
+        "user_pronouns": user_data.get("pronouns", ""),
+        "char_pronouns": ai_data.get("pronouns", ""),
     }
 
     system_part, post_part = _split_template(template)
