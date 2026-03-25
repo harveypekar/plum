@@ -9,6 +9,6 @@ mkdir -p "$BACKUP_DIR"
 TIMESTAMP=$(date +%Y%m%d-%H%M%S)
 OUTFILE="$BACKUP_DIR/plum-${TIMESTAMP}.sql.gz"
 
-docker exec db-postgres-1 pg_dump -U plum plum | gzip > "$OUTFILE"
+docker exec plum-postgres-1 pg_dump -U plum plum | gzip > "$OUTFILE"
 
 echo "Backup: $OUTFILE ($(du -h "$OUTFILE" | cut -f1))"
