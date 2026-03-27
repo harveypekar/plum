@@ -616,6 +616,16 @@
             break;
           }
 
+          // Queue status messages
+          if (chunk.status) {
+            if (chunk.status === "preempted") {
+              // Clear partial text — generation will restart
+              bubble.textContent = "";
+              if (thinkingContent) thinkingContent.textContent = "";
+            }
+            continue;
+          }
+
           if (chunk.thinking) {
             if (!hasThinking) {
               hasThinking = true;
