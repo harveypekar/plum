@@ -358,3 +358,26 @@ async def test_queue_full_raises():
     t1.cancel()
     t2.cancel()
     await q.stop()
+
+
+@pytest.mark.asyncio
+async def test_queue_snapshot():
+    """queue_snapshot should reflect active and queued entries."""
+    fake = FakeOllamaClient(delay=0.1)
+    q = InferenceQueue(fake, max_depth=10)
+    await q.start()
+
+    # Start a slow request so it becomes active
+    t1 = asyncio.create_task(
+        q.enqueue_and_collect(priority=0, mode="generate", model="test",
+                              prompt="active-req", system=None, options=None)
+    )
+    await asyncio.sleep(0.05)
+
+    snap = q.queue_snapshot()
+    assert snap["total"] >= 1
+    assert snap["active"] is not None
+    assert snap["active"]["model"] == "test"
+
+    t1.cancel()
+    await q.stop()
