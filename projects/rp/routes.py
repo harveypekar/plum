@@ -23,6 +23,14 @@ _log = logging.getLogger(__name__)
 _ollama = None
 _pipeline = None
 _resolve_model = None
+_app = None
+
+
+def _get_queue():
+    """Get InferenceQueue from app state. Available after lifespan starts."""
+    if _app and hasattr(_app.state, "queue"):
+        return _app.state.queue
+    return None
 
 
 async def init_mcp():
@@ -39,10 +47,11 @@ async def init_mcp():
 
 
 def setup(app: FastAPI, ollama, resolve_model=None):
-    global _ollama, _pipeline, _resolve_model
+    global _ollama, _pipeline, _resolve_model, _app
     _ollama = ollama
     _pipeline = create_default_pipeline()
     _resolve_model = resolve_model or (lambda m: m)
+    _app = app
 
     # -- Cards --
 
@@ -179,8 +188,9 @@ def setup(app: FastAPI, ollama, resolve_model=None):
 
         req_model = req.get("model", "") or _card_gen_model
         model = _resolve_model(req_model) if _resolve_model else req_model
-        result = await _ollama.generate(
-            model=model, prompt=description, system=system,
+        result = await _get_queue().enqueue_and_collect(
+            priority=0, mode="generate", model=model,
+            prompt=description, system=system,
             options={"temperature": 0.7, "num_predict": 2048, "think": False},
         )
         card_data = _parse_card_json(result)
@@ -211,8 +221,9 @@ def setup(app: FastAPI, ollama, resolve_model=None):
 
         req_model = req.get("model", "") or _card_gen_model
         model = _resolve_model(req_model) if _resolve_model else req_model
-        result = await _ollama.generate(
-            model=model, prompt=prompt,
+        result = await _get_queue().enqueue_and_collect(
+            priority=0, mode="generate", model=model,
+            prompt=prompt,
             system="Output only the requested field content. No thinking, no preamble, no quotes around the value.",
             options={"temperature": 0.7, "num_predict": 512, "think": False},
         )
@@ -550,8 +561,9 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         model = _resolve_model(conv["model"])
 
         result = await asyncio.wait_for(
-            _ollama.generate(
-                model=model, prompt=full_prompt,
+            _get_queue().enqueue_and_collect(
+                priority=0, mode="generate", model=model,
+                prompt=full_prompt,
                 system=f"You are writing the opening narration for {char_name}. Stay in character.",
                 options={"temperature": 1.05, "num_predict": 768, "min_p": 0.1, "repeat_penalty": 1.08},
             ),
@@ -648,8 +660,9 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         prompt = _build_scene_state_prompt(messages, previous_state, ai_name, user_name, ai_personality, scenario_context)
         summary_model = _resolve_model(_scene_state_model) if _resolve_model else model
         from .scene_state import clean_scene_state_response
-        result = await _ollama.generate(
-            model=summary_model, prompt=prompt,
+        result = await _get_queue().enqueue_and_collect(
+            priority=0, mode="generate", model=summary_model,
+            prompt=prompt,
             system="Output only the scene state summary. No thinking, no preamble.",
             options={"temperature": 0.2, "num_predict": 250, "think": False},
         )
@@ -808,10 +821,16 @@ def setup(app: FastAPI, ollama, resolve_model=None):
             for _round in range(max_tool_rounds + 1):
                 tokens = []
                 try:
-                    async for chunk in _ollama.chat_stream(
-                        model=model, messages=cur_messages,
+                    async for chunk in _get_queue().enqueue(
+                        priority=0, mode="chat", model=model,
+                        messages=cur_messages,
                         options=ollama_options, stop=[f"{user_name}:"],
                     ):
+                        if chunk.get("status"):
+                            yield json.dumps(chunk) + "\n"
+                            if chunk["status"] == "preempted":
+                                tokens.clear()
+                            continue
                         yield json.dumps(chunk) + "\n"
                         if chunk.get("done"):
                             raw = chunk
@@ -917,10 +936,16 @@ def setup(app: FastAPI, ollama, resolve_model=None):
             tokens = []
             raw = {}
             try:
-                async for chunk in _ollama.chat_stream(
-                    model=model, messages=chat_messages,
+                async for chunk in _get_queue().enqueue(
+                    priority=0, mode="chat", model=model,
+                    messages=chat_messages,
                     options=ollama_options, stop=[f"{user_name}:"],
                 ):
+                    if chunk.get("status"):
+                        yield json.dumps(chunk) + "\n"
+                        if chunk["status"] == "preempted":
+                            tokens.clear()
+                        continue
                     yield json.dumps(chunk) + "\n"
                     if chunk.get("done"):
                         raw = chunk
@@ -970,10 +995,16 @@ def setup(app: FastAPI, ollama, resolve_model=None):
             tokens = []
             raw = {}
             try:
-                async for chunk in _ollama.chat_stream(
-                    model=model, messages=chat_messages,
+                async for chunk in _get_queue().enqueue(
+                    priority=0, mode="chat", model=model,
+                    messages=chat_messages,
                     options=ollama_options, stop=[f"{user_name}:"],
                 ):
+                    if chunk.get("status"):
+                        yield json.dumps(chunk) + "\n"
+                        if chunk["status"] == "preempted":
+                            tokens.clear()
+                        continue
                     yield json.dumps(chunk) + "\n"
                     if chunk.get("done"):
                         raw = chunk
@@ -1071,10 +1102,16 @@ def setup(app: FastAPI, ollama, resolve_model=None):
             tokens = []
             raw = {}
             try:
-                async for chunk in _ollama.chat_stream(
-                    model=model, messages=chat_messages,
+                async for chunk in _get_queue().enqueue(
+                    priority=0, mode="chat", model=model,
+                    messages=chat_messages,
                     options=ollama_options, stop=[f"{user_name}:"],
                 ):
+                    if chunk.get("status"):
+                        yield json.dumps(chunk) + "\n"
+                        if chunk["status"] == "preempted":
+                            tokens.clear()
+                        continue
                     yield json.dumps(chunk) + "\n"
                     if chunk.get("done"):
                         raw = chunk
