@@ -219,7 +219,7 @@ async def main() -> None:
     )
     parser.add_argument(
         "--db-url", default=None,
-        help="Database URL (default: DATABASE_URL env or postgresql://localhost/plum)",
+        help="Database URL (default: DATABASE_URL env or postgresql://plum@localhost:5432/plum)",
     )
     parser.add_argument(
         "--dry-run", action="store_true",
@@ -236,7 +236,7 @@ async def main() -> None:
     args = parser.parse_args()
 
     db_url = args.db_url or os.environ.get(
-        "DATABASE_URL", "postgresql://localhost/plum"
+        "DATABASE_URL", "postgresql://plum@localhost:5432/plum"
     )
 
     pool = await asyncpg.create_pool(db_url, min_size=1, max_size=3)
