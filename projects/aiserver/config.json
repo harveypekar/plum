@@ -18,6 +18,7 @@
     "top_k": 40,
     "think": false
   },
+  "queue_max_depth": 100,
   "plugins": [
     {"name": "rp", "path": "../rp"},
     {"name": "front", "path": "../front"}
