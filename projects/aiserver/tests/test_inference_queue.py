@@ -182,6 +182,154 @@ async def test_chat_mode_flows_through():
 
 
 @pytest.mark.asyncio
+async def test_preemption_cancels_low_priority():
+    """A high-priority request should preempt a running low-priority one."""
+    served_prompts = []
+
+    class SlowOllama(FakeOllamaClient):
+        async def generate_stream(self, model, prompt, system=None, options=None):
+            served_prompts.append(prompt)
+            for i in range(20):
+                await asyncio.sleep(0.02)
+                yield {"token": f"t{i}", "thinking": False, "done": False}
+            yield {"token": "", "done": True, "total_tokens": 20, "tokens_per_second": 5.0}
+
+    fake = SlowOllama()
+    q = InferenceQueue(fake, max_depth=10)
+    await q.start()
+
+    low_chunks = []
+    high_chunks = []
+
+    async def consume_low():
+        async for chunk in q.enqueue(
+            priority=5, mode="generate", model="test",
+            prompt="batch-job", system=None, options=None,
+        ):
+            low_chunks.append(chunk)
+
+    async def consume_high():
+        # Wait for low-priority to start generating
+        await asyncio.sleep(0.1)
+        async for chunk in q.enqueue(
+            priority=0, mode="generate", model="test",
+            prompt="interactive", system=None, options=None,
+        ):
+            high_chunks.append(chunk)
+
+    await asyncio.gather(
+        asyncio.create_task(consume_low()),
+        asyncio.create_task(consume_high()),
+    )
+    await q.stop()
+
+    # Low-priority should have been preempted and restarted
+    low_statuses = [c for c in low_chunks if c.get("status") == "preempted"]
+    assert len(low_statuses) == 1, f"Expected 1 preemption, got {low_statuses}"
+
+    # High-priority should have completed
+    high_dones = [c for c in high_chunks if c.get("done")]
+    assert len(high_dones) == 1
+
+    # batch-job should appear twice in served_prompts (started, preempted, restarted)
+    assert served_prompts.count("batch-job") == 2
+    # interactive should appear once, and be served after first batch-job start
+    assert served_prompts.count("interactive") == 1
+    assert served_prompts[1] == "interactive"
+
+
+@pytest.mark.asyncio
+async def test_enqueue_and_collect_clears_on_preemption():
+    """enqueue_and_collect should discard partial tokens on preemption and return only final text."""
+    call_count = 0
+
+    class PreemptableOllama(FakeOllamaClient):
+        async def generate_stream(self, model, prompt, system=None, options=None):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1 and prompt == "batch-job":
+                # First run: yield some tokens then get cancelled
+                for i in range(20):
+                    await asyncio.sleep(0.02)
+                    yield {"token": f"OLD{i}", "thinking": False, "done": False}
+                yield {"token": "", "done": True, "total_tokens": 20, "tokens_per_second": 5.0}
+            elif prompt == "interactive":
+                yield {"token": "fast", "thinking": False, "done": False}
+                yield {"token": "", "done": True, "total_tokens": 1, "tokens_per_second": 10.0}
+            else:
+                # Second run of batch-job after preemption
+                yield {"token": "FINAL", "thinking": False, "done": False}
+                yield {"token": "", "done": True, "total_tokens": 1, "tokens_per_second": 5.0}
+
+    fake = PreemptableOllama()
+    q = InferenceQueue(fake, max_depth=10)
+    await q.start()
+
+    results = {}
+
+    async def batch():
+        results["batch"] = await q.enqueue_and_collect(
+            priority=5, mode="generate", model="test",
+            prompt="batch-job", system=None, options=None,
+        )
+
+    async def interactive():
+        await asyncio.sleep(0.1)
+        results["interactive"] = await q.enqueue_and_collect(
+            priority=0, mode="generate", model="test",
+            prompt="interactive", system=None, options=None,
+        )
+
+    await asyncio.gather(
+        asyncio.create_task(batch()),
+        asyncio.create_task(interactive()),
+    )
+    await q.stop()
+
+    # Batch result should contain ONLY the final run's tokens, not OLD0, OLD1, etc.
+    assert "OLD" not in results["batch"]
+    assert results["batch"] == "FINAL"
+    assert results["interactive"] == "fast"
+
+
+@pytest.mark.asyncio
+async def test_same_priority_no_preemption():
+    """Same-priority requests should NOT preempt each other."""
+    preempted = []
+
+    class SlowOllama(FakeOllamaClient):
+        async def generate_stream(self, model, prompt, system=None, options=None):
+            for i in range(5):
+                await asyncio.sleep(0.02)
+                yield {"token": f"t{i}", "thinking": False, "done": False}
+            yield {"token": "", "done": True, "total_tokens": 5, "tokens_per_second": 5.0}
+
+    fake = SlowOllama()
+    q = InferenceQueue(fake, max_depth=10)
+    await q.start()
+
+    async def consume(prompt):
+        chunks = []
+        async for chunk in q.enqueue(
+            priority=5, mode="generate", model="test",
+            prompt=prompt, system=None, options=None,
+        ):
+            chunks.append(chunk)
+            if chunk.get("status") == "preempted":
+                preempted.append(prompt)
+        return chunks
+
+    t1 = asyncio.create_task(consume("first"))
+    await asyncio.sleep(0.01)
+    t2 = asyncio.create_task(consume("second"))
+
+    await asyncio.gather(t1, t2)
+    await q.stop()
+
+    assert len(preempted) == 0
+
+
+@pytest.mark.asyncio
 async def test_queue_full_raises():
     """Exceeding max_depth should raise an error."""
     # Very slow fake so nothing completes during the test
