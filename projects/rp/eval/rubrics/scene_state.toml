@@ -1,0 +1,103 @@
+[meta]
+name = "Scene State Quality"
+description = "Evaluates the quality of scene state updates after each conversation turn"
+scale_min = 1
+scale_max = 5
+
+[dimensions.factual_accuracy]
+name = "Factual Accuracy"
+weight = 2.0
+context_requires = ["user_message", "assistant_message", "previous_state", "updated_state"]
+criteria = """
+Does the updated scene state accurately reflect what happened in the turn? Check:
+- New information from the user and assistant messages is captured
+- No fabricated details that weren't in the messages
+- Existing facts that weren't contradicted are preserved
+- Changes to location, clothing, props are grounded in the actual messages
+- No hallucinated actions or outcomes that didn't occur
+
+1: Major fabrications or missing critical changes from the messages.
+2: Some accurate updates but includes hallucinated details or misses key changes.
+3: Mostly accurate. One minor inaccuracy or omission.
+4: Accurate reflection of what happened. All key changes captured.
+5: Perfectly accurate. Every relevant change captured, nothing fabricated.
+"""
+
+[dimensions.clothing_tracking]
+name = "Clothing Tracking"
+weight = 1.5
+context_requires = ["user_message", "assistant_message", "previous_state", "updated_state"]
+criteria = """
+Does the scene state correctly track what characters are wearing? Check:
+- Clothing changes from messages are reflected (undressing, changing, dressing)
+- Clothing state doesn't revert to a previous state without cause
+- Both characters' clothing is tracked (not just one)
+- Items removed stay removed until explicitly put back on
+- Partial states are tracked (e.g., "shirt unbuttoned" vs "shirtless")
+
+If no clothing changes occurred, check that previous clothing state is preserved.
+
+1: Clothing state is wrong or contradicts what just happened.
+2: Partial tracking. Some items correct, others missing or wrong.
+3: Mostly correct. Minor gap in tracking one character's state.
+4: Good tracking of clothing changes for both characters.
+5: Perfect. Every clothing change captured with correct detail level.
+"""
+
+[dimensions.position_specificity]
+name = "Position Specificity"
+weight = 1.0
+context_requires = ["updated_state"]
+criteria = """
+Is the physical position description specific enough to be useful? Check:
+- Describes WHERE in the room characters are (not just "in the kitchen")
+- Describes relative positions (facing each other, side by side, across the room)
+- Body posture is noted when relevant (sitting, standing, leaning)
+- Enough detail for the model to maintain spatial consistency next turn
+- Not so verbose that it becomes noise
+
+1: No position info or just a room name. "In the bedroom."
+2: Basic position. "Standing in the kitchen." No relative positions.
+3: Decent. Location and basic posture but missing relative positions.
+4: Specific. Relative positions, posture, and relevant spatial details.
+5: Excellent. Clear spatial picture that would let a model stage the next beat.
+"""
+
+[dimensions.update_consistency]
+name = "Update Consistency"
+weight = 1.5
+context_requires = ["previous_state", "updated_state"]
+criteria = """
+Is the update consistent with the previous state? Check:
+- Fields that didn't change are preserved (not dropped or rewritten)
+- Changes are incremental, not full rewrites of unchanged information
+- Format and structure match the previous state (same field names, same style)
+- No contradictions between preserved fields and updated fields
+- State didn't lose information that wasn't contradicted by the messages
+
+1: Major information lost or contradictions with previous state.
+2: Some fields dropped or format changed significantly.
+3: Mostly consistent. One field unnecessarily rewritten or minor info lost.
+4: Good incremental update. Changes are targeted, rest preserved.
+5: Perfect incremental update. Only changed what needed changing.
+"""
+
+[dimensions.completeness]
+name = "Completeness"
+weight = 1.0
+context_requires = ["user_message", "assistant_message", "updated_state"]
+criteria = """
+Does the scene state capture all categories relevant to the scene? Check:
+- Location is noted
+- Clothing state is tracked (especially after changes)
+- Relevant props and objects are listed
+- Mood or emotional state is captured
+- Physical positions are described
+- Nothing important from the messages is missing from the state
+
+1: Bare minimum. Only one or two fields populated.
+2: Missing several relevant categories that the messages provided info for.
+3: Most categories covered. One or two gaps.
+4: Good coverage across all relevant categories.
+5: Comprehensive. All relevant state from the messages is captured.
+"""
