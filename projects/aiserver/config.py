@@ -1,5 +1,4 @@
 import json
-import os
 import subprocess
 from pathlib import Path
 from models import GenerateOptions
@@ -23,23 +22,25 @@ def _wsl_gateway_ip() -> str | None:
     return None
 
 
-def _resolve_ollama_url(raw_url: str) -> str:
-    """Resolve ollama URL, replacing 'wsl-gateway' with actual WSL2 gateway IP."""
-    env_url = os.environ.get("OLLAMA_URL")
-    if env_url:
-        return env_url
-    if "wsl-gateway" in raw_url:
+def resolve_url(url: str) -> str:
+    """Resolve 'wsl-gateway' placeholder to the actual WSL2 gateway IP.
+
+    With mirrored networking (.wslconfig networkingMode=mirrored), localhost
+    works across Windows/WSL2 and this function is a no-op. Kept as fallback
+    for NAT networking mode.
+    """
+    if "wsl-gateway" in url:
         gateway = _wsl_gateway_ip()
         if gateway:
-            return raw_url.replace("wsl-gateway", gateway)
-    return raw_url
+            return url.replace("wsl-gateway", gateway)
+    return url
 
 
 class Config:
     def __init__(self, path: Path = CONFIG_PATH):
         with open(path) as f:
             raw = json.load(f)
-        self.ollama_url: str = _resolve_ollama_url(raw["ollama_url"])
+        self.ollama_url: str = resolve_url(raw["ollama_url"])
         self.host: str = raw["host"]
         self.port: int = raw["port"]
         self.default_model: str = raw["default_model"]
