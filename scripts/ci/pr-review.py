@@ -111,9 +111,18 @@ def main() -> None:
     pr_number = os.environ.get("PR_NUMBER")
     repo = os.environ.get("GITHUB_REPOSITORY")
 
-    if not all([api_key, pr_number, repo]):
-        print("Missing env vars: ANTHROPIC_API_KEY, PR_NUMBER, GITHUB_REPOSITORY",
-              file=sys.stderr)
+    missing = []
+    if not api_key:
+        missing.append("ANTHROPIC_API_KEY")
+    if not pr_number:
+        missing.append("PR_NUMBER")
+    if not repo:
+        missing.append("GITHUB_REPOSITORY")
+    if missing:
+        print(f"Missing env vars: {', '.join(missing)}", file=sys.stderr)
+        if "ANTHROPIC_API_KEY" in missing and len(missing) == 1:
+            print("Skipping review (no API key configured).", file=sys.stderr)
+            return
         sys.exit(1)
 
     print(f"Reviewing PR #{pr_number} in {repo}...")
