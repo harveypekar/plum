@@ -28,5 +28,7 @@ jobs:
         working-directory: projects/aiserver
         run: python -m pytest tests/ -v
       - name: Run RP tests
-        working-directory: projects/aiserver
-        run: python -m pytest ../rp/tests/ -v
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        working-directory: projects/rp
+        run: python -m pytest tests/ -v
