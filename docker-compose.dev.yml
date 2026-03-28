@@ -1,0 +1,30 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: plum
+      POSTGRES_USER: plum
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    healthcheck:
+      test: pg_isready -U plum
+      interval: 3s
+      retries: 10
+
+  backup-watcher:
+    image: pgvector/pgvector:pg16
+    entrypoint: ["bash", "/scripts/backup-watcher.sh"]
+    volumes:
+      - ./projects/db/backup-watcher.sh:/scripts/backup-watcher.sh:ro
+      - ./projects/db/backups:/backups
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pgdata:

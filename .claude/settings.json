@@ -1,0 +1,44 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/block-env.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/block-worktree-danger.sh"
+          },
+          {
+            "type": "command",
+            "command": ".claude/hooks/block-master-commits.sh"
+          },
+          {
+            "type": "command",
+            "command": ".claude/hooks/enforce-claude-author.sh"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/lint-shell.sh",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}

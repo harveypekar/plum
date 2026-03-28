@@ -116,13 +116,13 @@ def build_system_prompt(card: dict) -> str:
 
 async def regenerate_response(
     client: httpx.AsyncClient,
-    ollama_url: str,
+    aiserver_url: str,
     model: str,
     system_prompt: str,
     context_msgs: list[dict],
     user_message: str,
 ) -> str | None:
-    """Send the user message + card context to a model and get a regenerated response."""
+    """Send the user message + card context to aiserver and get a regenerated response."""
     messages = [{"role": "system", "content": system_prompt}]
 
     # Add preceding context so the model has scene awareness
@@ -131,12 +131,21 @@ async def regenerate_response(
 
     messages.append({"role": "user", "content": user_message})
 
-    payload = {"model": model, "messages": messages, "stream": False}
     resp = await client.post(
-        f"{ollama_url}/api/chat", json=payload, timeout=180.0
+        f"{aiserver_url}/chat",
+        json={
+            "model": model,
+            "messages": messages,
+            "stream": False,
+            "priority": 5,
+        },
+        timeout=600.0,
     )
-    resp.raise_for_status()
+    if resp.status_code != 200:
+        raise RuntimeError(f"aiserver {resp.status_code}: {resp.text[:200]}")
     data = resp.json()
+    if "error" in data:
+        raise RuntimeError(f"aiserver error: {data['error']}")
     return data["message"]["content"]
 
 
@@ -214,12 +223,18 @@ async def main() -> None:
         help="Max message pairs to process (0 = all)",
     )
     parser.add_argument(
-        "--ollama-url", default="http://localhost:11434",
-        help="Ollama base URL",
+        "--aiserver-url",
+        default=os.environ.get("AISERVER_URL", "http://localhost:8080"),
+        help="aiserver URL for LLM calls (routed through priority queue)",
+    )
+    parser.add_argument(
+        "--ollama-url",
+        default=os.environ.get("OLLAMA_URL", "http://localhost:11434"),
+        help="Ollama URL for embedding calls (not routed through queue)",
     )
     parser.add_argument(
         "--db-url", default=None,
-        help="Database URL (default: DATABASE_URL env or postgresql://localhost/plum)",
+        help="Database URL (default: DATABASE_URL env or postgresql://plum@localhost:5432/plum)",
     )
     parser.add_argument(
         "--dry-run", action="store_true",
@@ -236,7 +251,7 @@ async def main() -> None:
     args = parser.parse_args()
 
     db_url = args.db_url or os.environ.get(
-        "DATABASE_URL", "postgresql://localhost/plum"
+        "DATABASE_URL", "postgresql://plum@localhost:5432/plum"
     )
 
     pool = await asyncpg.create_pool(db_url, min_size=1, max_size=3)
@@ -297,7 +312,7 @@ async def main() -> None:
 
                 try:
                     response = await regenerate_response(
-                        client, args.ollama_url, args.model,
+                        client, args.aiserver_url, args.model,
                         system_prompt, pair["context"],
                         pair["user_message"],
                     )

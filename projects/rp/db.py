@@ -17,7 +17,7 @@ async def get_pool() -> asyncpg.Pool:
     global _pool
     if _pool is None:
         _pool = await asyncpg.create_pool(
-            os.environ.get("DATABASE_URL", "postgresql://localhost/plum"),
+            os.environ.get("DATABASE_URL", "postgresql://plum@localhost:5432/plum"),
             min_size=1,
             max_size=5,
             init=_init_connection,
@@ -400,3 +400,73 @@ async def count_fewshot_examples(card_id: int | None = None) -> int:
     return await pool.fetchval(
         "SELECT COUNT(*) FROM rp_fewshot_examples WHERE active"
     )
+
+
+# -- Stored Metrics --
+
+async def save_metrics(
+    domain: str, target_type: str, target_id: str, target_label: str,
+    judge_model: str, rubric_name: str, scores: list[dict],
+    weighted_average: float, raw_judge_output: str,
+    pool: "asyncpg.Pool | None" = None,
+) -> dict:
+    """Store a set of scoring metrics and return the created row."""
+    pool = pool or await get_pool()
+    row = await pool.fetchrow(
+        "INSERT INTO rp_eval_results "
+        "(evaluator, target_type, target_id, target_label, judge_model, "
+        "rubric_name, scores, weighted_average, raw_judge_output) "
+        "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) "
+        "RETURNING id, evaluator, target_type, target_id, target_label, "
+        "judge_model, rubric_name, scores, weighted_average, created_at::text",
+        domain, target_type, target_id, target_label, judge_model,
+        rubric_name, json.dumps(scores), weighted_average, raw_judge_output,
+    )
+    return dict(row)
+
+
+async def get_metrics(
+    target_type: str, target_id: str | None = None,
+    domain: str | None = None, limit: int = 50,
+    pool: "asyncpg.Pool | None" = None,
+) -> list[dict]:
+    """Query stored metrics with optional filters."""
+    pool = pool or await get_pool()
+    conditions = ["target_type = $1"]
+    params: list = [target_type]
+    idx = 2
+    if target_id is not None:
+        conditions.append(f"target_id = ${idx}")
+        params.append(target_id)
+        idx += 1
+    if domain is not None:
+        conditions.append(f"evaluator = ${idx}")
+        params.append(domain)
+        idx += 1
+    where = " AND ".join(conditions)
+    params.append(limit)
+    rows = await pool.fetch(
+        f"SELECT id, evaluator, target_type, target_id, target_label, judge_model, "
+        f"rubric_name, scores, weighted_average, created_at::text "
+        f"FROM rp_eval_results WHERE {where} "
+        f"ORDER BY created_at DESC LIMIT ${idx}",
+        *params,
+    )
+    return [dict(r) for r in rows]
+
+
+async def get_latest_metrics(
+    target_type: str, target_id: str, domain: str,
+    pool: "asyncpg.Pool | None" = None,
+) -> dict | None:
+    """Get the most recent metrics for a specific target."""
+    pool = pool or await get_pool()
+    row = await pool.fetchrow(
+        "SELECT id, evaluator, target_type, target_id, target_label, judge_model, "
+        "rubric_name, scores, weighted_average, created_at::text "
+        "FROM rp_eval_results "
+        "WHERE target_type = $1 AND target_id = $2 AND evaluator = $3 "
+        "ORDER BY created_at DESC LIMIT 1",
+        target_type, target_id, domain,
+    )
+    return dict(row) if row else None
