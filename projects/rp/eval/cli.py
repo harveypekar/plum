@@ -587,10 +587,12 @@ async def run_report(args, pool: asyncpg.Pool, ollama_url: str):
     from .markdown import render_report
 
     log_path = Path(args.log_path) if args.log_path else None
+    print("Loading rubrics...", flush=True)
     response_rubric = load_rubric("response", Path(args.rubric) if args.rubric else None)
     scene_state_rubric = load_rubric("scene_state")
 
     # Step 1: Fetch conversation metadata from DB
+    print("Fetching conversation metadata...", flush=True)
     conv_row = await pool.fetchrow("""
         SELECT c.model, c.created_at,
                ai.name AS ai_card_name, u.name AS user_card_name
@@ -608,6 +610,7 @@ async def run_report(args, pool: asyncpg.Pool, ollama_url: str):
     conv_date = conv_row["created_at"].strftime("%Y-%m-%d")
 
     # Step 2: Parse turns from log
+    print("Parsing conversation log...", flush=True)
     conv = parse_conversation(args.conv_id, log_path)
     if not conv:
         print(f"Conversation {args.conv_id} not found in log", file=sys.stderr)
@@ -627,6 +630,7 @@ async def run_report(args, pool: asyncpg.Pool, ollama_url: str):
         return
 
     # Step 3: Check cache for existing evals
+    print("Checking DB cache for existing evals...", flush=True)
     response_results: dict[int, EvalResult | str] = {}
     scene_state_results: dict[int, EvalResult | str] = {}
     uncached_resp_turns = []
@@ -656,7 +660,10 @@ async def run_report(args, pool: asyncpg.Pool, ollama_url: str):
     print(f"  {ai_card_name} × {user_card_name}  Model: {conv.model}")
 
     # Step 4: Judge uncached turns
-    if uncached_count > 0:
+    if uncached_count == 0:
+        print("All evals cached, skipping judge.")
+    else:
+        print(f"Judging {uncached_count} uncached turns...")
         await _warmup_model(ollama_url, args.judge_model)
 
     eval_times: list[float] = []
@@ -708,6 +715,7 @@ async def run_report(args, pool: asyncpg.Pool, ollama_url: str):
             scene_state_results[turn.turn_index] = msg
 
     # Render markdown
+    print("Rendering markdown report...", flush=True)
     md = render_report(
         conv, response_results, scene_state_results,
         response_rubric, scene_state_rubric,
