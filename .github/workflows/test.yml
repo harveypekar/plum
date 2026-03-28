@@ -1,0 +1,34 @@
+name: test
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - projects/aiserver/**
+      - projects/rp/**
+  pull_request:
+    paths:
+      - projects/aiserver/**
+      - projects/rp/**
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: |
+          pip install -r projects/aiserver/requirements.txt
+          pip install -r projects/rp/requirements.txt
+          pip install pytest pytest-asyncio
+      - name: Run aiserver tests
+        working-directory: projects/aiserver
+        run: python -m pytest tests/ -v
+      - name: Run RP tests
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        working-directory: projects/rp
+        run: python -m pytest tests/ -v
