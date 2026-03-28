@@ -106,22 +106,21 @@ CREATE INDEX IF NOT EXISTS idx_rp_fewshot_embedding
     ON rp_fewshot_examples USING hnsw (embedding vector_cosine_ops)
     WHERE active;
 
-CREATE TABLE IF NOT EXISTS rp_conversation_summaries (
+CREATE TABLE IF NOT EXISTS rp_eval_results (
     id              SERIAL PRIMARY KEY,
-    conversation_id INTEGER NOT NULL REFERENCES rp_conversations(id) ON DELETE CASCADE,
-    summary         TEXT NOT NULL,
-    through_msg_id  INTEGER NOT NULL,
-    through_sequence INTEGER NOT NULL,
-    msg_count       INTEGER NOT NULL,
-    token_estimate  INTEGER NOT NULL,
+    evaluator       TEXT NOT NULL,
+    target_type     TEXT NOT NULL,
+    target_id       TEXT NOT NULL,
+    target_label    TEXT NOT NULL DEFAULT '',
+    judge_model     TEXT NOT NULL,
+    rubric_name     TEXT NOT NULL DEFAULT '',
+    scores          JSONB NOT NULL DEFAULT '[]',
+    weighted_average FLOAT NOT NULL DEFAULT 0.0,
+    raw_judge_output TEXT NOT NULL DEFAULT '',
     created_at      TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_rp_summaries_conv
-    ON rp_conversation_summaries(conversation_id, through_sequence DESC);
-
--- Migration: track which message the summary was last generated from
-DO $$ BEGIN
-    ALTER TABLE rp_conversations ADD COLUMN summary_msg_id INTEGER DEFAULT NULL;
-EXCEPTION WHEN duplicate_column THEN NULL;
-END $$;
+CREATE INDEX IF NOT EXISTS idx_rp_eval_target
+    ON rp_eval_results(target_type, target_id);
+CREATE INDEX IF NOT EXISTS idx_rp_eval_evaluator
+    ON rp_eval_results(evaluator, created_at DESC);

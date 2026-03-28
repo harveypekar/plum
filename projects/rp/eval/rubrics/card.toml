@@ -63,37 +63,15 @@ If no example dialogue is provided, score 1 and note the absence.
 5: Excellent examples that capture the character's range. Each shows something different.
 """
 
-[dimensions.first_message_quality]
-name = "First Message Quality"
-weight = 1.5
-context_requires = ["first_mes"]
-criteria = """
-Does the first message set up an engaging scene and demonstrate the character? Check:
-- Establishes a clear situation that invites user response
-- Character's voice and personality are immediately apparent
-- Creates an opening for interaction rather than a monologue
-- Sets tone appropriately for the character
-- Avoids the "walks up to you and smiles" cliche opening
-
-If no first message is provided, score 2 and note the absence as a gap.
-
-1: No first message, or message is a generic greeting with no scene-setting.
-2: Basic opening that establishes presence but little else. Or field is empty.
-3: Decent scene-setting with some character voice. Invites a response.
-4: Strong opening. Clear situation, character voice evident, natural entry point.
-5: Exceptional. Immediately immersive, character is fully present, compelling hook.
-"""
-
 [dimensions.internal_consistency]
 name = "Internal Consistency"
 weight = 1.5
-context_requires = ["description", "personality", "mes_example", "first_mes"]
+context_requires = ["description", "personality", "mes_example"]
 criteria = """
 Do all parts of the card reinforce the same character? Check:
 - Personality traits match the behavior shown in examples
 - Description and personality don't contradict each other
 - Example dialogue matches the described speech patterns and personality
-- First message (if present) aligns with the established character
 - No field contradicts another (e.g., "shy and quiet" personality but brash example dialogue)
 
 1: Major contradictions between fields. Card seems written by different people.
