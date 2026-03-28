@@ -37,7 +37,7 @@ from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).resolve().parents[3] / ".env")
 
-from .engine import EvalResult, judge, load_rubric  # noqa: E402
+from .engine import DimensionScore, EvalResult, judge, load_rubric  # noqa: E402
 from .evaluators import card as card_eval  # noqa: E402
 from .evaluators import fewshot as fewshot_eval  # noqa: E402
 from .evaluators import response as response_eval  # noqa: E402
@@ -47,7 +47,7 @@ from .report import aggregate, format_report, format_single, to_json  # noqa: E4
 
 # Import db functions for saving/loading metrics
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from db import save_metrics, get_metrics  # noqa: E402
+from db import save_metrics, get_metrics, get_latest_metrics  # noqa: E402
 
 
 def _add_common_args(sub: argparse.ArgumentParser):
@@ -556,6 +556,30 @@ async def run_show(args, pool: asyncpg.Pool):
         print()
 
 
+def _cached_to_eval_result(row: dict) -> EvalResult:
+    """Reconstruct an EvalResult from a stored metrics row."""
+    scores_data = row["scores"]
+    if isinstance(scores_data, str):
+        scores_data = json.loads(scores_data)
+    return EvalResult(
+        evaluator=row["evaluator"],
+        target_id=row["target_id"],
+        target_label=row["target_label"],
+        scores=[
+            DimensionScore(
+                dimension=s["dimension"],
+                score=s["score"],
+                explanation=s.get("explanation", ""),
+            )
+            for s in scores_data
+        ],
+        weighted_average=float(row["weighted_average"]),
+        raw_judge_output="",
+        model=row["judge_model"],
+        timestamp=str(row["created_at"]),
+    )
+
+
 async def run_report(args, pool: asyncpg.Pool, ollama_url: str):
     from .log_reader import parse_conversation
     from .evaluators import response as response_eval
@@ -602,19 +626,44 @@ async def run_report(args, pool: asyncpg.Pool, ollama_url: str):
         print(f"  Response turns: {len(resp_turns)}  Scene state turns: {len(ss_turns)}")
         return
 
-    total_evals = len(resp_turns) + len(ss_turns)
-    print(f"Judge: {args.judge_model}  Conv: {args.conv_id}  Evals: {total_evals}")
-    print(f"  {ai_card_name} × {user_card_name}  Model: {conv.model}")
-    await _warmup_model(ollama_url, args.judge_model)
-
-    # Step 3: Run response evals
+    # Step 3: Check cache for existing evals
     response_results: dict[int, EvalResult | str] = {}
-    eval_times: list[float] = []
-    all_response_results: list[EvalResult] = []
+    scene_state_results: dict[int, EvalResult | str] = {}
+    uncached_resp_turns = []
+    uncached_ss_turns = []
 
-    for i, turn in enumerate(resp_turns):
+    for turn in resp_turns:
+        target_id = f"{conv.conv_id}:{turn.turn_index}"
+        cached = await get_latest_metrics("response", target_id, "response", pool=pool)
+        if cached:
+            response_results[turn.turn_index] = _cached_to_eval_result(cached)
+        else:
+            uncached_resp_turns.append(turn)
+
+    for turn in ss_turns:
+        target_id = f"{conv.conv_id}:{turn.turn_index}"
+        cached = await get_latest_metrics("scene_state", target_id, "scene_state", pool=pool)
+        if cached:
+            scene_state_results[turn.turn_index] = _cached_to_eval_result(cached)
+        else:
+            uncached_ss_turns.append(turn)
+
+    cached_count = len(response_results) + len(scene_state_results)
+    uncached_count = len(uncached_resp_turns) + len(uncached_ss_turns)
+    total = cached_count + uncached_count
+
+    print(f"Judge: {args.judge_model}  Conv: {args.conv_id}  Total: {total} ({cached_count} cached, {uncached_count} to judge)")
+    print(f"  {ai_card_name} × {user_card_name}  Model: {conv.model}")
+
+    # Step 4: Judge uncached turns
+    if uncached_count > 0:
+        await _warmup_model(ollama_url, args.judge_model)
+
+    eval_times: list[float] = []
+
+    for i, turn in enumerate(uncached_resp_turns):
         preview = turn.user_message[:60].replace("\n", " ")
-        print(f"[resp {i+1}/{len(resp_turns)}] turn{turn.turn_index} {preview}...", end="", flush=True)
+        print(f"[resp {i+1}/{len(uncached_resp_turns)}] turn{turn.turn_index} {preview}...", end="", flush=True)
         try:
             context = response_eval.build_context_for_turn(turn, conv)
             t0 = time.time()
@@ -627,21 +676,18 @@ async def run_report(args, pool: asyncpg.Pool, ollama_url: str):
             elapsed = time.time() - t0
             eval_times.append(elapsed)
             response_results[turn.turn_index] = result
-            all_response_results.append(result)
-            _print_progress(result, i, len(resp_turns), elapsed, eval_times)
+            _print_progress(result, i, len(uncached_resp_turns), elapsed, eval_times)
+            await _save_results([result], "response", response_rubric.name, pool)
         except Exception as e:
             msg = f"{type(e).__name__}: {e}" if str(e) else type(e).__name__
             print(f" ERROR: {msg}")
             response_results[turn.turn_index] = msg
 
-    # Step 4: Run scene state evals
-    scene_state_results: dict[int, EvalResult | str] = {}
-    all_ss_results: list[EvalResult] = []
     eval_times.clear()
 
-    for i, turn in enumerate(ss_turns):
+    for i, turn in enumerate(uncached_ss_turns):
         preview = turn.user_message[:60].replace("\n", " ")
-        print(f"[scene {i+1}/{len(ss_turns)}] turn{turn.turn_index} {preview}...", end="", flush=True)
+        print(f"[scene {i+1}/{len(uncached_ss_turns)}] turn{turn.turn_index} {preview}...", end="", flush=True)
         try:
             context = scene_state_eval.build_context_for_turn(turn)
             t0 = time.time()
@@ -654,19 +700,12 @@ async def run_report(args, pool: asyncpg.Pool, ollama_url: str):
             elapsed = time.time() - t0
             eval_times.append(elapsed)
             scene_state_results[turn.turn_index] = result
-            all_ss_results.append(result)
-            _print_progress(result, i, len(ss_turns), elapsed, eval_times)
+            _print_progress(result, i, len(uncached_ss_turns), elapsed, eval_times)
+            await _save_results([result], "scene_state", scene_state_rubric.name, pool)
         except Exception as e:
             msg = f"{type(e).__name__}: {e}" if str(e) else type(e).__name__
             print(f" ERROR: {msg}")
             scene_state_results[turn.turn_index] = msg
-
-    # Save if requested
-    if args.save:
-        if all_response_results:
-            await _save_results(all_response_results, "response", response_rubric.name, pool)
-        if all_ss_results:
-            await _save_results(all_ss_results, "scene_state", scene_state_rubric.name, pool)
 
     # Render markdown
     md = render_report(
