@@ -1,0 +1,65 @@
+[meta]
+name = "Scenario Quality"
+description = "Evaluates the quality of a roleplay scenario definition"
+scale_min = 1
+scale_max = 5
+
+[dimensions.description_clarity]
+name = "Description Clarity"
+weight = 2.0
+context_requires = ["description"]
+criteria = """
+Is the scenario description clear, specific, and evocative? Check:
+- Establishes a concrete situation (who, where, what's happening)
+- Provides enough context for the model to understand the dynamic
+- Sets tone and stakes without over-constraining the scene
+- Avoids vague or generic setups ("you meet a girl")
+- Gives both characters something to work with (not just a backdrop)
+
+1: Vague or absent. "A scenario where things happen." No concrete setup.
+2: Basic setup but generic. Could be any characters in any setting.
+3: Decent situation. Clear who and where, but stakes or dynamic are weak.
+4: Specific and evocative. Clear dynamic, stakes, and atmosphere.
+5: Excellent. The scenario creates tension, invites interaction, sets mood.
+"""
+
+[dimensions.settings_appropriateness]
+name = "Settings Appropriateness"
+weight = 1.0
+context_requires = ["settings", "description"]
+criteria = """
+Are the scenario settings (model parameters, instructions) appropriate? Check:
+- Settings complement the scenario rather than contradicting it
+- No unnecessary overrides that could degrade response quality
+- Instructions (if any) are clear and actionable
+- Temperature, context size, and other model settings make sense for the tone
+
+If settings are empty or default, score 3 (neutral — not all scenarios need custom settings).
+
+1: Settings contradict the scenario or include harmful overrides.
+2: Settings are present but inappropriate or confusing.
+3: No custom settings, or settings are basic and neutral.
+4: Settings thoughtfully complement the scenario.
+5: Settings are precisely tuned to enhance the scenario's goals.
+"""
+
+[dimensions.first_message_quality]
+name = "First Message Quality"
+weight = 1.5
+context_requires = ["first_message", "description"]
+criteria = """
+Does the scenario's first message effectively launch the scene? Check:
+- Establishes the setting and situation concretely
+- Gives the user something specific to respond to
+- Character voice is present from the first line
+- Creates momentum without over-narrating
+- Invites participation rather than delivering a monologue
+
+If no first message is provided, score 2 and note the absence as a gap.
+
+1: No first message, or message is a generic greeting with no scene-setting.
+2: Basic opening or empty field. Minimal scene establishment.
+3: Decent scene-setting. Situation is clear, user has an entry point.
+4: Strong opening. Voice, setting, and hook are all present.
+5: Exceptional. Immediately immersive with a compelling situation to engage with.
+"""

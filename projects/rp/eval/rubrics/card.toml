@@ -1,0 +1,125 @@
+[meta]
+name = "Character Card Quality"
+description = "Evaluates the quality of a SillyTavern character card definition"
+scale_min = 1
+scale_max = 5
+
+[dimensions.description_quality]
+name = "Description Quality"
+weight = 2.0
+context_requires = ["description"]
+criteria = """
+Is the character description vivid, specific, and evocative? Check:
+- Physical appearance is concrete enough to picture (not just "attractive" or "beautiful")
+- Includes distinctive details that make this character memorable (scars, habits, style)
+- Personality traits are woven into the description, not just listed
+- Avoids generic anime/fantasy tropes without grounding them in specifics
+- Description gives the model enough to work with for generating consistent responses
+
+1: Vague or generic. "She is beautiful with long hair." No distinctive details.
+2: Some specifics but mostly stock descriptors. Could be many characters.
+3: Decent detail. A few distinctive features but some areas are thin or generic.
+4: Vivid and specific. Clear physical picture with personality woven in.
+5: Exceptional. Every detail serves characterization. Distinctive and memorable.
+"""
+
+[dimensions.personality_depth]
+name = "Personality Depth"
+weight = 2.0
+context_requires = ["personality", "description"]
+criteria = """
+Is the personality distinctive, nuanced, and actable? Check:
+- Has internal contradictions or tensions (e.g., "warm but struggles to accept care")
+- Traits are specific enough to guide model behavior, not just adjectives
+- Includes behavioral patterns, not just emotional descriptors
+- Avoids the "perfect partner" trap: character has flaws, friction, resistance
+- A model reading this personality could generate distinctly different responses than a generic character
+
+1: List of positive adjectives. "Kind, caring, sweet, loyal." No tension or depth.
+2: Some personality present but mostly one-dimensional or wish-fulfillment.
+3: Recognizable personality with some tension. A few behavioral specifics.
+4: Distinctive personality with clear internal contradictions and behavioral patterns.
+5: Deep, actable personality. Contradictions, coping mechanisms, specific triggers.
+"""
+
+[dimensions.mes_example_quality]
+name = "Example Dialogue Quality"
+weight = 1.5
+context_requires = ["mes_example"]
+criteria = """
+Do the example messages demonstrate the character's voice effectively? Check:
+- Examples show distinctive speech patterns (vocabulary, cadence, profanity level)
+- Range of emotional states is represented (not all the same mood)
+- Examples show how the character handles different situations
+- Dialogue feels natural, not exposition dumps about the character
+- Examples avoid common pitfalls: sycophancy, narrating user actions, stock phrases
+
+If no example dialogue is provided, score 1 and note the absence.
+
+1: No examples, or examples are generic/interchangeable with any character.
+2: Examples exist but voice is inconsistent or mostly generic.
+3: Some voice comes through. A few strong examples mixed with weaker ones.
+4: Clear voice demonstration across varied situations. Model can learn from these.
+5: Excellent examples that capture the character's range. Each shows something different.
+"""
+
+[dimensions.first_message_quality]
+name = "First Message Quality"
+weight = 1.5
+context_requires = ["first_mes"]
+criteria = """
+Does the first message set up an engaging scene and demonstrate the character? Check:
+- Establishes a clear situation that invites user response
+- Character's voice and personality are immediately apparent
+- Creates an opening for interaction rather than a monologue
+- Sets tone appropriately for the character
+- Avoids the "walks up to you and smiles" cliche opening
+
+If no first message is provided, score 2 and note the absence as a gap.
+
+1: No first message, or message is a generic greeting with no scene-setting.
+2: Basic opening that establishes presence but little else. Or field is empty.
+3: Decent scene-setting with some character voice. Invites a response.
+4: Strong opening. Clear situation, character voice evident, natural entry point.
+5: Exceptional. Immediately immersive, character is fully present, compelling hook.
+"""
+
+[dimensions.internal_consistency]
+name = "Internal Consistency"
+weight = 1.5
+context_requires = ["description", "personality", "mes_example", "first_mes"]
+criteria = """
+Do all parts of the card reinforce the same character? Check:
+- Personality traits match the behavior shown in examples
+- Description and personality don't contradict each other
+- Example dialogue matches the described speech patterns and personality
+- First message (if present) aligns with the established character
+- No field contradicts another (e.g., "shy and quiet" personality but brash example dialogue)
+
+1: Major contradictions between fields. Card seems written by different people.
+2: Notable inconsistencies. Personality says one thing, examples show another.
+3: Mostly consistent with minor drift between fields.
+4: Well-aligned. All fields reinforce the same character portrait.
+5: Seamless. Every field builds on the others. Reading any part predicts the rest.
+"""
+
+[dimensions.lorebook_quality]
+name = "Lorebook Quality"
+weight = 0.5
+context_requires = ["character_book"]
+criteria = """
+Is the character book / lorebook well-structured and useful? Check:
+- Entries provide information the model needs but can't infer from description alone
+- Keywords are specific enough to trigger at the right moments
+- Entries don't duplicate information already in the description or personality
+- Content is written for model consumption, not user reference
+- Entries enhance consistency without over-constraining the character
+
+If no character book is provided, score 3 (neutral — not all cards need one).
+
+1: Lorebook entries are redundant, poorly keyed, or contradictory.
+2: Some useful entries but mostly duplicates description content or has poor triggers.
+3: No lorebook present, or lorebook is basic but functional.
+4: Well-structured lorebook that adds depth. Good keyword coverage.
+5: Excellent. Targeted entries that enhance specific scenarios without over-constraining.
+"""

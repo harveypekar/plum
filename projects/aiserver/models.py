@@ -14,6 +14,7 @@ class GenerateRequest(BaseModel):
     model: str | None = None
     system: str | None = None
     options: GenerateOptions | None = None
+    priority: int = 0
 
 
 class DefaultsResponse(BaseModel):
@@ -45,3 +46,28 @@ class StatsResponse(BaseModel):
     requests_last_hour: int
     avg_tokens_per_second: float
     active_streams: int
+    queue_depth: int = 0
+
+
+class ChatRequest(BaseModel):
+    messages: list[dict]
+    model: str | None = None
+    options: GenerateOptions | None = None
+    stop: list[str] | None = None
+    stream: bool = True
+    priority: int = 5
+
+
+class QueueEntryStatus(BaseModel):
+    id: str
+    priority: int
+    model: str
+    status: str
+    position: int
+    created_at: float
+
+
+class QueueStatusResponse(BaseModel):
+    entries: list[QueueEntryStatus]
+    active: QueueEntryStatus | None
+    total: int
