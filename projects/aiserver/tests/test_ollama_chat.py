@@ -1,8 +1,14 @@
-import pytest
 import json
+import sys
+from pathlib import Path
+
 import httpx
-from unittest.mock import AsyncMock
-from projects.aiserver.ollama import OllamaClient
+import pytest
+
+# Allow imports from aiserver directory
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from ollama import OllamaClient
 
 
 class FakeStreamResponse:
