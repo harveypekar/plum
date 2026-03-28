@@ -211,7 +211,7 @@ def compute_weighted_average(scores: list[DimensionScore], rubric: Rubric) -> fl
 
 
 async def judge(
-    ollama_url: str,
+    aiserver_url: str,
     model: str,
     rubric: Rubric,
     context: dict,
@@ -229,18 +229,22 @@ async def judge(
 
     async with httpx.AsyncClient() as client:
         resp = await client.post(
-            f"{ollama_url}/api/chat",
+            f"{aiserver_url}/chat",
             json={
                 "model": model,
                 "messages": messages,
                 "stream": False,
+                "priority": 5,
                 "options": {"temperature": 0.3, "num_predict": 2048, "think": False},
             },
             timeout=1800.0,
         )
         if resp.status_code != 200:
-            raise RuntimeError(f"Ollama {resp.status_code}: {resp.text[:300]}")
-        raw_output = resp.json()["message"]["content"]
+            raise RuntimeError(f"aiserver {resp.status_code}: {resp.text[:300]}")
+        data = resp.json()
+        if "error" in data:
+            raise RuntimeError(f"aiserver error: {data['error']}")
+        raw_output = data["message"]["content"]
 
     scores = parse_scores(raw_output, rubric)
     weighted_avg = compute_weighted_average(scores, rubric)

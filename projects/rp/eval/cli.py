@@ -29,9 +29,6 @@ from pathlib import Path
 
 import asyncpg
 
-# Reuse aiserver's URL resolution for wsl-gateway fallback
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "aiserver"))
-from config import resolve_url
 
 from dotenv import load_dotenv
 
@@ -47,17 +44,17 @@ from .report import aggregate, format_report, format_single, to_json  # noqa: E4
 
 # Import db functions for saving/loading metrics
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from db import save_metrics, get_metrics, get_latest_metrics  # noqa: E402
+from db import save_metrics, get_metrics, get_latest_metrics  # noqa: E402, F401
 
 
 def _add_common_args(sub: argparse.ArgumentParser):
     sub.add_argument(
         "--judge-model", default="qwen3:32b",
-        help="Ollama model for judging (default: qwen3:32b)",
+        help="Model for judging (default: qwen3:32b)",
     )
     sub.add_argument(
-        "--ollama-url",
-        default=os.environ.get("OLLAMA_URL", "http://localhost:11434"),
+        "--aiserver-url",
+        default=os.environ.get("AISERVER_URL", "http://localhost:8080"),
     )
     sub.add_argument("--db-url", default=None)
     sub.add_argument("--rubric", default=None, help="Custom rubric TOML path")
@@ -114,7 +111,7 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-async def _warmup_model(ollama_url: str, model: str):
+async def _warmup_model(aiserver_url: str, model: str):
     """Send a throwaway request to load the model into memory."""
     print("Loading judge model...", end="", flush=True)
     t_load = time.time()
@@ -122,10 +119,10 @@ async def _warmup_model(ollama_url: str, model: str):
         import httpx
         async with httpx.AsyncClient() as client:
             await client.post(
-                f"{ollama_url}/api/chat",
+                f"{aiserver_url}/chat",
                 json={"model": model, "messages": [
                     {"role": "user", "content": "hi"}
-                ], "stream": False},
+                ], "stream": False, "priority": 5},
                 timeout=600.0,
             )
     except Exception:
@@ -194,7 +191,7 @@ async def _save_results(results: list[EvalResult], target_type: str,
     print(f"  Saved {count} results to database.")
 
 
-async def run_fewshot(args, pool: asyncpg.Pool, ollama_url: str):
+async def run_fewshot(args, pool: asyncpg.Pool, aiserver_url: str):
     rubric = load_rubric("fewshot", Path(args.rubric) if args.rubric else None)
 
     # Single example mode
@@ -204,7 +201,7 @@ async def run_fewshot(args, pool: asyncpg.Pool, ollama_url: str):
             return
         print(f"Evaluating fewshot example {args.example_id}...")
         result = await fewshot_eval.evaluate_single(
-            pool, ollama_url, args.judge_model, args.example_id, rubric,
+            pool, aiserver_url, args.judge_model, args.example_id, rubric,
         )
         if args.json:
             print(json.dumps(to_json(
@@ -222,7 +219,7 @@ async def run_fewshot(args, pool: asyncpg.Pool, ollama_url: str):
         sys.exit(1)
 
     rows, card_fields, rubric = await fewshot_eval.evaluate_batch(
-        pool, ollama_url, args.judge_model, args.card_id,
+        pool, aiserver_url, args.judge_model, args.card_id,
         limit=args.limit, rubric=rubric,
     )
     char_name = card_fields["name"]
@@ -241,7 +238,7 @@ async def run_fewshot(args, pool: asyncpg.Pool, ollama_url: str):
         return
 
     print(f"Judge: {args.judge_model}  Card: {char_name}  Examples: {len(rows)}")
-    await _warmup_model(ollama_url, args.judge_model)
+    await _warmup_model(aiserver_url, args.judge_model)
 
     results: list[EvalResult] = []
     eval_times: list[float] = []
@@ -253,7 +250,7 @@ async def run_fewshot(args, pool: asyncpg.Pool, ollama_url: str):
             context = fewshot_eval.build_context_for_row(row, card_fields)
             t0 = time.time()
             result = await judge(
-                ollama_url, args.judge_model, rubric, context,
+                aiserver_url, args.judge_model, rubric, context,
                 evaluator="fewshot",
                 target_id=str(row["id"]),
                 target_label=f"{char_name} #{row['id']}",
@@ -270,7 +267,7 @@ async def run_fewshot(args, pool: asyncpg.Pool, ollama_url: str):
         await _save_results(results, "fewshot", rubric.name, pool)
 
 
-async def run_card(args, pool: asyncpg.Pool, ollama_url: str):
+async def run_card(args, pool: asyncpg.Pool, aiserver_url: str):
     rubric = load_rubric("card", Path(args.rubric) if args.rubric else None)
 
     # Single card mode
@@ -281,9 +278,9 @@ async def run_card(args, pool: asyncpg.Pool, ollama_url: str):
             )
             print(f"Would evaluate card {args.card_id} ({row['name'] if row else '?'})")
             return
-        await _warmup_model(ollama_url, args.judge_model)
+        await _warmup_model(aiserver_url, args.judge_model)
         result = await card_eval.evaluate_single(
-            pool, ollama_url, args.judge_model, args.card_id, rubric,
+            pool, aiserver_url, args.judge_model, args.card_id, rubric,
         )
         if args.json:
             print(json.dumps(to_json(
@@ -300,7 +297,7 @@ async def run_card(args, pool: asyncpg.Pool, ollama_url: str):
         print("Error: --card-id or --all required", file=sys.stderr)
         sys.exit(1)
 
-    rows, rubric = await card_eval.evaluate_all(pool, ollama_url, args.judge_model, rubric)
+    rows, rubric = await card_eval.evaluate_all(pool, aiserver_url, args.judge_model, rubric)
 
     if args.limit and len(rows) > args.limit:
         rows = rows[:args.limit]
@@ -312,7 +309,7 @@ async def run_card(args, pool: asyncpg.Pool, ollama_url: str):
         return
 
     print(f"Judge: {args.judge_model}  Cards: {len(rows)}")
-    await _warmup_model(ollama_url, args.judge_model)
+    await _warmup_model(aiserver_url, args.judge_model)
 
     results: list[EvalResult] = []
     eval_times: list[float] = []
@@ -323,7 +320,7 @@ async def run_card(args, pool: asyncpg.Pool, ollama_url: str):
             context = card_eval.build_context_for_row(row)
             t0 = time.time()
             result = await judge(
-                ollama_url, args.judge_model, rubric, context,
+                aiserver_url, args.judge_model, rubric, context,
                 evaluator="card",
                 target_id=str(row["id"]),
                 target_label=row["name"],
@@ -340,12 +337,12 @@ async def run_card(args, pool: asyncpg.Pool, ollama_url: str):
         await _save_results(results, "card", rubric.name, pool)
 
 
-async def run_response(args, pool: asyncpg.Pool, ollama_url: str):
+async def run_response(args, pool: asyncpg.Pool, aiserver_url: str):
     rubric = load_rubric("response", Path(args.rubric) if args.rubric else None)
     log_path = Path(args.log_path) if args.log_path else None
 
     turns, conv, rubric = await response_eval.evaluate_conversation(
-        ollama_url, args.judge_model, args.conv_id,
+        aiserver_url, args.judge_model, args.conv_id,
         rubric=rubric, limit=args.limit, log_path=log_path,
     )
 
@@ -362,7 +359,7 @@ async def run_response(args, pool: asyncpg.Pool, ollama_url: str):
         return
 
     print(f"Judge: {args.judge_model}  Conv: {args.conv_id}  Turns: {len(turns)}  Model: {conv.model}")
-    await _warmup_model(ollama_url, args.judge_model)
+    await _warmup_model(aiserver_url, args.judge_model)
 
     results: list[EvalResult] = []
     eval_times: list[float] = []
@@ -374,7 +371,7 @@ async def run_response(args, pool: asyncpg.Pool, ollama_url: str):
             context = response_eval.build_context_for_turn(turn, conv)
             t0 = time.time()
             result = await judge(
-                ollama_url, args.judge_model, rubric, context,
+                aiserver_url, args.judge_model, rubric, context,
                 evaluator="response",
                 target_id=f"{conv.conv_id}:{turn.turn_index}",
                 target_label=f"conv{conv.conv_id} turn{turn.turn_index}",
@@ -391,12 +388,12 @@ async def run_response(args, pool: asyncpg.Pool, ollama_url: str):
         await _save_results(results, "response", rubric.name, pool)
 
 
-async def run_scene_state(args, pool: asyncpg.Pool, ollama_url: str):
+async def run_scene_state(args, pool: asyncpg.Pool, aiserver_url: str):
     rubric = load_rubric("scene_state", Path(args.rubric) if args.rubric else None)
     log_path = Path(args.log_path) if args.log_path else None
 
     turns, conv, rubric = await scene_state_eval.evaluate_conversation(
-        ollama_url, args.judge_model, args.conv_id,
+        aiserver_url, args.judge_model, args.conv_id,
         rubric=rubric, limit=args.limit, log_path=log_path,
     )
 
@@ -413,7 +410,7 @@ async def run_scene_state(args, pool: asyncpg.Pool, ollama_url: str):
         return
 
     print(f"Judge: {args.judge_model}  Conv: {args.conv_id}  Updates: {len(turns)}")
-    await _warmup_model(ollama_url, args.judge_model)
+    await _warmup_model(aiserver_url, args.judge_model)
 
     results: list[EvalResult] = []
     eval_times: list[float] = []
@@ -425,7 +422,7 @@ async def run_scene_state(args, pool: asyncpg.Pool, ollama_url: str):
             context = scene_state_eval.build_context_for_turn(turn)
             t0 = time.time()
             result = await judge(
-                ollama_url, args.judge_model, rubric, context,
+                aiserver_url, args.judge_model, rubric, context,
                 evaluator="scene_state",
                 target_id=f"{conv.conv_id}:{turn.turn_index}",
                 target_label=f"conv{conv.conv_id} turn{turn.turn_index}",
@@ -442,7 +439,7 @@ async def run_scene_state(args, pool: asyncpg.Pool, ollama_url: str):
         await _save_results(results, "scene_state", rubric.name, pool)
 
 
-async def run_scenario(args, pool: asyncpg.Pool, ollama_url: str):
+async def run_scenario(args, pool: asyncpg.Pool, aiserver_url: str):
     rubric = load_rubric("scenario", Path(args.rubric) if args.rubric else None)
 
     # Single scenario mode
@@ -453,9 +450,9 @@ async def run_scenario(args, pool: asyncpg.Pool, ollama_url: str):
             )
             print(f"Would evaluate scenario {args.scenario_id} ({row['name'] if row else '?'})")
             return
-        await _warmup_model(ollama_url, args.judge_model)
+        await _warmup_model(aiserver_url, args.judge_model)
         result = await scenario_eval.evaluate_single(
-            pool, ollama_url, args.judge_model, args.scenario_id, rubric,
+            pool, aiserver_url, args.judge_model, args.scenario_id, rubric,
         )
         if args.json:
             print(json.dumps(to_json(
@@ -473,7 +470,7 @@ async def run_scenario(args, pool: asyncpg.Pool, ollama_url: str):
         sys.exit(1)
 
     rows, rubric = await scenario_eval.evaluate_all(
-        pool, ollama_url, args.judge_model, rubric,
+        pool, aiserver_url, args.judge_model, rubric,
     )
 
     if args.limit and len(rows) > args.limit:
@@ -490,7 +487,7 @@ async def run_scenario(args, pool: asyncpg.Pool, ollama_url: str):
         return
 
     print(f"Judge: {args.judge_model}  Scenarios: {len(rows)}")
-    await _warmup_model(ollama_url, args.judge_model)
+    await _warmup_model(aiserver_url, args.judge_model)
 
     results: list[EvalResult] = []
     eval_times: list[float] = []
@@ -501,7 +498,7 @@ async def run_scenario(args, pool: asyncpg.Pool, ollama_url: str):
             context = scenario_eval.build_context_for_row(row)
             t0 = time.time()
             result = await judge(
-                ollama_url, args.judge_model, rubric, context,
+                aiserver_url, args.judge_model, rubric, context,
                 evaluator="scenario",
                 target_id=str(row["id"]),
                 target_label=row["name"],
@@ -580,7 +577,7 @@ def _cached_to_eval_result(row: dict) -> EvalResult:
     )
 
 
-async def run_report(args, pool: asyncpg.Pool, ollama_url: str):
+async def run_report(args, pool: asyncpg.Pool, aiserver_url: str):
     from .log_reader import parse_conversation
     from .evaluators import response as response_eval
     from .evaluators import scene_state as scene_state_eval
@@ -664,7 +661,7 @@ async def run_report(args, pool: asyncpg.Pool, ollama_url: str):
         print("All evals cached, skipping judge.")
     else:
         print(f"Judging {uncached_count} uncached turns...")
-        await _warmup_model(ollama_url, args.judge_model)
+        await _warmup_model(aiserver_url, args.judge_model)
 
     eval_times: list[float] = []
 
@@ -675,7 +672,7 @@ async def run_report(args, pool: asyncpg.Pool, ollama_url: str):
             context = response_eval.build_context_for_turn(turn, conv)
             t0 = time.time()
             result = await judge(
-                ollama_url, args.judge_model, response_rubric, context,
+                aiserver_url, args.judge_model, response_rubric, context,
                 evaluator="response",
                 target_id=f"{conv.conv_id}:{turn.turn_index}",
                 target_label=f"conv{conv.conv_id} turn{turn.turn_index}",
@@ -699,7 +696,7 @@ async def run_report(args, pool: asyncpg.Pool, ollama_url: str):
             context = scene_state_eval.build_context_for_turn(turn)
             t0 = time.time()
             result = await judge(
-                ollama_url, args.judge_model, scene_state_rubric, context,
+                aiserver_url, args.judge_model, scene_state_rubric, context,
                 evaluator="scene_state",
                 target_id=f"{conv.conv_id}:{turn.turn_index}",
                 target_label=f"conv{conv.conv_id} turn{turn.turn_index}",
@@ -744,20 +741,20 @@ async def main():
             await run_show(args, pool)
             return
 
-        ollama_url = resolve_url(args.ollama_url)
+        aiserver_url = args.aiserver_url
 
         if args.command == "fewshot":
-            await run_fewshot(args, pool, ollama_url)
+            await run_fewshot(args, pool, aiserver_url)
         elif args.command == "card":
-            await run_card(args, pool, ollama_url)
+            await run_card(args, pool, aiserver_url)
         elif args.command == "response":
-            await run_response(args, pool, ollama_url)
+            await run_response(args, pool, aiserver_url)
         elif args.command == "scene-state":
-            await run_scene_state(args, pool, ollama_url)
+            await run_scene_state(args, pool, aiserver_url)
         elif args.command == "scenario":
-            await run_scenario(args, pool, ollama_url)
+            await run_scenario(args, pool, aiserver_url)
         elif args.command == "report":
-            await run_report(args, pool, ollama_url)
+            await run_report(args, pool, aiserver_url)
         else:
             print(f"Unknown command: {args.command}", file=sys.stderr)
             sys.exit(1)

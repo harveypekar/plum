@@ -1,8 +1,6 @@
 import asyncio
 import importlib
 import json
-import os
-import signal
 import subprocess
 import sys
 import time
@@ -11,21 +9,24 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from dotenv import load_dotenv
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from config import Config
+from inference_queue import InferenceQueue, QueueFullError
 from models import (
+    ChatRequest,
     DefaultsResponse,
-    GenerateOptions,
     GenerateRequest,
     HealthResponse,
     ModelInfo,
     StatsResponse,
 )
-from ollama import OllamaClient, OllamaError
+from ollama import OllamaClient
 
+load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
 config = Config()
 ollama = OllamaClient(base_url=config.ollama_url)
@@ -52,6 +53,10 @@ dashboard_clients: list[asyncio.Queue] = []
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    inference_queue = InferenceQueue(ollama, max_depth=config.queue_max_depth)
+    app.state.queue = inference_queue
+    await inference_queue.start()
+
     async def stats_broadcaster():
         while True:
             await asyncio.sleep(5)
@@ -62,6 +67,7 @@ async def lifespan(app: FastAPI):
     task = asyncio.create_task(stats_broadcaster())
     yield
     task.cancel()
+    await inference_queue.stop()
 
 
 app = FastAPI(title="aiserver", lifespan=lifespan)
@@ -71,6 +77,7 @@ app = FastAPI(title="aiserver", lifespan=lifespan)
 async def generate(req: GenerateRequest):
     model = config.resolve_model(req.model)
     merged = config.merge_options(req.options)
+    queue: InferenceQueue = app.state.queue
     start = time.time()
 
     async def stream():
@@ -78,7 +85,9 @@ async def generate(req: GenerateRequest):
         active_streams += 1
         total_tokens = 0
         try:
-            async for chunk in ollama.generate_stream(
+            async for chunk in queue.enqueue(
+                priority=req.priority,
+                mode="generate",
                 model=model,
                 prompt=req.prompt,
                 system=req.system,
@@ -87,7 +96,7 @@ async def generate(req: GenerateRequest):
                 yield json.dumps(chunk) + "\n"
                 if chunk.get("done"):
                     total_tokens = chunk.get("total_tokens", 0)
-        except OllamaError as e:
+        except QueueFullError as e:
             yield json.dumps({"error": str(e), "done": True}) + "\n"
         finally:
             active_streams -= 1
@@ -103,6 +112,79 @@ async def generate(req: GenerateRequest):
             await broadcast_event({"type": "request_complete", **entry})
 
     return StreamingResponse(stream(), media_type="application/x-ndjson")
+
+
+@app.post("/chat")
+async def chat(req: ChatRequest):
+    model = config.resolve_model(req.model)
+    merged = config.merge_options(req.options)
+    queue: InferenceQueue = app.state.queue
+    start = time.time()
+
+    if not req.stream:
+        # Non-streaming: collect all tokens and return JSON
+        try:
+            text = await queue.enqueue_and_collect(
+                priority=req.priority,
+                mode="chat",
+                model=model,
+                messages=req.messages,
+                options=merged.copy(),
+                stop=req.stop,
+            )
+        except QueueFullError as e:
+            raise HTTPException(status_code=503, detail=str(e))
+        elapsed = time.time() - start
+        entry = {
+            "model": model,
+            "prompt": str(req.messages[-1].get("content", ""))[:100] if req.messages else "",
+            "total_tokens": len(text) // 4,
+            "latency": round(elapsed, 2),
+            "timestamp": time.time(),
+        }
+        request_log.append(entry)
+        await broadcast_event({"type": "request_complete", **entry})
+        return {"message": {"content": text}, "model": model}
+
+    # Streaming mode
+    async def stream():
+        global active_streams
+        active_streams += 1
+        total_tokens = 0
+        try:
+            async for chunk in queue.enqueue(
+                priority=req.priority,
+                mode="chat",
+                model=model,
+                messages=req.messages,
+                options=merged.copy(),
+                stop=req.stop,
+            ):
+                yield json.dumps(chunk) + "\n"
+                if chunk.get("done"):
+                    total_tokens = chunk.get("total_tokens", 0)
+        except QueueFullError as e:
+            yield json.dumps({"error": str(e), "done": True}) + "\n"
+        finally:
+            active_streams -= 1
+            elapsed = time.time() - start
+            entry = {
+                "model": model,
+                "prompt": str(req.messages[-1].get("content", ""))[:100] if req.messages else "",
+                "total_tokens": total_tokens,
+                "latency": round(elapsed, 2),
+                "timestamp": time.time(),
+            }
+            request_log.append(entry)
+            await broadcast_event({"type": "request_complete", **entry})
+
+    return StreamingResponse(stream(), media_type="application/x-ndjson")
+
+
+@app.get("/queue")
+async def queue_status():
+    queue: InferenceQueue = app.state.queue
+    return queue.queue_snapshot()
 
 
 @app.get("/defaults", response_model=DefaultsResponse)
@@ -174,11 +256,13 @@ async def stats():
         for r in recent
         if r["latency"] > 0 and r["total_tokens"] > 0
     ]
+    queue_depth = len(app.state.queue._entries) if hasattr(app.state, "queue") else 0
     return StatsResponse(
         total_requests=len(request_log),
         requests_last_hour=len(recent),
         avg_tokens_per_second=round(sum(tps_values) / len(tps_values), 1) if tps_values else 0,
         active_streams=active_streams,
+        queue_depth=queue_depth,
     )
 
 

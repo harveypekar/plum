@@ -1,0 +1,140 @@
+[meta]
+name = "Response Quality"
+description = "Evaluates the quality of a single assistant response in conversation context"
+scale_min = 1
+scale_max = 5
+
+[dimensions.character_consistency]
+name = "Character Consistency"
+weight = 2.0
+context_requires = ["system_prompt", "assistant_message"]
+criteria = """
+Does the response stay in character as established by the system prompt? Check:
+- Speech patterns match the character's described voice (vocabulary, cadence, profanity)
+- Emotional reactions fit the character's personality, not a generic assistant
+- Character maintains their established disposition (guarded stays guarded, playful stays playful)
+- Does NOT break character to be helpful, accommodating, or therapist-like
+- Internal logic: character remembers their own motivations and attitudes
+
+1: Completely out of character. Generic assistant voice or personality 180.
+2: Mostly generic with occasional character markers.
+3: Recognizably in character but with drift in key moments.
+4: Solidly in character. Voice and behavior match throughout.
+5: Flawless. Every line is unmistakably this character in this moment.
+"""
+
+[dimensions.scene_state_adherence]
+name = "Scene State Adherence"
+weight = 1.5
+context_requires = ["scene_state", "assistant_message"]
+criteria = """
+Does the response respect the established physical reality? Check:
+- Character's location matches the scene state
+- Clothing state is consistent (if undressed, don't reference adjusting clothes)
+- Physical props mentioned are ones that exist in the scene
+- Body position and proximity make physical sense
+- No teleportation or impossible physical actions
+
+If no scene state is provided, score 3 (neutral).
+
+1: Contradicts scene state in multiple ways. Impossible actions given physical setup.
+2: One clear contradiction (wrong location, phantom clothing, impossible reach).
+3: Mostly consistent. Minor ambiguity but no hard contradictions.
+4: Respects the physical scene. All actions are plausible given the setup.
+5: Demonstrates detailed awareness of the scene. Uses props and positions naturally.
+"""
+
+[dimensions.emotional_persistence]
+name = "Emotional Persistence"
+weight = 1.5
+context_requires = ["conversation_history", "assistant_message"]
+criteria = """
+Do emotions evolve naturally across the conversation, or reset each turn? Check:
+- Emotional state carries forward from previous turns (grief doesn't vanish)
+- Mood shifts happen gradually and for clear reasons, not suddenly
+- Character doesn't snap from vulnerable to cheerful without cause
+- Unresolved tensions remain present even when the topic changes
+- The emotional arc across visible history feels coherent
+
+1: Emotional reset every turn. Previous vulnerability or tension vanishes.
+2: Mostly reactive to current turn only. Weak emotional memory.
+3: Some carryover but occasional jarring mood shifts.
+4: Good emotional continuity. Mood shifts are earned and gradual.
+5: Excellent emotional arc. Previous states color current reactions naturally.
+"""
+
+[dimensions.response_variety]
+name = "Response Shape Variety"
+weight = 1.0
+context_requires = ["assistant_message"]
+criteria = """
+Does the response avoid formulaic structure? Check:
+- Not every paragraph follows: asterisk-action + dialogue + inner-thought
+- Length matches the dramatic beat (short for punchy, longer for reflective)
+- Varies between action-heavy, dialogue-heavy, and mixed
+- Avoids the "gasp/shiver/breath caught" physical reaction template
+- Sentence structure varies (not all compound sentences with semicolons)
+
+1: Rigid formula every paragraph. Action-dialogue-thought repeated.
+2: Mostly formulaic with occasional variation.
+3: Some structural variety but defaults to a recognizable pattern.
+4: Good variety. Different beats get different structures.
+5: Excellent. Structure serves the moment. Silence and brevity used when appropriate.
+"""
+
+[dimensions.user_narration_avoidance]
+name = "User Narration Avoidance"
+weight = 1.5
+context_requires = ["assistant_message"]
+criteria = """
+Does the response avoid narrating the user's actions, thoughts, or emotions? Check:
+- Does NOT describe what the user character does ("You reach out and...")
+- Does NOT attribute emotions to the user character ("You feel a surge of...")
+- Does NOT assume the user character's physical actions or movements
+- The response stops at the character's own actions and perceptions
+- Observations about the user character are from the character's POV only ("she noticed him flinch")
+
+1: Extensively narrates user actions and emotions. Multiple instances.
+2: A few instances of user narration or assumed user actions.
+3: Mostly avoids it but one borderline instance.
+4: Clean. Only describes own character's actions and perceptions.
+5: Perfect boundary. Even observations of the user are filtered through character POV.
+"""
+
+[dimensions.physical_consistency]
+name = "Physical Consistency"
+weight = 1.0
+context_requires = ["assistant_message", "conversation_history"]
+criteria = """
+Are physical actions internally consistent within the response? Check:
+- Hands doing something don't simultaneously do something else
+- Character doesn't stand up twice or sit down from standing
+- Object interactions make sense (can't drink from an empty cup)
+- Spatial relationships are maintained within the response
+- Body language matches the emotional state being portrayed
+
+1: Multiple physical impossibilities within the response.
+2: One clear physical contradiction (holding something while doing two-handed task).
+3: Mostly plausible. Minor ambiguity in physical staging.
+4: Physically coherent. All actions flow naturally.
+5: Excellent physical awareness. Actions create a vivid, consistent picture.
+"""
+
+[dimensions.stop_quality]
+name = "Stop Quality"
+weight = 1.0
+context_requires = ["assistant_message"]
+criteria = """
+Does the response end at a natural stopping point? Check:
+- Ends on a complete action or line of dialogue, not mid-sentence
+- Doesn't trail off with "..." as a lazy ending (unless character voice demands it)
+- Leaves space for the user to respond (not a monologue that answers itself)
+- Doesn't end with an explicit prompt/question that feels forced
+- Length is appropriate — not truncated, not padded
+
+1: Ends mid-sentence or mid-action. Clearly truncated or unnaturally cut.
+2: Ends at a sentence boundary but feels abrupt or artificially padded.
+3: Reasonable ending but slightly forced or could be tighter.
+4: Natural stopping point that invites response without forcing it.
+5: Perfect ending. The moment lands, the beat is complete, space is left.
+"""
