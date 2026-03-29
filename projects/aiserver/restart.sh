@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # Restart aiserver: kill existing process, wait for port, start fresh
 # For full stack startup (postgres + ollama + aiserver), use scripts/dev-up.sh
-# shellcheck disable=SC1091
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -11,6 +10,7 @@ cd "$SCRIPT_DIR"
 PORT=8080
 
 # Load env (DATABASE_URL etc.)
+# shellcheck source=/dev/null
 source "$REPO_ROOT/scripts/common/load-env.sh"
 
 # Kill existing aiserver
@@ -28,6 +28,7 @@ for _ in $(seq 1 10); do
 done
 
 # Activate venv
+# shellcheck source=/dev/null
 source .venv/bin/activate
 
 # Start aiserver in background

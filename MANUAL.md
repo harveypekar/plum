@@ -14,6 +14,7 @@ These are specific to Plum (defined in `.claude/skills/`):
 | `/plum-postmortem` | After merging a PR, checks if design.md needs updating |
 | `/plum-churn` | Dispatches all open GitHub Issues as parallel subagents in isolated worktrees |
 | `/plum-audit [section]` | Runs comprehensive project health audit (security, quality, docs, infra, claude, testing) |
+| `/screenshot` | View the most recent screenshot from the scratch folder |
 
 ## Workflow Slash Commands
 
@@ -28,7 +29,6 @@ From installed plugins - the ones you'll use most often:
 | `/clean-gone` | commit-commands | Delete local branches that are gone on remote |
 | `/review-pr` | pr-review-toolkit | Run multi-agent PR review (silent failures, test coverage, types) |
 | `/code-review` | code-review | Review a PR against project guidelines |
-| `/coderabbit:review` | coderabbit | Run CodeRabbit AI code review on changes |
 
 ### Development
 
@@ -52,18 +52,15 @@ From installed plugins - the ones you'll use most often:
 | `/revise-claude-md` | claude-md-management | Update CLAUDE.md with learnings from this session |
 | `/claude-md-improver` | claude-md-management | Audit and improve CLAUDE.md files |
 
-### Skill & Hook Management
+### Skill Management
 
 | Command | Plugin | What It Does |
 |---------|--------|-------------|
-| `/hookify` | hookify | Create hooks from conversation analysis |
-| `/hookify:configure` | hookify | Enable/disable hookify rules |
-| `/hookify:list` | hookify | List all configured hookify rules |
 | `/skill-creator` | skill-creator | Create, modify, and test skills |
 
 ## Active Hooks
 
-Configured in `.claude/settings.local.json`. Active next session.
+Hook scripts live in `.claude/hooks/`.
 
 ### PreToolUse: Block .env edits
 - **Trigger:** Any Edit or Write targeting a `.env` file
@@ -75,6 +72,16 @@ Configured in `.claude/settings.local.json`. Active next session.
 - **Effect:** Runs shellcheck and reports warnings to Claude for fixing
 - **Script:** `.claude/hooks/lint-shell.sh`
 - **Requires:** shellcheck installed at `~/.local/bin/shellcheck`
+
+### PreToolUse: Block commits/pushes on master/main
+- **Trigger:** Any `git commit` or `git push` while on master or main branch
+- **Effect:** Blocks the operation, tells Claude to use a worktree with a feature branch
+- **Script:** `.claude/hooks/block-master-commits.sh`
+
+### PreToolUse: Enforce Claude author identity
+- **Trigger:** Any `git commit` that doesn't include `--author` with Claude's email
+- **Effect:** Blocks the commit, requires `--author="Claude <noreply@anthropic.com>"`
+- **Script:** `.claude/hooks/enforce-claude-author.sh`
 
 ### PreToolUse: Block dangerous git in worktrees
 - **Trigger:** Any Bash command inside a `.claude/worktrees/` directory
@@ -124,6 +131,7 @@ These are NOT slash commands - Claude invokes them automatically when relevant. 
 | systematic-debugging | When encountering bugs or test failures |
 | verification-before-completion | Before claiming work is done |
 | dispatching-parallel-agents | When facing 2+ independent tasks |
+| subagent-driven-development | When executing plans with independent tasks in current session |
 | finishing-a-development-branch | When implementation is complete and ready to merge |
 | writing-skills | When creating or editing skills |
 | using-git-worktrees | When starting isolated feature work |
@@ -158,10 +166,10 @@ These are part of Claude Code itself (not plugins):
 4. **Run `/revise-claude-md`** at the end of sessions that establish new patterns
 5. **Check `docs/staging.md`** before writing scripts that touch the VPS
 6. **Test in Docker first:** `docker-compose -f docker/docker-compose.local.yml run plum bash scripts/...`
-7. **ShellCheck runs automatically** on .sh file edits (after next session restart)
+7. **ShellCheck runs automatically** on .sh file edits via the `lint-shell.sh` hook
 8. **`.env` edits are blocked** - edit that file manually outside Claude
 9. **Use `/simplify`** after writing a chunk of code to clean it up
-10. **Use `/hookify`** when Claude keeps making a mistake you want to prevent permanently
+10. **Use `/skill-creator`** to build custom skills for recurring workflows
 
 ---
 
