@@ -18,6 +18,11 @@ from .mcp_client import get_router as get_mcp_router
 from .research import research_dispatch
 from .fewshot import get_fewshot_messages
 
+# Priority levels from aiserver's inference queue (lower = higher priority).
+# Duplicated here to avoid a circular import from the host process.
+_PRI_INTERACTIVE = 0   # UI chat: /message, /continue, /regenerate, /auto-reply
+_PRI_BACKGROUND = 5    # card generation, scene state, summaries
+
 _log = logging.getLogger(__name__)
 
 _ollama = None
@@ -189,7 +194,7 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         req_model = req.get("model", "") or _card_gen_model
         model = _resolve_model(req_model) if _resolve_model else req_model
         result = await _get_queue().enqueue_and_collect(
-            priority=0, mode="generate", model=model,
+            priority=_PRI_BACKGROUND, mode="generate", model=model,
             prompt=description, system=system,
             options={"temperature": 0.7, "num_predict": 2048, "think": False},
         )
@@ -222,7 +227,7 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         req_model = req.get("model", "") or _card_gen_model
         model = _resolve_model(req_model) if _resolve_model else req_model
         result = await _get_queue().enqueue_and_collect(
-            priority=0, mode="generate", model=model,
+            priority=_PRI_BACKGROUND, mode="generate", model=model,
             prompt=prompt,
             system="Output only the requested field content. No thinking, no preamble, no quotes around the value.",
             options={"temperature": 0.7, "num_predict": 512, "think": False},
@@ -562,7 +567,7 @@ def setup(app: FastAPI, ollama, resolve_model=None):
 
         result = await asyncio.wait_for(
             _get_queue().enqueue_and_collect(
-                priority=0, mode="generate", model=model,
+                priority=_PRI_BACKGROUND, mode="generate", model=model,
                 prompt=full_prompt,
                 system=f"You are writing the opening narration for {char_name}. Stay in character.",
                 options={"temperature": 1.05, "num_predict": 768, "min_p": 0.1, "repeat_penalty": 1.08},
@@ -661,7 +666,7 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         summary_model = _resolve_model(_scene_state_model) if _resolve_model else model
         from .scene_state import clean_scene_state_response
         result = await _get_queue().enqueue_and_collect(
-            priority=0, mode="generate", model=summary_model,
+            priority=_PRI_BACKGROUND, mode="generate", model=summary_model,
             prompt=prompt,
             system="Output only the scene state summary. No thinking, no preamble.",
             options={"temperature": 0.2, "num_predict": 250, "think": False},
@@ -822,7 +827,7 @@ def setup(app: FastAPI, ollama, resolve_model=None):
                 tokens = []
                 try:
                     async for chunk in _get_queue().enqueue(
-                        priority=0, mode="chat", model=model,
+                        priority=_PRI_INTERACTIVE, mode="chat", model=model,
                         messages=cur_messages,
                         options=ollama_options, stop=[f"{user_name}:"],
                     ):
@@ -937,7 +942,7 @@ def setup(app: FastAPI, ollama, resolve_model=None):
             raw = {}
             try:
                 async for chunk in _get_queue().enqueue(
-                    priority=0, mode="chat", model=model,
+                    priority=_PRI_INTERACTIVE, mode="chat", model=model,
                     messages=chat_messages,
                     options=ollama_options, stop=[f"{user_name}:"],
                 ):
@@ -996,7 +1001,7 @@ def setup(app: FastAPI, ollama, resolve_model=None):
             raw = {}
             try:
                 async for chunk in _get_queue().enqueue(
-                    priority=0, mode="chat", model=model,
+                    priority=_PRI_INTERACTIVE, mode="chat", model=model,
                     messages=chat_messages,
                     options=ollama_options, stop=[f"{user_name}:"],
                 ):
@@ -1103,7 +1108,7 @@ def setup(app: FastAPI, ollama, resolve_model=None):
             raw = {}
             try:
                 async for chunk in _get_queue().enqueue(
-                    priority=0, mode="chat", model=model,
+                    priority=_PRI_INTERACTIVE, mode="chat", model=model,
                     messages=chat_messages,
                     options=ollama_options, stop=[f"{user_name}:"],
                 ):

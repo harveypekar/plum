@@ -300,9 +300,15 @@ def _hash_data(data) -> str:
 
 
 def compute_card_hash(card: dict) -> str:
-    """Hash the card's voice-relevant fields (description, personality, system_prompt, first_mes, mes_example)."""
+    """Hash the card's identity + voice-relevant fields.
+
+    Includes card ID to prevent cross-card cache collisions — two different
+    characters with similar descriptions must never share a cached first message.
+    """
     data = card.get("card_data", {}).get("data", card.get("card_data", {}))
     relevant = {
+        "id": card.get("id"),
+        "name": data.get("name", ""),
         "description": data.get("description", ""),
         "personality": data.get("personality", ""),
         "system_prompt": data.get("system_prompt", ""),
@@ -452,3 +458,44 @@ async def count_fewshot_examples(card_id: int | None = None) -> int:
     return await pool.fetchval(
         "SELECT COUNT(*) FROM rp_fewshot_examples WHERE active"
     )
+
+
+# -- Eval Metrics --
+
+async def save_metrics(*, domain: str, target_type: str, target_id: str,
+                       target_label: str, judge_model: str, rubric_name: str,
+                       scores: list[dict], weighted_average: float,
+                       raw_judge_output: str = "", pool=None):
+    """Persist a single eval result to rp_eval_metrics."""
+    if pool is None:
+        pool = await get_pool()
+    await pool.execute(
+        "INSERT INTO rp_eval_metrics "
+        "(domain, target_type, target_id, target_label, judge_model, "
+        " rubric_name, scores, weighted_average, raw_judge_output) "
+        "VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9)",
+        domain, target_type, target_id, target_label, judge_model,
+        rubric_name, json.dumps(scores), weighted_average, raw_judge_output,
+    )
+
+
+async def get_metrics(*, target_type: str, target_id: str | None = None,
+                      limit: int = 50, pool=None) -> list[dict]:
+    """Retrieve eval metrics, newest first."""
+    if pool is None:
+        pool = await get_pool()
+    if target_id:
+        rows = await pool.fetch(
+            "SELECT * FROM rp_eval_metrics "
+            "WHERE target_type = $1 AND target_id = $2 "
+            "ORDER BY created_at DESC LIMIT $3",
+            target_type, target_id, limit,
+        )
+    else:
+        rows = await pool.fetch(
+            "SELECT * FROM rp_eval_metrics "
+            "WHERE target_type = $1 "
+            "ORDER BY created_at DESC LIMIT $2",
+            target_type, limit,
+        )
+    return [dict(r) for r in rows]
