@@ -108,22 +108,24 @@ fi
 
 header "tests"
 # Map changed paths to project test suites
-declare -A projects_hit
+projects_to_test=""
 while IFS= read -r f; do
     [ -z "$f" ] && continue
     case "$f" in
-        projects/aiserver/*) projects_hit[aiserver]=1 ;;
-        projects/rp/*)       projects_hit[rp]=1 ;;
-        projects/3dml/*)     projects_hit[3dml]=1 ;;
-        projects/coach/*)    projects_hit[coach]=1 ;;
+        projects/aiserver/*) projects_to_test="$projects_to_test aiserver" ;;
+        projects/rp/*)       projects_to_test="$projects_to_test rp" ;;
+        projects/3dml/*)     projects_to_test="$projects_to_test 3dml" ;;
+        projects/coach/*)    projects_to_test="$projects_to_test coach" ;;
     esac
 done <<< "$STAGED_FILES"
+# deduplicate
+projects_to_test=$(echo "$projects_to_test" | tr ' ' '\n' | sort -u | tr '\n' ' ')
 
-if [ ${#projects_hit[@]} -eq 0 ]; then
+if [ -z "$projects_to_test" ]; then
     echo "  (no project files staged)"
 else
     test_failed=0
-    for proj in "${!projects_hit[@]}"; do
+    for proj in $projects_to_test; do
         test_dir="$REPO_ROOT/projects/$proj/tests"
         [ -d "$test_dir" ] || continue
 
