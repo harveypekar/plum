@@ -10,6 +10,8 @@ credentials/
 # Logs (local only)
 logs/
 ~/.logs/
+projects/rp/log.txt
+projects/rp/examples-dump.md
 
 # Python
 __pycache__/
@@ -48,4 +50,3 @@ projects/rp/comfyui/
 
 # Claude Code local settings (per-machine permissions, may accumulate secrets)
 .claude/settings.local.json
-

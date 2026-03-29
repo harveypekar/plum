@@ -1,11 +1,12 @@
 #!/bin/bash
 # Load environment variables safely
 # Usage: source scripts/common/load-env.sh
-# Works in both bash and zsh (BASH_SOURCE for bash, $0 for zsh)
 
 # Find .env in same directory as this script or parent directories
 find_env_file() {
-    local script_path="${BASH_SOURCE[0]:-$0}"
+    # Support both bash (BASH_SOURCE) and zsh (${(%):-%x})
+    # shellcheck disable=SC2296
+    local script_path="${BASH_SOURCE[0]:-${(%):-%x}}"
     local current_dir
     current_dir="$(cd "$(dirname "$script_path")/../.." && pwd)"
 
@@ -29,9 +30,10 @@ if [ -z "$ENV_FILE" ]; then
     return 1 2>/dev/null || exit 1
 fi
 
-# shellcheck disable=SC1090
+# Source .env with set -a to preserve variable quoting
 if [ -f "$ENV_FILE" ]; then
     set -a
+    # shellcheck source=/dev/null
     source "$ENV_FILE"
     set +a
 else
