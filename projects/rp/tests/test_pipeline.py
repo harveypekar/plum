@@ -166,7 +166,7 @@ class TestExpandVariables:
         assert result["system_prompt"] == "Scene: a park"
 
     def test_scene_state_injected_into_post(self):
-        ctx = self._ctx(post="Stay in character.", scene_state="Location: park\nMood: tense")
+        ctx = self._ctx(post="Stay in character.", scene_state="Location: park\nMood: Char is tense")
         result = expand_variables(ctx)
         assert "Current Scene State" in result["post_prompt"]
         assert "Location: park" in result["post_prompt"]
@@ -183,10 +183,17 @@ class TestExpandVariables:
 
     def test_empty_post_prompt_still_gets_scene_state(self):
         ctx = self._ctx(system="${char} says hi", post="", ai_name="Jess",
-                        scene_state="Location: X")
+                        scene_state="Location: X\nArc: Jess is cautious")
         result = expand_variables(ctx)
         assert result["system_prompt"] == "Jess says hi"
         assert "Location: X" in result["post_prompt"]
+
+    def test_scene_state_discarded_if_wrong_character(self):
+        ctx = self._ctx(ai_name="Amber",
+                        scene_state="Location: park\nArc: Valentina is nervous")
+        result = expand_variables(ctx)
+        assert result["scene_state"] == ""
+        assert "Scene State" not in result.get("post_prompt", "")
 
 
 class TestCleanResponse:
