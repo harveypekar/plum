@@ -104,6 +104,51 @@ else
     echo "  (no .py files staged)"
 fi
 
+# ── Check 5: project tests ────────────────────────────────────────
+
+header "tests"
+# Map changed paths to project test suites
+declare -A projects_hit
+while IFS= read -r f; do
+    [ -z "$f" ] && continue
+    case "$f" in
+        projects/aiserver/*) projects_hit[aiserver]=1 ;;
+        projects/rp/*)       projects_hit[rp]=1 ;;
+        projects/3dml/*)     projects_hit[3dml]=1 ;;
+        projects/coach/*)    projects_hit[coach]=1 ;;
+    esac
+done <<< "$STAGED_FILES"
+
+if [ ${#projects_hit[@]} -eq 0 ]; then
+    echo "  (no project files staged)"
+else
+    test_failed=0
+    for proj in "${!projects_hit[@]}"; do
+        test_dir="$REPO_ROOT/projects/$proj/tests"
+        [ -d "$test_dir" ] || continue
+
+        venv="$REPO_ROOT/projects/$proj/.venv/bin/python"
+        if [ -x "$venv" ]; then
+            py="$venv"
+        else
+            py="python3"
+        fi
+
+        echo "  running $proj tests..."
+        extra_args=()
+        if [ "$proj" = "3dml" ]; then
+            extra_args=(--ignore=tests/test_ui.py)
+        fi
+        if ! (cd "$REPO_ROOT/projects/$proj" && PYTHONPATH="$REPO_ROOT" "$py" -m pytest tests/ -x -q "${extra_args[@]}" 2>&1); then
+            echo "  FAIL: $proj tests"
+            test_failed=1
+        fi
+    done
+    if [ "$test_failed" -eq 1 ]; then
+        fail
+    fi
+fi
+
 # ── Result ──────────────────────────────────────────────────────────
 
 echo ""
