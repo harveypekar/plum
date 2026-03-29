@@ -45,13 +45,18 @@ Rules for your review:
 """
 
 
-def run(cmd: list[str]) -> str:
-    result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-    return result.stdout.strip()
+PR_SIZE_WARN = 1000  # lines added — warn above this
+
+
+def run(cmd: list[str], *, binary: bool = False) -> str | bytes:
+    result = subprocess.run(cmd, capture_output=True, check=True,
+                            text=not binary)
+    return result.stdout if binary else result.stdout.strip()
 
 
 def get_pr_diff(pr_number: str, repo: str) -> str:
-    return run(["gh", "pr", "diff", pr_number, "--repo", repo])
+    raw = run(["gh", "pr", "diff", pr_number, "--repo", repo], binary=True)
+    return raw.decode("utf-8", errors="replace").strip()
 
 
 def get_pr_info(pr_number: str, repo: str) -> dict:
@@ -97,6 +102,12 @@ def call_claude(diff: str, pr_info: dict, api_key: str) -> str:
         sys.exit(1)
 
 
+def get_pr_stats(pr_number: str, repo: str) -> dict:
+    raw = run(["gh", "pr", "view", pr_number, "--repo", repo,
+               "--json", "additions,deletions"])
+    return json.loads(raw)
+
+
 def post_review(pr_number: str, repo: str, review_text: str) -> None:
     body = f"## Automated Review\n\n{review_text}"
     subprocess.run(
@@ -132,9 +143,19 @@ def main() -> None:
         print("Empty diff, skipping review.")
         return
 
+    stats = get_pr_stats(pr_number, repo)
+    additions = stats.get("additions", 0)
+    size_note = ""
+    if additions > PR_SIZE_WARN:
+        size_note = (
+            f"\n\n> **Size warning**: this PR adds **{additions:,}** lines "
+            f"(threshold: {PR_SIZE_WARN:,}). Consider splitting into "
+            "smaller, reviewable chunks."
+        )
+
     pr_info = get_pr_info(pr_number, repo)
     review = call_claude(diff, pr_info, api_key)
-    post_review(pr_number, repo, review)
+    post_review(pr_number, repo, review + size_note)
     print(f"Review posted on PR #{pr_number}")
 
 

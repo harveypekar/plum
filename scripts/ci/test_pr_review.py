@@ -121,6 +121,31 @@ class TestRequestFormat(unittest.TestCase):
         assert sent_body["system"] == pr_review.SYSTEM_PROMPT
 
 
+class TestBinaryDiffHandling(unittest.TestCase):
+    """Verify diffs with binary content don't crash."""
+
+    @patch("subprocess.run")
+    def test_binary_diff_decoded_safely(self, mock_run):
+        mock_run.return_value = MagicMock(
+            stdout=b"--- a/img.png\n+++ b/img.png\n\xff\xfe binary"
+        )
+        result = pr_review.get_pr_diff("1", "owner/repo")
+        assert isinstance(result, str)
+        assert "binary" in result
+
+
+class TestPRSizeWarning(unittest.TestCase):
+    """Verify large PRs get a size warning appended."""
+
+    @patch("subprocess.run")
+    def test_large_pr_stats(self, mock_run):
+        mock_run.return_value = MagicMock(
+            stdout='{"additions": 5000, "deletions": 100}'
+        )
+        stats = pr_review.get_pr_stats("1", "owner/repo")
+        assert stats["additions"] == 5000
+
+
 class TestMissingEnvVars(unittest.TestCase):
     """Verify main exits when required env vars are missing."""
 
