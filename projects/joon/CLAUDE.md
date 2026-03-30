@@ -38,6 +38,46 @@ This project follows LLVM coding standards for consistency with industry best pr
 
 See [LLVM Coding Standards](https://llvm.org/docs/CodingStandards/) for full reference.
 
+## Static Analysis
+
+This project uses multiple static analysis tools to ensure code quality:
+
+### Automated Analysis (on PR open)
+- **clang-tidy:** LLVM coding standard conformance, readability, performance, and modernization checks
+- **MSVC Static Analysis:** Windows/C++ core guidelines checking
+
+Configuration: `.clang-tidy` (LLVM-aligned checks with exclusions for Vulkan/no-exceptions code)
+
+### Local Development: ANALYZE Configuration
+
+Build with ASan/UBSan for comprehensive runtime analysis:
+
+```bash
+cd projects/joon
+premake5 gmake2      # or: premake5 vs2022 (Windows)
+make config=analyze  # Linux
+# Or select ANALYZE configuration in Visual Studio (Windows)
+```
+
+This configuration enables:
+- **AddressSanitizer (ASan)** - Detects memory leaks, buffer overflows, use-after-free
+- **UndefinedBehaviorSanitizer (UBSan)** - Detects undefined behavior (integer overflow, etc.)
+- Debug symbols and no optimization for accurate error reporting
+
+Expected: Some performance overhead; use for development and testing only.
+
+### Running Checks Locally
+
+```bash
+# clang-tidy check specific file
+clang-tidy -p build src/vulkan/device.cpp
+
+# Count warnings/errors
+clang-tidy -p build src/**/*.cpp 2>&1 | grep -c "warning:"
+```
+
+See [LLVM clang-tidy docs](https://clang.llvm.org/extra/clang-tidy/) for details.
+
 ## Conventions
 
 - C++20, no exceptions (use result types)

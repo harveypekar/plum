@@ -1,5 +1,5 @@
 workspace "Joon"
-    configurations { "Debug", "Release" }
+    configurations { "Debug", "Release", "ANALYZE" }
     architecture "x86_64"
     language "C++"
     cppdialect "C++20"
@@ -13,6 +13,23 @@ workspace "Joon"
     filter "configurations:Release"
         defines { "NDEBUG" }
         optimize "Speed"
+
+    filter "configurations:ANALYZE"
+        defines { "DEBUG", "JOON_ANALYZE" }
+        symbols "On"
+        optimize "Off"
+
+        -- AddressSanitizer (ASan)
+        buildoptions { "-fsanitize=address" }
+        linkoptions { "-fsanitize=address" }
+
+        -- UndefinedBehaviorSanitizer (UBSan)
+        buildoptions { "-fsanitize=undefined" }
+        linkoptions { "-fsanitize=undefined" }
+
+        -- Additional sanitizer options
+        buildoptions { "-fno-omit-frame-pointer" }
+        linkoptions { "-fno-omit-frame-pointer" }
 
     filter "system:windows"
         systemversion "latest"
