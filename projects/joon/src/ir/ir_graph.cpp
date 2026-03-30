@@ -26,7 +26,7 @@ void IRGraph::resolve_ast(const dsl::Program& program) {
         if (auto* def = std::get_if<dsl::DefNode>(&stmt->data)) {
             uint32_t node_id = resolve_expr(*def->value);
             nodes[node_id].name = def->name;
-            name_to_node_[def->name] = node_id;
+            m_nameToNode[def->name] = node_id;
 
         } else if (auto* param = std::get_if<dsl::ParamNode>(&stmt->data)) {
             uint32_t id = add_node("param", Tier::CPU);
@@ -59,7 +59,7 @@ void IRGraph::resolve_ast(const dsl::Program& program) {
             }
 
             params.push_back(std::move(pi));
-            name_to_node_[param->name] = id;
+            m_nameToNode[param->name] = id;
 
         } else if (auto* output = std::get_if<dsl::OutputNode>(&stmt->data)) {
             uint32_t node_id = resolve_expr(*output->value);
@@ -83,10 +83,10 @@ uint32_t IRGraph::resolve_expr(const dsl::AstNode& expr) {
     }
 
     if (auto* sym = std::get_if<dsl::SymbolNode>(&expr.data)) {
-        auto it = name_to_node_.find(sym->name);
-        if (it == name_to_node_.end()) {
+        auto it = m_nameToNode.find(sym->name);
+        if (it == m_nameToNode.end()) {
             diagnostics.push_back({
-                Diagnostic::Level::Error,
+                Diagnostic::Level::ERROR,
                 "Undefined symbol: " + sym->name,
                 expr.line, expr.col
             });
@@ -127,7 +127,7 @@ uint32_t IRGraph::resolve_expr(const dsl::AstNode& expr) {
     }
 
     diagnostics.push_back({
-        Diagnostic::Level::Error,
+        Diagnostic::Level::ERROR,
         "Unexpected expression",
         expr.line, expr.col
     });
@@ -167,8 +167,8 @@ const Node* IRGraph::find_node(uint32_t id) const {
 }
 
 const Node* IRGraph::find_node_by_name(const std::string& name) const {
-    auto it = name_to_node_.find(name);
-    if (it != name_to_node_.end()) return &nodes[it->second];
+    auto it = m_nameToNode.find(name);
+    if (it != m_nameToNode.end()) return &nodes[it->second];
     return nullptr;
 }
 
