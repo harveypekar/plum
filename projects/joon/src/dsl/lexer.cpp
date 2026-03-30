@@ -2,27 +2,27 @@
 
 namespace joon::dsl {
 
-Lexer::Lexer(std::string_view source) : source_(source) {}
+Lexer::Lexer(std::string_view source) : m_source(source) {}
 
 char Lexer::peek() const {
-    if (pos_ >= source_.size()) return '\0';
-    return source_[pos_];
+    if (m_pos >= m_source.size()) return '\0';
+    return m_source[m_pos];
 }
 
 char Lexer::advance() {
-    char c = source_[pos_++];
-    if (c == '\n') { line_++; col_ = 1; }
-    else { col_++; }
+    char c = m_source[m_pos++];
+    if (c == '\n') { m_line++; m_col = 1; }
+    else { m_col++; }
     return c;
 }
 
 void Lexer::skip_whitespace_and_comments() {
-    while (pos_ < source_.size()) {
+    while (m_pos < m_source.size()) {
         char c = peek();
         if (c == ' ' || c == '\t' || c == '\n' || c == '\r') {
             advance();
         } else if (c == ';') {
-            while (pos_ < source_.size() && peek() != '\n') advance();
+            while (m_pos < m_source.size() && peek() != '\n') advance();
         } else {
             break;
         }
@@ -30,46 +30,46 @@ void Lexer::skip_whitespace_and_comments() {
 }
 
 Token Lexer::read_number() {
-    uint32_t start_col = col_;
-    uint32_t start_line = line_;
-    size_t start = pos_;
+    uint32_t start_col = m_col;
+    uint32_t start_line = m_line;
+    size_t start = m_pos;
 
     if (peek() == '-') advance();
-    while (pos_ < source_.size() && isdigit(peek())) advance();
-    if (pos_ < source_.size() && peek() == '.') {
+    while (m_pos < m_source.size() && isdigit(peek())) advance();
+    if (m_pos < m_source.size() && peek() == '.') {
         advance();
-        while (pos_ < source_.size() && isdigit(peek())) advance();
+        while (m_pos < m_source.size() && isdigit(peek())) advance();
     }
 
-    return { TokenType::Number, std::string(source_.substr(start, pos_ - start)),
+    return { TokenType::Number, std::string(m_source.substr(start, m_pos - start)),
              start_line, start_col };
 }
 
 Token Lexer::read_string() {
-    uint32_t start_col = col_;
-    uint32_t start_line = line_;
+    uint32_t start_col = m_col;
+    uint32_t start_line = m_line;
     advance(); // skip opening "
-    size_t start = pos_;
-    while (pos_ < source_.size() && peek() != '"') advance();
-    std::string text(source_.substr(start, pos_ - start));
-    if (pos_ < source_.size()) advance(); // skip closing "
+    size_t start = m_pos;
+    while (m_pos < m_source.size() && peek() != '"') advance();
+    std::string text(m_source.substr(start, m_pos - start));
+    if (m_pos < m_source.size()) advance(); // skip closing "
     return { TokenType::String, text, start_line, start_col };
 }
 
 Token Lexer::read_symbol_or_keyword() {
-    uint32_t start_col = col_;
-    uint32_t start_line = line_;
+    uint32_t start_col = m_col;
+    uint32_t start_line = m_line;
     bool is_keyword = (peek() == ':');
-    size_t start = pos_;
+    size_t start = m_pos;
     advance();
-    while (pos_ < source_.size()) {
+    while (m_pos < m_source.size()) {
         char c = peek();
         if (c == '(' || c == ')' || c == ' ' || c == '\t' ||
             c == '\n' || c == '\r' || c == ';' || c == '"')
             break;
         advance();
     }
-    std::string text(source_.substr(start, pos_ - start));
+    std::string text(m_source.substr(start, m_pos - start));
     return { is_keyword ? TokenType::Keyword : TokenType::Symbol,
              text, start_line, start_col };
 }
@@ -78,18 +78,18 @@ std::vector<Token> Lexer::tokenize() {
     std::vector<Token> tokens;
     while (true) {
         skip_whitespace_and_comments();
-        if (pos_ >= source_.size()) break;
+        if (m_pos >= m_source.size()) break;
 
         char c = peek();
         if (c == '(') {
-            tokens.push_back({ TokenType::LParen, "(", line_, col_ });
+            tokens.push_back({ TokenType::LParen, "(", m_line, m_col });
             advance();
         } else if (c == ')') {
-            tokens.push_back({ TokenType::RParen, ")", line_, col_ });
+            tokens.push_back({ TokenType::RParen, ")", m_line, m_col });
             advance();
         } else if (c == '"') {
             tokens.push_back(read_string());
-        } else if (isdigit(c) || (c == '-' && pos_ + 1 < source_.size() && isdigit(source_[pos_ + 1]))) {
+        } else if (isdigit(c) || (c == '-' && m_pos + 1 < m_source.size() && isdigit(m_source[m_pos + 1]))) {
             tokens.push_back(read_number());
         } else {
             tokens.push_back(read_symbol_or_keyword());

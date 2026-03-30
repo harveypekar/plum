@@ -4,21 +4,21 @@
 
 namespace joon::vk {
 
-ResourcePool::ResourcePool(Device& device) : device_(device) {}
+ResourcePool::ResourcePool(Device& device) : m_device(device) {}
 
 ResourcePool::~ResourcePool() { clear(); }
 
 GpuImage* ResourcePool::alloc_image(uint32_t node_id, uint32_t width, uint32_t height,
                                      VkFormat format) {
-    auto it = images_.find(node_id);
-    if (it != images_.end()) {
+    auto it = m_images.find(node_id);
+    if (it != m_images.end()) {
         auto& old = it->second;
         if (old.width == width && old.height == height && old.format == format) {
             return &it->second; // reuse if same dimensions
         }
-        vkDestroyImageView(device_.device, old.view, nullptr);
-        vmaDestroyImage(device_.allocator, old.image, old.allocation);
-        images_.erase(it);
+        vkDestroyImageView(m_device.device, old.view, nullptr);
+        vmaDestroyImage(m_device.allocator, old.image, old.allocation);
+        m_images.erase(it);
     }
 
     GpuImage img{};
@@ -41,7 +41,7 @@ GpuImage* ResourcePool::alloc_image(uint32_t node_id, uint32_t width, uint32_t h
     VmaAllocationCreateInfo alloc_info{};
     alloc_info.usage = VMA_MEMORY_USAGE_GPU_ONLY;
 
-    if (vmaCreateImage(device_.allocator, &img_info, &alloc_info,
+    if (vmaCreateImage(m_device.allocator, &img_info, &alloc_info,
                        &img.image, &img.allocation, nullptr) != VK_SUCCESS) {
         throw std::runtime_error("Failed to allocate GPU image");
     }
@@ -55,15 +55,15 @@ GpuImage* ResourcePool::alloc_image(uint32_t node_id, uint32_t width, uint32_t h
     view_info.subresourceRange.levelCount = 1;
     view_info.subresourceRange.layerCount = 1;
 
-    vkCreateImageView(device_.device, &view_info, nullptr, &img.view);
+    vkCreateImageView(m_device.device, &view_info, nullptr, &img.view);
 
-    images_[node_id] = img;
-    return &images_[node_id];
+    m_images[node_id] = img;
+    return &m_images[node_id];
 }
 
 GpuImage* ResourcePool::get_image(uint32_t node_id) {
-    auto it = images_.find(node_id);
-    if (it == images_.end()) return nullptr;
+    auto it = m_images.find(node_id);
+    if (it == m_images.end()) return nullptr;
     return &it->second;
 }
 
@@ -78,14 +78,14 @@ void ResourcePool::upload(GpuImage* img, const void* data, size_t size) {
 
     VkBuffer staging;
     VmaAllocation staging_alloc;
-    vmaCreateBuffer(device_.allocator, &buf_info, &alloc_info, &staging, &staging_alloc, nullptr);
+    vmaCreateBuffer(m_device.allocator, &buf_info, &alloc_info, &staging, &staging_alloc, nullptr);
 
     void* mapped;
-    vmaMapMemory(device_.allocator, staging_alloc, &mapped);
+    vmaMapMemory(m_device.allocator, staging_alloc, &mapped);
     memcpy(mapped, data, size);
-    vmaUnmapMemory(device_.allocator, staging_alloc);
+    vmaUnmapMemory(m_device.allocator, staging_alloc);
 
-    auto cmd = device_.begin_single_command();
+    auto cmd = m_device.begin_single_command();
 
     VkImageMemoryBarrier barrier{};
     barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -113,8 +113,8 @@ void ResourcePool::upload(GpuImage* img, const void* data, size_t size) {
                          VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
                          0, 0, nullptr, 0, nullptr, 1, &barrier);
 
-    device_.end_single_command(cmd);
-    vmaDestroyBuffer(device_.allocator, staging, staging_alloc);
+    m_device.end_single_command(cmd);
+    vmaDestroyBuffer(m_device.allocator, staging, staging_alloc);
 }
 
 void ResourcePool::download(GpuImage* img, void* data, size_t size) {
@@ -128,9 +128,9 @@ void ResourcePool::download(GpuImage* img, void* data, size_t size) {
 
     VkBuffer staging;
     VmaAllocation staging_alloc;
-    vmaCreateBuffer(device_.allocator, &buf_info, &alloc_info, &staging, &staging_alloc, nullptr);
+    vmaCreateBuffer(m_device.allocator, &buf_info, &alloc_info, &staging, &staging_alloc, nullptr);
 
-    auto cmd = device_.begin_single_command();
+    auto cmd = m_device.begin_single_command();
 
     VkImageMemoryBarrier barrier{};
     barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -151,22 +151,22 @@ void ResourcePool::download(GpuImage* img, void* data, size_t size) {
     vkCmdCopyImageToBuffer(cmd, img->image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
                            staging, 1, &region);
 
-    device_.end_single_command(cmd);
+    m_device.end_single_command(cmd);
 
     void* mapped;
-    vmaMapMemory(device_.allocator, staging_alloc, &mapped);
+    vmaMapMemory(m_device.allocator, staging_alloc, &mapped);
     memcpy(data, mapped, size);
-    vmaUnmapMemory(device_.allocator, staging_alloc);
+    vmaUnmapMemory(m_device.allocator, staging_alloc);
 
-    vmaDestroyBuffer(device_.allocator, staging, staging_alloc);
+    vmaDestroyBuffer(m_device.allocator, staging, staging_alloc);
 }
 
 void ResourcePool::clear() {
-    for (auto& [id, img] : images_) {
-        vkDestroyImageView(device_.device, img.view, nullptr);
-        vmaDestroyImage(device_.allocator, img.image, img.allocation);
+    for (auto& [id, img] : m_images) {
+        vkDestroyImageView(m_device.device, img.view, nullptr);
+        vmaDestroyImage(m_device.allocator, img.image, img.allocation);
     }
-    images_.clear();
+    m_images.clear();
 }
 
 } // namespace joon::vk

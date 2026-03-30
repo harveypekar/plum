@@ -3,12 +3,12 @@
 namespace joon::nodes {
 
 void NodeRegistry::register_node(const std::string& op, NodeExecutor executor) {
-    executors_[op] = std::move(executor);
+    m_executors[op] = std::move(executor);
 }
 
 const NodeExecutor* NodeRegistry::find(const std::string& op) const {
-    auto it = executors_.find(op);
-    if (it == executors_.end()) return nullptr;
+    auto it = m_executors.find(op);
+    if (it == m_executors.end()) return nullptr;
     return &it->second;
 }
 

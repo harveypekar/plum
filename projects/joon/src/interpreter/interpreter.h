@@ -12,8 +12,8 @@ public:
     void evaluate(const ir::IRGraph& graph);
 
 private:
-    nodes::EvalContext& ctx_;
-    const nodes::NodeRegistry& registry_;
+    nodes::EvalContext& m_ctx;
+    const nodes::NodeRegistry& m_registry;
 };
 
 } // namespace joon

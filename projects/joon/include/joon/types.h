@@ -34,15 +34,15 @@ struct mat3 { float m[9]; };
 struct mat4 { float m[16]; };
 
 enum class Type {
-    Float,
-    Int,
-    Bool,
-    Vec2,
-    Vec3,
-    Vec4,
-    Mat3,
-    Mat4,
-    Image
+    FLOAT,
+    INT,
+    BOOL,
+    VEC2,
+    VEC3,
+    VEC4,
+    MAT3,
+    MAT4,
+    IMAGE
 };
 
 using Value = std::variant<

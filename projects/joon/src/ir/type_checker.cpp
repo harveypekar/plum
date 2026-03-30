@@ -2,16 +2,16 @@
 
 namespace joon::ir {
 
-// Promotion lattice: Float < Int < Bool < Vec2 < Vec3 < Vec4 < Image
-// Float promotes into everything. Image is the widest.
+// Promotion lattice: FLOAT < INT < BOOL < VEC2 < VEC3 < VEC4 < IMAGE
+// FLOAT promotes into everything. IMAGE is the widest.
 static Type promote(Type a, Type b) {
     if (a == b) return a;
-    if (a == Type::Float) return b;
-    if (b == Type::Float) return a;
-    if (a == Type::Image || b == Type::Image) return Type::Image;
-    if (a == Type::Vec4 || b == Type::Vec4) return Type::Vec4;
-    if (a == Type::Vec3 || b == Type::Vec3) return Type::Vec3;
-    if (a == Type::Vec2 || b == Type::Vec2) return Type::Vec2;
+    if (a == Type::FLOAT) return b;
+    if (b == Type::FLOAT) return a;
+    if (a == Type::IMAGE || b == Type::IMAGE) return Type::IMAGE;
+    if (a == Type::VEC4 || b == Type::VEC4) return Type::VEC4;
+    if (a == Type::VEC3 || b == Type::VEC3) return Type::VEC3;
+    if (a == Type::VEC2 || b == Type::VEC2) return Type::VEC2;
     return a;
 }
 
@@ -31,17 +31,17 @@ void type_check(IRGraph& graph) {
         }
 
         if (node.op == "image") {
-            node.output_type = Type::Image;
+            node.output_type = Type::IMAGE;
             continue;
         }
 
         if (node.op == "color") {
-            node.output_type = Type::Vec3;
+            node.output_type = Type::VEC3;
             continue;
         }
 
         if (node.op == "noise") {
-            node.output_type = Type::Float;
+            node.output_type = Type::FLOAT;
             continue;
         }
 

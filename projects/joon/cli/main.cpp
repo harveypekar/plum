@@ -14,15 +14,15 @@ static void print_usage() {
 
 static const char* type_name(joon::Type t) {
     switch (t) {
-        case joon::Type::Float: return "float";
-        case joon::Type::Int:   return "int";
-        case joon::Type::Bool:  return "bool";
-        case joon::Type::Vec2:  return "vec2";
-        case joon::Type::Vec3:  return "vec3";
-        case joon::Type::Vec4:  return "vec4";
-        case joon::Type::Mat3:  return "mat3";
-        case joon::Type::Mat4:  return "mat4";
-        case joon::Type::Image: return "image";
+        case joon::Type::FLOAT: return "float";
+        case joon::Type::INT:   return "int";
+        case joon::Type::BOOL:  return "bool";
+        case joon::Type::VEC2:  return "vec2";
+        case joon::Type::VEC3:  return "vec3";
+        case joon::Type::VEC4:  return "vec4";
+        case joon::Type::MAT3:  return "mat3";
+        case joon::Type::MAT4:  return "mat4";
+        case joon::Type::IMAGE: return "image";
         default: return "unknown";
     }
 }

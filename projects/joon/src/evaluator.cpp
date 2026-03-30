@@ -18,35 +18,35 @@ namespace joon {
 // --- Result implementation ---
 
 Result::Result(vk::ResourcePool& pool, uint32_t node_id)
-    : pool_(pool), node_id_(node_id) {}
+    : m_pool(pool), m_nodeId(node_id) {}
 
 uint32_t Result::width() const {
-    auto* img = pool_.get_image(node_id_);
+    auto* img = m_pool.get_image(m_nodeId);
     return img ? img->width : 0;
 }
 
 uint32_t Result::height() const {
-    auto* img = pool_.get_image(node_id_);
+    auto* img = m_pool.get_image(m_nodeId);
     return img ? img->height : 0;
 }
 
 void* Result::vk_image_view() const {
-    auto* img = pool_.get_image(node_id_);
+    auto* img = m_pool.get_image(m_nodeId);
     return img ? (void*)img->view : nullptr;
 }
 
 std::vector<float> Result::read_pixels() {
-    auto* img = pool_.get_image(node_id_);
+    auto* img = m_pool.get_image(m_nodeId);
     if (!img) return {};
 
     size_t pixel_count = img->width * img->height;
     std::vector<float> data(pixel_count * 4);
-    pool_.download(img, data.data(), data.size() * sizeof(float));
+    m_pool.download(img, data.data(), data.size() * sizeof(float));
     return data;
 }
 
 void Result::save_image(const char* path) {
-    auto* img = pool_.get_image(node_id_);
+    auto* img = m_pool.get_image(m_nodeId);
     if (!img) return;
 
     auto float_data = read_pixels();
@@ -64,11 +64,11 @@ void Result::save_image(const char* path) {
 
 template<>
 Param<float>& Param<float>::operator=(const float& value) {
-    auto& ir = graph_.ir();
+    auto& ir = m_graph.ir();
     for (auto& p : ir.params) {
-        if (p.node_id == node_id_) {
+        if (p.node_id == m_nodeId) {
             p.default_value = value;
-            ir.nodes[node_id_].constant_value = value;
+            ir.nodes[m_nodeId].constant_value = value;
             break;
         }
     }
@@ -77,8 +77,8 @@ Param<float>& Param<float>::operator=(const float& value) {
 
 template<>
 Param<float>::operator float() const {
-    auto& ir = graph_.ir();
-    return std::get<float>(ir.nodes[node_id_].constant_value);
+    auto& ir = m_graph.ir();
+    return std::get<float>(ir.nodes[m_nodeId].constant_value);
 }
 
 // --- Evaluator implementation ---
@@ -120,53 +120,53 @@ struct Evaluator::Impl {
 };
 
 Evaluator::Evaluator(Context& ctx, const Graph& graph)
-    : impl_(std::make_unique<Impl>(ctx, graph)) {}
+    : m_impl(std::make_unique<Impl>(ctx, graph)) {}
 
 Evaluator::~Evaluator() = default;
 
 void Evaluator::evaluate() {
-    vkResetDescriptorPool(impl_->ctx.device().device, impl_->desc_pool, 0);
+    vkResetDescriptorPool(m_impl->ctx.device().device, m_impl->desc_pool, 0);
 
     nodes::EvalContext eval_ctx{
-        impl_->ctx.device(),
-        impl_->ctx.pool(),
-        *impl_->pipelines,
+        m_impl->ctx.device(),
+        m_impl->ctx.pool(),
+        *m_impl->pipelines,
         512, 512,
-        impl_->desc_pool
+        m_impl->desc_pool
     };
 
-    Interpreter interp(eval_ctx, impl_->registry);
-    interp.evaluate(impl_->graph.ir());
+    Interpreter interp(eval_ctx, m_impl->registry);
+    interp.evaluate(m_impl->graph.ir());
 }
 
 template<>
 Param<float> Evaluator::param(const std::string& name) {
-    auto& ir = impl_->graph.ir();
+    auto& ir = m_impl->graph.ir();
     for (auto& p : ir.params) {
         if (p.name == name) {
-            return Param<float>(p.node_id, impl_->graph);
+            return Param<float>(p.node_id, m_impl->graph);
         }
     }
     // Not found — return a dummy param pointing at node 0
-    return Param<float>(0, impl_->graph);
+    return Param<float>(0, m_impl->graph);
 }
 
 Result Evaluator::result(const std::string& name) {
-    auto& ir = impl_->graph.ir();
+    auto& ir = m_impl->graph.ir();
     if (!ir.outputs.empty()) {
-        return Result(impl_->ctx.pool(), ir.outputs[0].node_id);
+        return Result(m_impl->ctx.pool(), ir.outputs[0].node_id);
     }
-    return Result(impl_->ctx.pool(), 0);
+    return Result(m_impl->ctx.pool(), 0);
 }
 
 Result Evaluator::node_result(const std::string& name) {
-    auto* node = impl_->graph.ir().find_node_by_name(name);
-    if (node) return Result(impl_->ctx.pool(), node->id);
-    return Result(impl_->ctx.pool(), 0);
+    auto* node = m_impl->graph.ir().find_node_by_name(name);
+    if (node) return Result(m_impl->ctx.pool(), node->id);
+    return Result(m_impl->ctx.pool(), 0);
 }
 
 const std::vector<ir::Diagnostic>& Evaluator::diagnostics() const {
-    return impl_->graph.ir().diagnostics;
+    return m_impl->graph.ir().diagnostics;
 }
 
 } // namespace joon
