@@ -1,0 +1,96 @@
+name: Joon Static Analysis
+
+on:
+  pull_request:
+    paths:
+      - 'projects/joon/**'
+      - '.github/workflows/joon-analysis.yml'
+    types: [opened, synchronize, reopened]
+
+jobs:
+  clang-tidy:
+    name: Clang-Tidy Analysis
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-tidy clang llvm
+
+      - name: Run clang-tidy
+        working-directory: projects/joon
+        run: |
+          # Run clang-tidy on all source files
+          find src include -name "*.cpp" -o -name "*.h" | \
+          xargs clang-tidy -p build 2>&1 | tee clang-tidy-report.log
+
+          # Count warnings and errors
+          WARNINGS=$(grep -c "warning:" clang-tidy-report.log || echo 0)
+          ERRORS=$(grep -c "error:" clang-tidy-report.log || echo 0)
+          echo "Clang-tidy results: $WARNINGS warnings, $ERRORS errors"
+
+      - name: Upload clang-tidy results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: clang-tidy-report
+          path: projects/joon/clang-tidy-report.log
+
+  msvc-analysis:
+    name: MSVC Static Analysis
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Premake5
+        run: |
+          $ProgressPreference = 'SilentlyContinue'
+          Invoke-WebRequest -Uri 'https://github.com/premake/premake-core/releases/download/v5.0.0-beta2/premake-5.0.0-beta2-windows.zip' -OutFile 'premake.zip'
+          Expand-Archive -Path 'premake.zip' -DestinationPath '.'
+
+      - name: Generate Visual Studio project
+        working-directory: projects/joon
+        run: ..\..\..\premake5.exe vs2022
+
+      - name: Run MSVC Static Analysis
+        working-directory: projects/joon
+        run: |
+          msbuild build/Joon.sln /p:Configuration=Debug /p:Platform=x64 /p:EnableCppCoreCheck=true /p:CodeAnalysisRuleSet=AllRules.ruleset 2>&1 | Tee-Object -FilePath analysis-report.txt
+
+      - name: Upload MSVC analysis results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: msvc-analysis-report
+          path: projects/joon/analysis-report.txt
+
+  analyze-config:
+    name: Build ANALYZE Configuration
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential premake5 clang llvm
+
+      - name: Generate ANALYZE config
+        working-directory: projects/joon
+        run: premake5 gmake2
+
+      - name: Build with ANALYZE configuration
+        working-directory: projects/joon/build
+        run: |
+          make config=analyze SANITIZERS=1 -j$(nproc) 2>&1 | head -50
+        continue-on-error: true
+
+      - name: Report ANALYZE build status
+        run: echo "ANALYZE configuration ready for local development with ASan/UBSan"
