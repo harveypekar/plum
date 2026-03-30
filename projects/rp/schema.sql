@@ -125,3 +125,20 @@ DO $$ BEGIN
     ALTER TABLE rp_conversations ADD COLUMN summary_msg_id INTEGER DEFAULT NULL;
 EXCEPTION WHEN duplicate_column THEN NULL;
 END $$;
+
+CREATE TABLE IF NOT EXISTS rp_eval_metrics (
+    id              SERIAL PRIMARY KEY,
+    domain          TEXT NOT NULL,
+    target_type     TEXT NOT NULL,
+    target_id       TEXT NOT NULL,
+    target_label    TEXT NOT NULL DEFAULT '',
+    judge_model     TEXT NOT NULL,
+    rubric_name     TEXT NOT NULL,
+    scores          JSONB NOT NULL,
+    weighted_average REAL NOT NULL,
+    raw_judge_output TEXT NOT NULL DEFAULT '',
+    created_at      TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_rp_eval_metrics_target
+    ON rp_eval_metrics(target_type, target_id, created_at DESC);

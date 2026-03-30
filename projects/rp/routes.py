@@ -19,6 +19,11 @@ from .research import research_dispatch
 from .fewshot import get_fewshot_messages
 from . import conv_log
 
+# Priority levels from aiserver's inference queue (lower = higher priority).
+# Duplicated here to avoid a circular import from the host process.
+_PRI_INTERACTIVE = 0   # UI chat: /message, /continue, /regenerate, /auto-reply
+_PRI_BACKGROUND = 5    # card generation, scene state, summaries
+
 _log = logging.getLogger(__name__)
 
 _ollama = None
@@ -541,7 +546,7 @@ def setup(app: FastAPI, ollama, resolve_model=None):
                 system=f"You are writing the opening narration for {char_name}. Stay in character.",
                 options={"temperature": 1.05, "num_predict": 768, "min_p": 0.1, "repeat_penalty": 1.08},
             ),
-            timeout=120,
+            timeout=300,
         )
         # Clean up
         clean = result.strip()

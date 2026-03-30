@@ -38,12 +38,19 @@ class TestComputeCardHash:
         c = self._card()
         assert compute_card_hash(c) == compute_card_hash(c)
 
-    def test_ignores_name(self):
+    def test_name_changes_hash(self):
         c1 = self._card()
         c1["card_data"]["data"]["name"] = "Alice"
         c2 = self._card()
         c2["card_data"]["data"]["name"] = "Bob"
-        assert compute_card_hash(c1) == compute_card_hash(c2)
+        assert compute_card_hash(c1) != compute_card_hash(c2)
+
+    def test_id_changes_hash(self):
+        c1 = self._card()
+        c1["id"] = 1
+        c2 = self._card()
+        c2["id"] = 2
+        assert compute_card_hash(c1) != compute_card_hash(c2)
 
     def test_description_change_changes_hash(self):
         c1 = self._card(description="tall")

@@ -11,6 +11,13 @@ from dataclasses import dataclass, field
 from typing import AsyncGenerator
 
 
+# Priority levels — lower number = higher priority (served first).
+# Interactive requests preempt bulk work via _maybe_preempt().
+PRIORITY_INTERACTIVE = 0   # UI chat: /message, /continue, /regenerate, /auto-reply
+PRIORITY_BACKGROUND = 5    # card generation, scene state, summaries
+PRIORITY_EVAL = 10         # eval judge calls — lowest, always yields to real usage
+
+
 class QueueFullError(Exception):
     """Raised when the queue exceeds its max depth."""
     pass
