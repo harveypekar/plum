@@ -1,4 +1,16 @@
-"""Conversation summary prompt building and response cleaning."""
+"""Conversation summary generation, prompt building, and response cleaning.
+
+Generates rolling summaries of conversation history so the SummaryBuffer
+context strategy can inject them instead of losing older messages entirely.
+"""
+
+import logging
+
+from . import db
+
+_log = logging.getLogger("rp.summarize")
+
+SUMMARY_THRESHOLD = 10  # unsummarized messages before triggering
 
 
 def build_summary_prompt(messages: list[dict], previous_summary: str = "",
@@ -44,3 +56,66 @@ def clean_summary_response(raw: str) -> str:
     if "<think>" in clean:
         clean = clean.split("</think>")[-1].strip()
     return clean
+
+
+async def maybe_generate_summary(
+    conv_id: int,
+    ollama,
+    model: str,
+    char_name: str = "Character",
+    user_name: str = "User",
+    ai_personality: str = "",
+) -> dict | None:
+    """Generate a summary if enough unsummarized messages have accumulated.
+
+    Returns the saved summary row, or None if no summary was needed.
+    """
+    messages = await db.get_messages(conv_id)
+    if not messages:
+        return None
+
+    existing = await db.get_latest_summary(conv_id)
+    prev_summary = ""
+    prev_through_seq = 0
+
+    if existing:
+        prev_summary = existing["summary"]
+        prev_through_seq = existing["through_sequence"]
+
+    # Filter to messages after the last summary
+    new_msgs = [m for m in messages if m["sequence"] > prev_through_seq]
+    if len(new_msgs) < SUMMARY_THRESHOLD:
+        return None
+
+    prompt = build_summary_prompt(
+        [{"role": m["role"], "content": m["content"]} for m in new_msgs],
+        previous_summary=prev_summary,
+        char_name=char_name,
+        user_name=user_name,
+        ai_personality=ai_personality,
+    )
+
+    raw = await ollama.generate(
+        model=model, prompt=prompt,
+        system="Output only the summary. No thinking, no preamble.",
+        options={"temperature": 0.3, "num_predict": 600, "think": False},
+    )
+    summary = clean_summary_response(raw)
+    if not summary:
+        _log.warning("Empty summary generated for conv %d", conv_id)
+        return None
+
+    last_msg = new_msgs[-1]
+    token_estimate = len(summary) // 4
+
+    saved = await db.save_summary(
+        conv_id,
+        summary=summary,
+        through_msg_id=last_msg["id"],
+        through_sequence=last_msg["sequence"],
+        msg_count=len(new_msgs),
+        token_estimate=token_estimate,
+    )
+    _log.info("Generated summary for conv %d (through seq %d, %d msgs, ~%d tokens)",
+              conv_id, last_msg["sequence"], len(new_msgs), token_estimate)
+    return saved
