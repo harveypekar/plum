@@ -30,8 +30,8 @@ public:
     void clear();
 
 private:
-    Device& device_;
-    std::unordered_map<uint32_t, GpuImage> images_;
+    Device& m_device;
+    std::unordered_map<uint32_t, GpuImage> m_images;
 };
 
 } // namespace joon::vk

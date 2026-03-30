@@ -21,8 +21,8 @@ public:
     Program parse();
 
 private:
-    std::vector<Token> tokens_;
-    size_t pos_ = 0;
+    std::vector<Token> m_tokens;
+    size_t m_pos = 0;
 
     const Token& peek() const;
     const Token& advance();

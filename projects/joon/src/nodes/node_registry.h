@@ -29,7 +29,7 @@ public:
     static NodeRegistry create_default();
 
 private:
-    std::unordered_map<std::string, NodeExecutor> executors_;
+    std::unordered_map<std::string, NodeExecutor> m_executors;
 };
 
 void register_image_load(NodeRegistry& reg);

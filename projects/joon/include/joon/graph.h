@@ -24,7 +24,7 @@ public:
 private:
     friend class Context;
     struct Impl;
-    std::unique_ptr<Impl> impl_;
+    std::unique_ptr<Impl> m_impl;
 };
 
 } // namespace joon

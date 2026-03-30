@@ -13,10 +13,10 @@ public:
     std::vector<Token> tokenize();
 
 private:
-    std::string_view source_;
-    size_t pos_ = 0;
-    uint32_t line_ = 1;
-    uint32_t col_ = 1;
+    std::string_view m_source;
+    size_t m_pos = 0;
+    uint32_t m_line = 1;
+    uint32_t m_col = 1;
 
     char peek() const;
     char advance();

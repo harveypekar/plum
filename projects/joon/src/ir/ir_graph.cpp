@@ -16,7 +16,7 @@ uint32_t IRGraph::add_node(const std::string& op, Tier tier) {
     node.id = id;
     node.op = op;
     node.tier = tier;
-    node.output_type = Type::Float;
+    node.output_type = Type::FLOAT;
     nodes.push_back(std::move(node));
     return id;
 }
@@ -43,13 +43,13 @@ void IRGraph::resolve_ast(const dsl::Program& program) {
             pi.default_value = nodes[id].constant_value;
             pi.node_id = id;
 
-            if (param->type_name == "float")      pi.type = Type::Float;
-            else if (param->type_name == "int")    pi.type = Type::Int;
-            else if (param->type_name == "bool")   pi.type = Type::Bool;
-            else if (param->type_name == "vec2")   pi.type = Type::Vec2;
-            else if (param->type_name == "vec3")   pi.type = Type::Vec3;
-            else if (param->type_name == "vec4")   pi.type = Type::Vec4;
-            else pi.type = Type::Float;
+            if (param->type_name == "float")      pi.type = Type::FLOAT;
+            else if (param->type_name == "int")    pi.type = Type::INT;
+            else if (param->type_name == "bool")   pi.type = Type::BOOL;
+            else if (param->type_name == "vec2")   pi.type = Type::VEC2;
+            else if (param->type_name == "vec3")   pi.type = Type::VEC3;
+            else if (param->type_name == "vec4")   pi.type = Type::VEC4;
+            else pi.type = Type::FLOAT;
 
             nodes[id].output_type = pi.type;
 

@@ -5,19 +5,19 @@
 namespace joon::vk {
 
 PipelineCache::PipelineCache(Device& device, const std::string& shader_dir)
-    : device_(device), shader_dir_(shader_dir) {}
+    : m_device(device), m_shaderDir(shader_dir) {}
 
 PipelineCache::~PipelineCache() {
-    for (auto& [name, p] : pipelines_) {
-        vkDestroyPipeline(device_.device, p.pipeline, nullptr);
-        vkDestroyPipelineLayout(device_.device, p.layout, nullptr);
-        vkDestroyDescriptorSetLayout(device_.device, p.desc_layout, nullptr);
-        vkDestroyShaderModule(device_.device, p.shader_module, nullptr);
+    for (auto& [name, p] : m_pipelines) {
+        vkDestroyPipeline(m_device.device, p.pipeline, nullptr);
+        vkDestroyPipelineLayout(m_device.device, p.layout, nullptr);
+        vkDestroyDescriptorSetLayout(m_device.device, p.desc_layout, nullptr);
+        vkDestroyShaderModule(m_device.device, p.shader_module, nullptr);
     }
 }
 
 std::vector<uint8_t> PipelineCache::read_spirv(const std::string& name) {
-    std::string path = shader_dir_ + "/" + name + ".spv";
+    std::string path = m_shaderDir + "/" + name + ".spv";
     std::ifstream file(path, std::ios::binary | std::ios::ate);
     if (!file.is_open()) throw std::runtime_error("Cannot open shader: " + path);
     size_t size = file.tellg();
@@ -30,8 +30,8 @@ std::vector<uint8_t> PipelineCache::read_spirv(const std::string& name) {
 const ComputePipeline& PipelineCache::get(const std::string& name,
                                            uint32_t num_images,
                                            uint32_t push_constant_size) {
-    auto it = pipelines_.find(name);
-    if (it != pipelines_.end()) return it->second;
+    auto it = m_pipelines.find(name);
+    if (it != m_pipelines.end()) return it->second;
 
     ComputePipeline p{};
 
@@ -40,7 +40,7 @@ const ComputePipeline& PipelineCache::get(const std::string& name,
     shader_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
     shader_info.codeSize = spirv.size();
     shader_info.pCode = reinterpret_cast<const uint32_t*>(spirv.data());
-    vkCreateShaderModule(device_.device, &shader_info, nullptr, &p.shader_module);
+    vkCreateShaderModule(m_device.device, &shader_info, nullptr, &p.shader_module);
 
     std::vector<VkDescriptorSetLayoutBinding> bindings(num_images);
     for (uint32_t i = 0; i < num_images; i++) {
@@ -54,7 +54,7 @@ const ComputePipeline& PipelineCache::get(const std::string& name,
     desc_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
     desc_info.bindingCount = num_images;
     desc_info.pBindings = bindings.data();
-    vkCreateDescriptorSetLayout(device_.device, &desc_info, nullptr, &p.desc_layout);
+    vkCreateDescriptorSetLayout(m_device.device, &desc_info, nullptr, &p.desc_layout);
 
     VkPipelineLayoutCreateInfo layout_info{};
     layout_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
@@ -70,7 +70,7 @@ const ComputePipeline& PipelineCache::get(const std::string& name,
         layout_info.pPushConstantRanges = &push_range;
     }
 
-    vkCreatePipelineLayout(device_.device, &layout_info, nullptr, &p.layout);
+    vkCreatePipelineLayout(m_device.device, &layout_info, nullptr, &p.layout);
 
     VkComputePipelineCreateInfo pipeline_info{};
     pipeline_info.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
@@ -80,11 +80,11 @@ const ComputePipeline& PipelineCache::get(const std::string& name,
     pipeline_info.stage.pName = "main";
     pipeline_info.layout = p.layout;
 
-    vkCreateComputePipelines(device_.device, VK_NULL_HANDLE, 1, &pipeline_info, nullptr,
+    vkCreateComputePipelines(m_device.device, VK_NULL_HANDLE, 1, &pipeline_info, nullptr,
                              &p.pipeline);
 
-    pipelines_[name] = p;
-    return pipelines_[name];
+    m_pipelines[name] = p;
+    return m_pipelines[name];
 }
 
 } // namespace joon::vk

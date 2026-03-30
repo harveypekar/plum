@@ -24,9 +24,9 @@ public:
                                 uint32_t push_constant_size = 0);
 
 private:
-    Device& device_;
-    std::string shader_dir_;
-    std::unordered_map<std::string, ComputePipeline> pipelines_;
+    Device& m_device;
+    std::string m_shaderDir;
+    std::unordered_map<std::string, ComputePipeline> m_pipelines;
 
     std::vector<uint8_t> read_spirv(const std::string& name);
 };

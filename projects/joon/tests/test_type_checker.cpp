@@ -17,14 +17,14 @@ TEST_CASE("Type: noise is float", "[types]") {
     auto g = build("(def n (noise :scale 4.0)) (output n)");
     auto* n = g.find_node_by_name("n");
     REQUIRE(n);
-    CHECK(n->output_type == Type::Float);
+    CHECK(n->output_type == Type::FLOAT);
 }
 
 TEST_CASE("Type: image load is image", "[types]") {
     auto g = build(R"((def b (image "t.png")) (output b))");
     auto* b = g.find_node_by_name("b");
     REQUIRE(b);
-    CHECK(b->output_type == Type::Image);
+    CHECK(b->output_type == Type::IMAGE);
 }
 
 TEST_CASE("Type: float * image promotes to image", "[types]") {
@@ -36,21 +36,21 @@ TEST_CASE("Type: float * image promotes to image", "[types]") {
     )");
     auto* r = g.find_node_by_name("r");
     REQUIRE(r);
-    CHECK(r->output_type == Type::Image);
+    CHECK(r->output_type == Type::IMAGE);
 }
 
 TEST_CASE("Type: float + float stays float", "[types]") {
     auto g = build("(def r (+ 1.0 2.0)) (output r)");
     auto* r = g.find_node_by_name("r");
     REQUIRE(r);
-    CHECK(r->output_type == Type::Float);
+    CHECK(r->output_type == Type::FLOAT);
 }
 
 TEST_CASE("Type: color is vec3", "[types]") {
     auto g = build("(def c (color 0.8 0.3 0.1)) (output c)");
     auto* c = g.find_node_by_name("c");
     REQUIRE(c);
-    CHECK(c->output_type == Type::Vec3);
+    CHECK(c->output_type == Type::VEC3);
 }
 
 TEST_CASE("Type: vec3 * image promotes to image", "[types]") {
@@ -62,14 +62,14 @@ TEST_CASE("Type: vec3 * image promotes to image", "[types]") {
     )");
     auto* r = g.find_node_by_name("r");
     REQUIRE(r);
-    CHECK(r->output_type == Type::Image);
+    CHECK(r->output_type == Type::IMAGE);
 }
 
 TEST_CASE("Type: float * vec3 promotes to vec3", "[types]") {
     auto g = build("(def c (color 0.8 0.3 0.1)) (def r (* c 0.5)) (output r)");
     auto* r = g.find_node_by_name("r");
     REQUIRE(r);
-    CHECK(r->output_type == Type::Vec3);
+    CHECK(r->output_type == Type::VEC3);
 }
 
 TEST_CASE("Type: undefined symbol produces error", "[types]") {
@@ -111,7 +111,7 @@ TEST_CASE("Type: param type is respected", "[types]") {
     auto g = build("(param c float 1.0) (output c)");
     auto* c = g.find_node_by_name("c");
     REQUIRE(c);
-    CHECK(c->output_type == Type::Float);
+    CHECK(c->output_type == Type::FLOAT);
 }
 
 TEST_CASE("Type: blur preserves input type", "[types]") {
@@ -122,5 +122,5 @@ TEST_CASE("Type: blur preserves input type", "[types]") {
     )");
     auto* r = g.find_node_by_name("r");
     REQUIRE(r);
-    CHECK(r->output_type == Type::Image);
+    CHECK(r->output_type == Type::IMAGE);
 }

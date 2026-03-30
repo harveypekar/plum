@@ -16,18 +16,18 @@ struct Context::Impl {
     std::unique_ptr<vk::ResourcePool> pool;
 };
 
-Context::Context() : impl_(std::make_unique<Impl>()) {}
+Context::Context() : m_impl(std::make_unique<Impl>()) {}
 Context::~Context() = default;
 
 std::unique_ptr<Context> Context::create() {
     auto ctx = std::unique_ptr<Context>(new Context());
-    ctx->impl_->device = vk::Device::create();
-    ctx->impl_->pool = std::make_unique<vk::ResourcePool>(*ctx->impl_->device);
+    ctx->m_impl->device = vk::Device::create();
+    ctx->m_impl->pool = std::make_unique<vk::ResourcePool>(*ctx->m_impl->device);
     return ctx;
 }
 
-vk::Device& Context::device() const { return *impl_->device; }
-vk::ResourcePool& Context::pool() const { return *impl_->pool; }
+vk::Device& Context::device() const { return *m_impl->device; }
+vk::ResourcePool& Context::pool() const { return *m_impl->pool; }
 
 Graph Context::parse_string(const char* source) {
     Graph g;

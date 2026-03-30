@@ -5,21 +5,21 @@ namespace joon::dsl {
 
 Parser::Parser(std::string_view source) {
     Lexer lexer(source);
-    tokens_ = lexer.tokenize();
+    m_tokens = lexer.tokenize();
 }
 
 const Token& Parser::peek() const {
     static Token eof{ TokenType::Eof, "", 0, 0 };
-    if (pos_ >= tokens_.size()) return eof;
-    return tokens_[pos_];
+    if (m_pos >= m_tokens.size()) return eof;
+    return m_tokens[m_pos];
 }
 
 const Token& Parser::advance() {
-    return tokens_[pos_++];
+    return m_tokens[m_pos++];
 }
 
 bool Parser::at_end() const {
-    return pos_ >= tokens_.size();
+    return m_pos >= m_tokens.size();
 }
 
 void Parser::expect(TokenType type, const std::string& context) {

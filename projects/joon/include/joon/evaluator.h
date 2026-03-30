@@ -15,13 +15,13 @@ namespace vk { class ResourcePool; struct GpuImage; }
 template<typename T>
 class Param {
 public:
-    Param(uint32_t node_id, Graph& graph) : node_id_(node_id), graph_(graph) {}
+    Param(uint32_t node_id, Graph& graph) : m_nodeId(node_id), m_graph(graph) {}
     Param& operator=(const T& value);
     operator T() const;
 
 private:
-    uint32_t node_id_;
-    Graph& graph_;
+    uint32_t m_nodeId;
+    Graph& m_graph;
 };
 
 class Result {
@@ -37,8 +37,8 @@ public:
     void* vk_image_view() const;
 
 private:
-    vk::ResourcePool& pool_;
-    uint32_t node_id_;
+    vk::ResourcePool& m_pool;
+    uint32_t m_nodeId;
 };
 
 class Evaluator {
@@ -59,7 +59,7 @@ private:
     friend class Context;
     Evaluator(Context& ctx, const Graph& graph);
     struct Impl;
-    std::unique_ptr<Impl> impl_;
+    std::unique_ptr<Impl> m_impl;
 };
 
 } // namespace joon
