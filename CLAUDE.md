@@ -31,6 +31,8 @@ Monorepo: sysadmin scripts (Windows/WSL2 + Linux VPS), side projects. Bash and P
 - Python preferred over bash when logic gets complex; use a virtual environment
 - Agents commit on their own name/email, never the one for user
 - **Never mix commands with English text** — put all explanatory text as comments in the command block, not mixed inline
+- Design specs and implementation plans live on the **feature branch**, never duplicated on main
+- Pre-commit hook runs project tests for any modified project — fix failures before committing
 
 ## Research
 

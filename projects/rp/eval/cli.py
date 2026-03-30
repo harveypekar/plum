@@ -34,7 +34,7 @@ from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).resolve().parents[3] / ".env")
 
-from .engine import EvalResult, judge, load_rubric  # noqa: E402
+from .engine import DimensionScore, EvalResult, judge, load_rubric  # noqa: E402
 from .evaluators import card as card_eval  # noqa: E402
 from .evaluators import fewshot as fewshot_eval  # noqa: E402
 from .evaluators import response as response_eval  # noqa: E402
@@ -44,7 +44,7 @@ from .report import aggregate, format_report, format_single, to_json  # noqa: E4
 
 # Import db functions for saving/loading metrics
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from db import save_metrics, get_metrics  # noqa: E402, F401
+from db import save_metrics, get_metrics, get_latest_metrics  # noqa: E402, F401
 
 
 def _add_common_args(sub: argparse.ArgumentParser):
@@ -101,6 +101,12 @@ def build_parser() -> argparse.ArgumentParser:
                         help="Target type to show metrics for")
     p_show.add_argument("--id", dest="target_id", default=None, help="Specific target ID")
     p_show.add_argument("--limit", type=int, default=20)
+
+    p_report = sub.add_parser("report", help="Generate markdown conversation report")
+    _add_common_args(p_report)
+    p_report.add_argument("--conv-id", type=int, required=True, help="Conversation ID")
+    p_report.add_argument("--log-path", default=None, help="Custom log.txt path")
+    p_report.add_argument("--output", default=None, help="Output file path (default: stdout)")
 
     return parser
 
@@ -547,6 +553,180 @@ async def run_show(args, pool: asyncpg.Pool):
         print()
 
 
+def _cached_to_eval_result(row: dict) -> EvalResult:
+    """Reconstruct an EvalResult from a stored metrics row."""
+    scores_data = row["scores"]
+    if isinstance(scores_data, str):
+        scores_data = json.loads(scores_data)
+    return EvalResult(
+        evaluator=row["evaluator"],
+        target_id=row["target_id"],
+        target_label=row["target_label"],
+        scores=[
+            DimensionScore(
+                dimension=s["dimension"],
+                score=s["score"],
+                explanation=s.get("explanation", ""),
+            )
+            for s in scores_data
+        ],
+        weighted_average=float(row["weighted_average"]),
+        raw_judge_output="",
+        model=row["judge_model"],
+        timestamp=str(row["created_at"]),
+    )
+
+
+async def run_report(args, pool: asyncpg.Pool, aiserver_url: str):
+    from .log_reader import parse_conversation
+    from .evaluators import response as response_eval
+    from .evaluators import scene_state as scene_state_eval
+    from .markdown import render_report
+
+    log_path = Path(args.log_path) if args.log_path else None
+    print("Loading rubrics...", flush=True)
+    response_rubric = load_rubric("response", Path(args.rubric) if args.rubric else None)
+    scene_state_rubric = load_rubric("scene_state")
+
+    # Step 1: Fetch conversation metadata from DB
+    print("Fetching conversation metadata...", flush=True)
+    conv_row = await pool.fetchrow("""
+        SELECT c.model, c.created_at,
+               ai.name AS ai_card_name, u.name AS user_card_name
+        FROM rp_conversations c
+        JOIN rp_character_cards ai ON ai.id = c.ai_card_id
+        JOIN rp_character_cards u ON u.id = c.user_card_id
+        WHERE c.id = $1
+    """, args.conv_id)
+    if not conv_row:
+        print(f"Conversation {args.conv_id} not found in database", file=sys.stderr)
+        sys.exit(1)
+
+    ai_card_name = conv_row["ai_card_name"]
+    user_card_name = conv_row["user_card_name"]
+    conv_date = conv_row["created_at"].strftime("%Y-%m-%d")
+
+    # Step 2: Parse turns from log
+    print("Parsing conversation log...", flush=True)
+    conv = parse_conversation(args.conv_id, log_path)
+    if not conv:
+        print(f"Conversation {args.conv_id} not found in log", file=sys.stderr)
+        sys.exit(1)
+
+    resp_turns = response_eval.get_evaluable_turns(conv)
+    ss_turns = scene_state_eval.get_evaluable_turns(conv)
+
+    if args.limit:
+        resp_turns = resp_turns[:args.limit]
+        ss_turns = ss_turns[:args.limit]
+
+    if args.dry_run:
+        print(f"Would generate report for conv {args.conv_id}")
+        print(f"  AI: {ai_card_name}  User: {user_card_name}  Model: {conv.model}")
+        print(f"  Response turns: {len(resp_turns)}  Scene state turns: {len(ss_turns)}")
+        return
+
+    # Step 3: Check cache for existing evals
+    print("Checking DB cache for existing evals...", flush=True)
+    response_results: dict[int, EvalResult | str] = {}
+    scene_state_results: dict[int, EvalResult | str] = {}
+    uncached_resp_turns = []
+    uncached_ss_turns = []
+
+    for turn in resp_turns:
+        target_id = f"{conv.conv_id}:{turn.turn_index}"
+        cached = await get_latest_metrics("response", target_id, "response", pool=pool)
+        if cached:
+            response_results[turn.turn_index] = _cached_to_eval_result(cached)
+        else:
+            uncached_resp_turns.append(turn)
+
+    for turn in ss_turns:
+        target_id = f"{conv.conv_id}:{turn.turn_index}"
+        cached = await get_latest_metrics("scene_state", target_id, "scene_state", pool=pool)
+        if cached:
+            scene_state_results[turn.turn_index] = _cached_to_eval_result(cached)
+        else:
+            uncached_ss_turns.append(turn)
+
+    cached_count = len(response_results) + len(scene_state_results)
+    uncached_count = len(uncached_resp_turns) + len(uncached_ss_turns)
+    total = cached_count + uncached_count
+
+    print(f"Judge: {args.judge_model}  Conv: {args.conv_id}  Total: {total} ({cached_count} cached, {uncached_count} to judge)")
+    print(f"  {ai_card_name} × {user_card_name}  Model: {conv.model}")
+
+    # Step 4: Judge uncached turns
+    if uncached_count == 0:
+        print("All evals cached, skipping judge.")
+    else:
+        print(f"Judging {uncached_count} uncached turns...")
+        await _warmup_model(aiserver_url, args.judge_model)
+
+    eval_times: list[float] = []
+
+    for i, turn in enumerate(uncached_resp_turns):
+        preview = turn.user_message[:60].replace("\n", " ")
+        print(f"[resp {i+1}/{len(uncached_resp_turns)}] turn{turn.turn_index} {preview}...", end="", flush=True)
+        try:
+            context = response_eval.build_context_for_turn(turn, conv)
+            t0 = time.time()
+            result = await judge(
+                aiserver_url, args.judge_model, response_rubric, context,
+                evaluator="response",
+                target_id=f"{conv.conv_id}:{turn.turn_index}",
+                target_label=f"conv{conv.conv_id} turn{turn.turn_index}",
+            )
+            elapsed = time.time() - t0
+            eval_times.append(elapsed)
+            response_results[turn.turn_index] = result
+            _print_progress(result, i, len(uncached_resp_turns), elapsed, eval_times)
+            await _save_results([result], "response", response_rubric.name, pool)
+        except Exception as e:
+            msg = f"{type(e).__name__}: {e}" if str(e) else type(e).__name__
+            print(f" ERROR: {msg}")
+            response_results[turn.turn_index] = msg
+
+    eval_times.clear()
+
+    for i, turn in enumerate(uncached_ss_turns):
+        preview = turn.user_message[:60].replace("\n", " ")
+        print(f"[scene {i+1}/{len(uncached_ss_turns)}] turn{turn.turn_index} {preview}...", end="", flush=True)
+        try:
+            context = scene_state_eval.build_context_for_turn(turn)
+            t0 = time.time()
+            result = await judge(
+                aiserver_url, args.judge_model, scene_state_rubric, context,
+                evaluator="scene_state",
+                target_id=f"{conv.conv_id}:{turn.turn_index}",
+                target_label=f"conv{conv.conv_id} turn{turn.turn_index}",
+            )
+            elapsed = time.time() - t0
+            eval_times.append(elapsed)
+            scene_state_results[turn.turn_index] = result
+            _print_progress(result, i, len(uncached_ss_turns), elapsed, eval_times)
+            await _save_results([result], "scene_state", scene_state_rubric.name, pool)
+        except Exception as e:
+            msg = f"{type(e).__name__}: {e}" if str(e) else type(e).__name__
+            print(f" ERROR: {msg}")
+            scene_state_results[turn.turn_index] = msg
+
+    # Render markdown
+    print("Rendering markdown report...", flush=True)
+    md = render_report(
+        conv, response_results, scene_state_results,
+        response_rubric, scene_state_rubric,
+        args.judge_model, ai_card_name, user_card_name, conv_date,
+    )
+
+    if args.output:
+        Path(args.output).write_text(md, encoding="utf-8")
+        print(f"\nReport written to {args.output}")
+    else:
+        print(f"\n{'=' * 60}\n")
+        print(md)
+
+
 async def main():
     parser = build_parser()
     args = parser.parse_args()
@@ -573,6 +753,8 @@ async def main():
             await run_scene_state(args, pool, aiserver_url)
         elif args.command == "scenario":
             await run_scenario(args, pool, aiserver_url)
+        elif args.command == "report":
+            await run_report(args, pool, aiserver_url)
         else:
             print(f"Unknown command: {args.command}", file=sys.stderr)
             sys.exit(1)

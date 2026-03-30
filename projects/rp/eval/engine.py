@@ -237,7 +237,7 @@ async def judge(
                 "priority": 10,
                 "options": {"temperature": 0.3, "num_predict": 4096, "think": True},
             },
-            timeout=900.0,
+            timeout=1800.0,
         )
         if resp.status_code != 200:
             raise RuntimeError(f"aiserver {resp.status_code}: {resp.text[:300]}")
