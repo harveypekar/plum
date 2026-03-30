@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # Bring up the local dev stack: Docker PostgreSQL -> Ollama check -> aiserver
 # Usage: bash scripts/dev-up.sh [--no-aiserver]
-# shellcheck disable=SC1091
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -31,8 +30,31 @@ if ! docker info &>/dev/null 2>&1; then
     fail "Docker daemon not running. Start Docker Desktop first."
 fi
 
+# Stop any other compose project that holds port 5432 (e.g. projects/db)
+if ss -tlnH 2>/dev/null | grep -q ":5432 "; then
+    cf="$REPO_ROOT/projects/db/docker-compose.yml"
+    if [ -f "$cf" ]; then
+        docker compose -f "$cf" stop postgres 2>/dev/null || true
+    fi
+    # Wait for port release
+    for _ in $(seq 1 10); do
+        ss -tlnH 2>/dev/null | grep -q ":5432 " || break
+        sleep 1
+    done
+fi
+
 docker compose -f "$REPO_ROOT/docker-compose.dev.yml" up -d --wait postgres 2>&1 | grep -v "^$"
-if pg_isready -h localhost -p 5432 -q 2>/dev/null; then
+
+# Wait for pg_isready (first-time init can take a few seconds after --wait)
+PG_READY=false
+for _ in $(seq 1 15); do
+    if pg_isready -h localhost -p 5432 -q 2>/dev/null; then
+        PG_READY=true
+        break
+    fi
+    sleep 1
+done
+if $PG_READY; then
     info "PostgreSQL running on port 5432 (Docker)"
 else
     fail "PostgreSQL container started but not accepting connections"
@@ -61,6 +83,7 @@ fi
 step "aiserver"
 
 # Load env so DATABASE_URL is available
+# shellcheck source=/dev/null
 source "$SCRIPT_DIR/common/load-env.sh"
 
 # Kill stale aiserver if running
@@ -80,6 +103,7 @@ fi
 
 # Activate venv and start
 cd "$AISERVER_DIR"
+# shellcheck source=/dev/null
 source .venv/bin/activate
 nohup python main.py > /tmp/aiserver.log 2>&1 &
 AISERVER_PID=$!

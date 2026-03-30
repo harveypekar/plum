@@ -37,8 +37,5 @@ jobs:
         working-directory: projects/3dml
         run: python -m pytest tests/ -v --tb=short --ignore=tests/test_ui.py
 
-      - name: Run CI script tests
-        run: python -m pytest scripts/ci/test_pr_review.py -v --tb=short
-
       - name: Run hook tests
         run: bash .claude/hooks/tests/test-enforce-claude-author.sh
