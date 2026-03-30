@@ -300,9 +300,15 @@ def _hash_data(data) -> str:
 
 
 def compute_card_hash(card: dict) -> str:
-    """Hash the card's voice-relevant fields (description, personality, system_prompt, first_mes, mes_example)."""
+    """Hash the card's identity + voice-relevant fields.
+
+    Includes card ID to prevent cross-card cache collisions — two different
+    characters with similar descriptions must never share a cached first message.
+    """
     data = card.get("card_data", {}).get("data", card.get("card_data", {}))
     relevant = {
+        "id": card.get("id"),
+        "name": data.get("name", ""),
         "description": data.get("description", ""),
         "personality": data.get("personality", ""),
         "system_prompt": data.get("system_prompt", ""),
@@ -413,11 +419,11 @@ async def save_metrics(
     """Store a set of scoring metrics and return the created row."""
     pool = pool or await get_pool()
     row = await pool.fetchrow(
-        "INSERT INTO rp_eval_results "
-        "(evaluator, target_type, target_id, target_label, judge_model, "
+        "INSERT INTO rp_eval_metrics "
+        "(domain, target_type, target_id, target_label, judge_model, "
         "rubric_name, scores, weighted_average, raw_judge_output) "
         "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) "
-        "RETURNING id, evaluator, target_type, target_id, target_label, "
+        "RETURNING id, domain, target_type, target_id, target_label, "
         "judge_model, rubric_name, scores, weighted_average, created_at::text",
         domain, target_type, target_id, target_label, judge_model,
         rubric_name, json.dumps(scores), weighted_average, raw_judge_output,
@@ -440,15 +446,15 @@ async def get_metrics(
         params.append(target_id)
         idx += 1
     if domain is not None:
-        conditions.append(f"evaluator = ${idx}")
+        conditions.append(f"domain = ${idx}")
         params.append(domain)
         idx += 1
     where = " AND ".join(conditions)
     params.append(limit)
     rows = await pool.fetch(
-        f"SELECT id, evaluator, target_type, target_id, target_label, judge_model, "
+        f"SELECT id, domain, target_type, target_id, target_label, judge_model, "
         f"rubric_name, scores, weighted_average, created_at::text "
-        f"FROM rp_eval_results WHERE {where} "
+        f"FROM rp_eval_metrics WHERE {where} "
         f"ORDER BY created_at DESC LIMIT ${idx}",
         *params,
     )
@@ -462,10 +468,10 @@ async def get_latest_metrics(
     """Get the most recent metrics for a specific target."""
     pool = pool or await get_pool()
     row = await pool.fetchrow(
-        "SELECT id, evaluator, target_type, target_id, target_label, judge_model, "
+        "SELECT id, domain, target_type, target_id, target_label, judge_model, "
         "rubric_name, scores, weighted_average, created_at::text "
-        "FROM rp_eval_results "
-        "WHERE target_type = $1 AND target_id = $2 AND evaluator = $3 "
+        "FROM rp_eval_metrics "
+        "WHERE target_type = $1 AND target_id = $2 AND domain = $3 "
         "ORDER BY created_at DESC LIMIT 1",
         target_type, target_id, domain,
     )

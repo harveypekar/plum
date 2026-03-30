@@ -55,10 +55,18 @@ def expand_variables(ctx: dict) -> dict:
     if ctx.get("post_prompt"):
         ctx["post_prompt"] = replace(ctx["post_prompt"])
 
-    # Inject scene state into post prompt so it's close to generation
+    # Inject scene state into post prompt so it's close to generation.
+    # Guard: if scene state references a different character (e.g. stale data
+    # from a card that was overwritten), discard it to prevent identity bleed.
     scene_state = ctx.get("scene_state", "")
     if scene_state.strip():
-        ctx["post_prompt"] += "\n\n[Current Scene State — do NOT contradict this]\n" + scene_state.strip()
+        ai_name = ai_data.get("name", "")
+        if ai_name and ai_name not in scene_state:
+            _log.warning("Scene state discarded — references unknown character "
+                         "(expected %r, state: %s)", ai_name, scene_state[:120])
+            ctx["scene_state"] = ""
+        else:
+            ctx["post_prompt"] += "\n\n[Current Scene State — do NOT contradict this]\n" + scene_state.strip()
 
     return ctx
 

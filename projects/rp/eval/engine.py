@@ -234,8 +234,8 @@ async def judge(
                 "model": model,
                 "messages": messages,
                 "stream": False,
-                "priority": 5,
-                "options": {"temperature": 0.3, "num_predict": 2048, "think": False},
+                "priority": 10,
+                "options": {"temperature": 0.3, "num_predict": 4096, "think": True},
             },
             timeout=1800.0,
         )
