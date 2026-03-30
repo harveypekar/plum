@@ -1,0 +1,31 @@
+#version 450
+layout(local_size_x = 16, local_size_y = 16) in;
+
+layout(set = 0, binding = 0, rgba32f) uniform readonly image2D input_img;
+layout(set = 0, binding = 1, rgba32f) uniform writeonly image2D output_img;
+
+layout(push_constant) uniform Params {
+    float radius;
+} params;
+
+void main() {
+    ivec2 pos = ivec2(gl_GlobalInvocationID.xy);
+    ivec2 size = imageSize(output_img);
+    if (pos.x >= size.x || pos.y >= size.y) return;
+
+    int r = int(ceil(params.radius));
+    vec4 sum = vec4(0.0);
+    float weight_sum = 0.0;
+
+    for (int dy = -r; dy <= r; dy++) {
+        for (int dx = -r; dx <= r; dx++) {
+            ivec2 sample_pos = clamp(pos + ivec2(dx, dy), ivec2(0), size - 1);
+            float dist = length(vec2(dx, dy));
+            float w = exp(-dist * dist / (2.0 * params.radius * params.radius));
+            sum += w * imageLoad(input_img, sample_pos);
+            weight_sum += w;
+        }
+    }
+
+    imageStore(output_img, pos, sum / weight_sum);
+}
