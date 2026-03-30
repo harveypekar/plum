@@ -9,7 +9,7 @@
 namespace joon::ir {
 
 struct Diagnostic {
-    enum class Level { Error, Warning };
+    enum class Level { ERROR, WARNING };
     Level level;
     std::string message;
     uint32_t line, col;
@@ -31,7 +31,7 @@ public:
     const Node* find_node_by_name(const std::string& name) const;
 
 private:
-    std::unordered_map<std::string, uint32_t> name_to_node_;
+    std::unordered_map<std::string, uint32_t> m_nameToNode;
 
     uint32_t add_node(const std::string& op, Tier tier);
     void resolve_ast(const dsl::Program& program);
