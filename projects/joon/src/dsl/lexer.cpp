@@ -41,7 +41,7 @@ Token Lexer::read_number() {
         while (m_pos < m_source.size() && isdigit(peek())) advance();
     }
 
-    return { TokenType::Number, std::string(m_source.substr(start, m_pos - start)),
+    return { TokenType::NUMBER, std::string(m_source.substr(start, m_pos - start)),
              start_line, start_col };
 }
 
@@ -53,7 +53,7 @@ Token Lexer::read_string() {
     while (m_pos < m_source.size() && peek() != '"') advance();
     std::string text(m_source.substr(start, m_pos - start));
     if (m_pos < m_source.size()) advance(); // skip closing "
-    return { TokenType::String, text, start_line, start_col };
+    return { TokenType::STRING, text, start_line, start_col };
 }
 
 Token Lexer::read_symbol_or_keyword() {
@@ -70,7 +70,7 @@ Token Lexer::read_symbol_or_keyword() {
         advance();
     }
     std::string text(m_source.substr(start, m_pos - start));
-    return { is_keyword ? TokenType::Keyword : TokenType::Symbol,
+    return { is_keyword ? TokenType::KEYWORD : TokenType::SYMBOL,
              text, start_line, start_col };
 }
 
@@ -82,10 +82,10 @@ std::vector<Token> Lexer::tokenize() {
 
         char c = peek();
         if (c == '(') {
-            tokens.push_back({ TokenType::LParen, "(", m_line, m_col });
+            tokens.push_back({ TokenType::LPAREN, "(", m_line, m_col });
             advance();
         } else if (c == ')') {
-            tokens.push_back({ TokenType::RParen, ")", m_line, m_col });
+            tokens.push_back({ TokenType::RPAREN, ")", m_line, m_col });
             advance();
         } else if (c == '"') {
             tokens.push_back(read_string());

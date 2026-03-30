@@ -1,0 +1,19 @@
+---
+Checks: >
+  readability-*,
+  modernize-*,
+  performance-*,
+  portability-*,
+  google-*,
+  cppcoreguidelines-*,
+  bugprone-*,
+  -readability-magic-numbers,
+  -readability-identifier-length,
+  -cppcoreguidelines-pro-bounds-array-to-pointer-decay,
+  -cppcoreguidelines-avoid-c-arrays,
+  -google-runtime-references
+
+HeaderFilterRegex: '(include|src)/.*\.h$'
+WarningsAsErrors: ''
+FormatStyle: LLVM
+UseColor: true

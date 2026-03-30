@@ -48,7 +48,7 @@ void type_check(IRGraph& graph) {
         if (is_math_op(node.op)) {
             if (node.inputs.size() != 2) {
                 graph.diagnostics.push_back({
-                    Diagnostic::Level::Error,
+                    Diagnostic::Level::ERROR,
                     "Operator " + node.op + " expects 2 arguments, got " +
                         std::to_string(node.inputs.size()),
                     0, 0
@@ -88,7 +88,7 @@ void type_check(IRGraph& graph) {
         }
 
         graph.diagnostics.push_back({
-            Diagnostic::Level::Error,
+            Diagnostic::Level::ERROR,
             "Unknown node type: " + node.op,
             0, 0
         });

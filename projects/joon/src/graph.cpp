@@ -14,7 +14,7 @@ Graph& Graph::operator=(Graph&&) noexcept = default;
 
 bool Graph::has_errors() const {
     for (auto& d : m_impl->ir.diagnostics) {
-        if (d.level == ir::Diagnostic::Level::Error) return true;
+        if (d.level == ir::Diagnostic::Level::ERROR) return true;
     }
     return false;
 }

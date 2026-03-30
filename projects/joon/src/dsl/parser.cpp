@@ -9,7 +9,7 @@ Parser::Parser(std::string_view source) {
 }
 
 const Token& Parser::peek() const {
-    static Token eof{ TokenType::Eof, "", 0, 0 };
+    static Token eof{ TokenType::EOF_TOKEN, "", 0, 0 };
     if (m_pos >= m_tokens.size()) return eof;
     return m_tokens[m_pos];
 }
@@ -37,10 +37,10 @@ Program Parser::parse() {
 }
 
 AstPtr Parser::parse_form() {
-    expect(TokenType::LParen, "'('");
+    expect(TokenType::LPAREN, "'('");
     advance();
 
-    expect(TokenType::Symbol, "form name");
+    expect(TokenType::SYMBOL, "form name");
     const auto& op = peek();
 
     AstPtr result;
@@ -54,7 +54,7 @@ AstPtr Parser::parse_form() {
         result = parse_call(op);
     }
 
-    expect(TokenType::RParen, "')'");
+    expect(TokenType::RPAREN, "')'");
     advance();
     return result;
 }
@@ -63,7 +63,7 @@ AstPtr Parser::parse_def() {
     auto line = peek().line, col = peek().col;
     advance(); // skip 'def'
 
-    expect(TokenType::Symbol, "binding name");
+    expect(TokenType::SYMBOL, "binding name");
     auto name = advance().text;
     auto value = parse_expr();
 
@@ -78,16 +78,16 @@ AstPtr Parser::parse_param() {
     auto line = peek().line, col = peek().col;
     advance(); // skip 'param'
 
-    expect(TokenType::Symbol, "param name");
+    expect(TokenType::SYMBOL, "param name");
     auto name = advance().text;
 
-    expect(TokenType::Symbol, "param type");
+    expect(TokenType::SYMBOL, "param type");
     auto type_name = advance().text;
 
     auto default_value = parse_expr();
 
     std::vector<KeywordArg> constraints;
-    while (peek().type == TokenType::Keyword) {
+    while (peek().type == TokenType::KEYWORD) {
         auto kw_name = advance().text.substr(1); // strip ':'
         auto kw_value = parse_expr();
         constraints.push_back({ kw_name, std::move(kw_value) });
@@ -120,8 +120,8 @@ AstPtr Parser::parse_call(const Token& op) {
     std::vector<AstPtr> args;
     std::vector<KeywordArg> kwargs;
 
-    while (peek().type != TokenType::RParen && !at_end()) {
-        if (peek().type == TokenType::Keyword) {
+    while (peek().type != TokenType::RPAREN && !at_end()) {
+        if (peek().type == TokenType::KEYWORD) {
             auto kw_name = advance().text.substr(1);
             auto kw_value = parse_expr();
             kwargs.push_back({ kw_name, std::move(kw_value) });
@@ -140,11 +140,11 @@ AstPtr Parser::parse_call(const Token& op) {
 AstPtr Parser::parse_expr() {
     const auto& tok = peek();
 
-    if (tok.type == TokenType::LParen) {
+    if (tok.type == TokenType::LPAREN) {
         return parse_form();
     }
 
-    if (tok.type == TokenType::Number) {
+    if (tok.type == TokenType::NUMBER) {
         auto t = advance();
         auto node = std::make_unique<AstNode>();
         node->data = NumberNode{ std::stod(t.text) };
@@ -153,7 +153,7 @@ AstPtr Parser::parse_expr() {
         return node;
     }
 
-    if (tok.type == TokenType::String) {
+    if (tok.type == TokenType::STRING) {
         auto t = advance();
         auto node = std::make_unique<AstNode>();
         node->data = StringNode{ t.text };
@@ -162,7 +162,7 @@ AstPtr Parser::parse_expr() {
         return node;
     }
 
-    if (tok.type == TokenType::Symbol) {
+    if (tok.type == TokenType::SYMBOL) {
         auto t = advance();
         auto node = std::make_unique<AstNode>();
         node->data = SymbolNode{ t.text };
