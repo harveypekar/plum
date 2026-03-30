@@ -44,3 +44,9 @@ projects/rp/comfyui
 bak
 tmp
 projects/backup/
+
+# ComfyUI runtime (binaries, models, DLLs — too large for git)
+projects/rp/comfyui/
+
+# Claude Code local settings (per-machine permissions, may accumulate secrets)
+.claude/settings.local.json
