@@ -17,6 +17,7 @@ from .pipeline import create_default_pipeline
 from .mcp_client import get_router as get_mcp_router
 from .research import research_dispatch
 from .fewshot import get_fewshot_messages
+from .summarize import maybe_generate_summary
 from . import conv_log
 
 # Priority levels from aiserver's inference queue (lower = higher priority).
@@ -436,22 +437,48 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         if _template_path.exists():
             prompt_template = _template_path.read_text()
 
+        # Attach _sequence to each message so SummaryBuffer can filter
+        msg_dicts = []
+        for m in messages:
+            d = {"role": m["role"], "content": m["content"]}
+            d["_sequence"] = m.get("sequence", 0)
+            msg_dicts.append(d)
+
         ctx = {
             "user_card": user_card,
             "ai_card": ai_card,
             "scenario": scenario,
-            "messages": [{"role": m["role"], "content": m["content"]} for m in messages],
+            "messages": msg_dicts,
             "system_prompt": "",
             "post_prompt": "",
             "scene_state": conv.get("scene_state", ""),
             "prompt_template": prompt_template,
         }
+
+        # Load latest summary for SummaryBuffer context strategy
+        summary_row = await db.get_latest_summary(conv["id"])
+        if summary_row:
+            ctx["_summary"] = summary_row["summary"]
+            ctx["_summary_through_sequence"] = summary_row["through_sequence"]
+
         return await _pipeline.run_pre(ctx)
 
     def _get_ai_name(ctx):
         """Extract AI character name for response prefixing."""
         ai_data = ctx.get("ai_card", {}).get("card_data", {}).get("data", ctx.get("ai_card", {}).get("card_data", {}))
         return ai_data.get("name", "Character")
+
+    async def _maybe_summarize(conv_id: int, model: str,
+                               ai_name: str, user_name: str, ai_personality: str):
+        """Fire-and-forget summary generation if enough messages accumulated."""
+        try:
+            await maybe_generate_summary(
+                conv_id, _ollama, model,
+                char_name=ai_name, user_name=user_name,
+                ai_personality=ai_personality,
+            )
+        except Exception as e:
+            _log.warning("Summary generation failed for conv %d: %s", conv_id, e)
 
     async def _get_or_generate_first_message(conv, ai_card, user_card, scenario, model):
         """Check cache, return if fresh, otherwise generate and cache."""
@@ -777,8 +804,10 @@ def setup(app: FastAPI, ollama, resolve_model=None):
                 post_ctx = await _pipeline.run_post(post_ctx)
                 await db.add_message(conv_id, "assistant", post_ctx["response"], raw_response=raw)
                 conv_log.log_response(conv_id, "assistant", post_ctx["response"], raw)
-                # Update scene state in background
+                # Update scene state and maybe generate summary in background
                 asyncio.create_task(_auto_update_scene_state(conv_id, model,
+                                                _get_ai_name(ctx), _get_user_name(ctx), _get_ai_personality(ctx)))
+                asyncio.create_task(_maybe_summarize(conv_id, model,
                                                 _get_ai_name(ctx), _get_user_name(ctx), _get_ai_personality(ctx)))
             except Exception as e:
                 yield json.dumps({"error": f"Failed to save response: {e}", "done": True}) + "\n"
@@ -863,8 +892,10 @@ def setup(app: FastAPI, ollama, resolve_model=None):
                 post_ctx = await _pipeline.run_post(post_ctx)
                 await db.add_message(conv_id, "assistant", post_ctx["response"], raw_response=raw)
                 conv_log.log_response(conv_id, "assistant", post_ctx["response"], raw)
-                # Update scene state in background
+                # Update scene state and maybe generate summary in background
                 asyncio.create_task(_auto_update_scene_state(conv_id, model,
+                                                _get_ai_name(ctx), _get_user_name(ctx), _get_ai_personality(ctx)))
+                asyncio.create_task(_maybe_summarize(conv_id, model,
                                                 _get_ai_name(ctx), _get_user_name(ctx), _get_ai_personality(ctx)))
             except Exception as e:
                 yield json.dumps({"error": f"Failed to save response: {e}", "done": True}) + "\n"
@@ -919,8 +950,10 @@ def setup(app: FastAPI, ollama, resolve_model=None):
                 post_ctx = await _pipeline.run_post(post_ctx)
                 await db.add_message(conv_id, "assistant", post_ctx["response"], raw_response=raw)
                 conv_log.log_response(conv_id, "assistant", post_ctx["response"], raw)
-                # Update scene state in background
+                # Update scene state and maybe generate summary in background
                 asyncio.create_task(_auto_update_scene_state(conv_id, model,
+                                                _get_ai_name(ctx), _get_user_name(ctx), _get_ai_personality(ctx)))
+                asyncio.create_task(_maybe_summarize(conv_id, model,
                                                 _get_ai_name(ctx), _get_user_name(ctx), _get_ai_personality(ctx)))
             except Exception as e:
                 yield json.dumps({"error": f"Failed to save response: {e}", "done": True}) + "\n"
@@ -1024,8 +1057,10 @@ def setup(app: FastAPI, ollama, resolve_model=None):
                 post_ctx = await _pipeline.run_post(post_ctx)
                 await db.add_message(conv_id, save_role, post_ctx["response"], raw_response=raw)
                 conv_log.log_response(conv_id, save_role, post_ctx["response"], raw)
-                # Update scene state in background
+                # Update scene state and maybe generate summary in background
                 asyncio.create_task(_auto_update_scene_state(conv_id, model,
+                                                _get_ai_name(ctx), _get_user_name(ctx), _get_ai_personality(ctx)))
+                asyncio.create_task(_maybe_summarize(conv_id, model,
                                                 _get_ai_name(ctx), _get_user_name(ctx), _get_ai_personality(ctx)))
             except Exception as e:
                 yield json.dumps({"error": f"Failed to save response: {e}", "done": True}) + "\n"
