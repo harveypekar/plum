@@ -461,6 +461,42 @@ async def get_metrics(
     return [dict(r) for r in rows]
 
 
+# -- Summaries --
+
+async def save_summary(conv_id: int, summary: str, through_msg_id: int,
+                       through_sequence: int, msg_count: int,
+                       token_estimate: int) -> dict:
+    pool = await get_pool()
+    row = await pool.fetchrow(
+        "INSERT INTO rp_conversation_summaries "
+        "(conversation_id, summary, through_msg_id, through_sequence, "
+        "msg_count, token_estimate) "
+        "VALUES ($1, $2, $3, $4, $5, $6) "
+        "RETURNING id, conversation_id, summary, through_msg_id, "
+        "through_sequence, msg_count, token_estimate, created_at::text",
+        conv_id, summary, through_msg_id, through_sequence,
+        msg_count, token_estimate,
+    )
+    await pool.execute(
+        "UPDATE rp_conversations SET summary_msg_id = $1 WHERE id = $2",
+        through_msg_id, conv_id,
+    )
+    return dict(row)
+
+
+async def get_latest_summary(conv_id: int) -> dict | None:
+    pool = await get_pool()
+    row = await pool.fetchrow(
+        "SELECT id, conversation_id, summary, through_msg_id, through_sequence, "
+        "msg_count, token_estimate, created_at::text "
+        "FROM rp_conversation_summaries "
+        "WHERE conversation_id = $1 "
+        "ORDER BY through_sequence DESC LIMIT 1",
+        conv_id,
+    )
+    return dict(row) if row else None
+
+
 async def get_latest_metrics(
     target_type: str, target_id: str, domain: str,
     pool: "asyncpg.Pool | None" = None,
