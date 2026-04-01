@@ -544,7 +544,8 @@ def setup(app: FastAPI, ollama, resolve_model=None):
 
         prompt_parts.append(
             f"\nWrite the opening scene for a roleplay conversation. "
-            f"Write as {char_name} in the style demonstrated below."
+            f"Write as {char_name} in third person (e.g. \"{char_name} stepped forward\", not \"I stepped forward\"). "
+            f"Match the voice and style demonstrated below."
         )
         if scenario_desc:
             prompt_parts.append(f"\nScenario to set up:\n{scenario_desc}")

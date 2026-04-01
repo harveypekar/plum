@@ -82,23 +82,23 @@ Does the response avoid formulaic structure? Check:
 5: Excellent. Structure serves the moment. Silence and brevity used when appropriate.
 """
 
-[dimensions.user_narration_avoidance]
-name = "User Narration Avoidance"
+[dimensions.character_boundary]
+name = "Character Boundary"
 weight = 1.5
-context_requires = ["assistant_message"]
+context_requires = ["user_message", "assistant_message"]
 criteria = """
-Does the response avoid narrating the user's actions, thoughts, or emotions? Check:
-- Does NOT describe what the user character does ("You reach out and...")
+Does the character respect the boundary between themselves and the user's character? Check:
+- Does NOT narrate the user character's actions ("You reach out and...")
 - Does NOT attribute emotions to the user character ("You feel a surge of...")
-- Does NOT assume the user character's physical actions or movements
-- The response stops at the character's own actions and perceptions
+- Does NOT react to the user's internal thoughts or narration that wasn't spoken or visible
+- Only responds to observable actions, spoken dialogue, and visible expressions
 - Observations about the user character are from the character's POV only ("she noticed him flinch")
 
-1: Extensively narrates user actions and emotions. Multiple instances.
-2: A few instances of user narration or assumed user actions.
-3: Mostly avoids it but one borderline instance.
-4: Clean. Only describes own character's actions and perceptions.
-5: Perfect boundary. Even observations of the user are filtered through character POV.
+1: Narrates user actions AND reads user's unspoken thoughts. Multiple boundary violations.
+2: A few instances of user narration or reacting to information the character shouldn't have.
+3: Mostly respects boundaries but one borderline instance (narration or implausible inference).
+4: Clean boundary. Only reacts to observable actions and dialogue. No narration of user.
+5: Perfect. Perceptions filtered through character POV. May misread or miss things the user only thought.
 """
 
 [dimensions.physical_consistency]
