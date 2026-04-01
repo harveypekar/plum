@@ -9,18 +9,9 @@ if [[ -z "$command" ]]; then
   exit 0
 fi
 
-# Only check git commit and git push commands
-if ! echo "$command" | grep -qE 'git\s+(commit|push)'; then
+# Only check git commit commands (push is allowed on any branch)
+if ! echo "$command" | grep -qE 'git\s+commit'; then
   exit 0
-fi
-
-# For git push: allow if the command explicitly names a non-main branch
-if echo "$command" | grep -qE 'git\s+push'; then
-  # If pushing an explicit branch that isn't main/master, allow it
-  if echo "$command" | grep -qE 'git\s+push\s+' && \
-     ! echo "$command" | grep -qE 'git\s+push.*\s+(main|master)\b'; then
-    exit 0
-  fi
 fi
 
 # Determine the working directory for branch detection
