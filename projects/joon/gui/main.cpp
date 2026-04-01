@@ -8,6 +8,9 @@
 
 #include "vulkan/device.h"
 
+#include <thread>
+#include <chrono>
+
 // Minimal Vulkan swapchain for ImGui rendering.
 // The joon::Context owns the compute device; this adds presentation support.
 
@@ -80,21 +83,20 @@ int main() {
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
 
-        // ImGui_ImplVulkan_NewFrame();
-        // ImGui_ImplGlfw_NewFrame();
-        ImGui::NewFrame();
-        ImGui::DockSpaceOverViewport();
+        // TODO: Full swapchain + backend initialization needed for ImGui rendering
+        // For vertical slice, skip ImGui frame until Vulkan integration is complete
+        // Uncomment when backends are initialized:
+        //   ImGui_ImplVulkan_NewFrame();
+        //   ImGui_ImplGlfw_NewFrame();
+        //   ImGui::NewFrame();
+        //   ... draw calls ...
+        //   ImGui::Render();
+        //   // Submit ImGui draw data to Vulkan
 
         app.update();
-        app.draw_tree();
-        app.draw_properties();
-        app.draw_code();
-        app.draw_viewport();
-        app.draw_preview();
-        app.draw_log();
 
-        ImGui::Render();
-        // Submit ImGui draw data to Vulkan
+        // Keep window responsive
+        std::this_thread::sleep_for(std::chrono::milliseconds(16)); // ~60 FPS
     }
 
     vkDeviceWaitIdle(dev.device);
