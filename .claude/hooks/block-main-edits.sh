@@ -16,7 +16,7 @@ case "$FILE_PATH" in
 esac
 
 # Resolve the repo root for the file being edited
-REPO_ROOT="$(cd "$(dirname "$FILE_PATH")" 2>/dev/null && git rev-parse --show-toplevel 2>/dev/null || true)"
+REPO_ROOT="$(cd "$(dirname "$FILE_PATH")" 2>/dev/null && git rev-parse --show-toplevel 2>/dev/null)" || true
 [[ -z "$REPO_ROOT" ]] && exit 0
 
 MAIN_WORKTREE="/mnt/d/prg/plum"
