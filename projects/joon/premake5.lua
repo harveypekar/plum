@@ -162,7 +162,7 @@ project "joon-cli"
 
 -- GUI
 project "joon-gui"
-    kind "WindowedApp"
+    kind "ConsoleApp"
     targetdir "build/bin/%{cfg.buildcfg}"
     objdir "build/obj/%{cfg.buildcfg}/gui"
 
