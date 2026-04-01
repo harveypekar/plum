@@ -8,7 +8,6 @@
 #include "vulkan/resource_pool.h"
 #include "vulkan/pipeline_cache.h"
 
-#define STB_IMAGE_WRITE_STATIC
 #include <stb/stb_image_write.h>
 
 #include <algorithm>

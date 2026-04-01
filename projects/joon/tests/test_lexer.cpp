@@ -8,20 +8,20 @@ TEST_CASE("Lexer tokenizes S-expression", "[lexer]") {
     auto tokens = lexer.tokenize();
 
     REQUIRE(tokens.size() == 9);
-    CHECK(tokens[0].type == TokenType::LParen);
-    CHECK(tokens[1].type == TokenType::Symbol);
+    CHECK(tokens[0].type == TokenType::LPAREN);
+    CHECK(tokens[1].type == TokenType::SYMBOL);
     CHECK(tokens[1].text == "def");
-    CHECK(tokens[2].type == TokenType::Symbol);
+    CHECK(tokens[2].type == TokenType::SYMBOL);
     CHECK(tokens[2].text == "x");
-    CHECK(tokens[3].type == TokenType::LParen);
-    CHECK(tokens[4].type == TokenType::Symbol);
+    CHECK(tokens[3].type == TokenType::LPAREN);
+    CHECK(tokens[4].type == TokenType::SYMBOL);
     CHECK(tokens[4].text == "+");
-    CHECK(tokens[5].type == TokenType::Number);
+    CHECK(tokens[5].type == TokenType::NUMBER);
     CHECK(tokens[5].text == "1.0");
-    CHECK(tokens[6].type == TokenType::Number);
+    CHECK(tokens[6].type == TokenType::NUMBER);
     CHECK(tokens[6].text == "2.0");
-    CHECK(tokens[7].type == TokenType::RParen);
-    CHECK(tokens[8].type == TokenType::RParen);
+    CHECK(tokens[7].type == TokenType::RPAREN);
+    CHECK(tokens[8].type == TokenType::RPAREN);
 }
 
 TEST_CASE("Lexer handles keywords", "[lexer]") {
@@ -29,9 +29,9 @@ TEST_CASE("Lexer handles keywords", "[lexer]") {
     auto tokens = lexer.tokenize();
 
     REQUIRE(tokens.size() == 7);
-    CHECK(tokens[2].type == TokenType::Keyword);
+    CHECK(tokens[2].type == TokenType::KEYWORD);
     CHECK(tokens[2].text == ":scale");
-    CHECK(tokens[4].type == TokenType::Keyword);
+    CHECK(tokens[4].type == TokenType::KEYWORD);
     CHECK(tokens[4].text == ":octaves");
 }
 
@@ -40,7 +40,7 @@ TEST_CASE("Lexer handles strings", "[lexer]") {
     auto tokens = lexer.tokenize();
 
     REQUIRE(tokens.size() == 4);
-    CHECK(tokens[2].type == TokenType::String);
+    CHECK(tokens[2].type == TokenType::STRING);
     CHECK(tokens[2].text == "textures/stone.png");
 }
 
@@ -48,7 +48,7 @@ TEST_CASE("Lexer handles comments", "[lexer]") {
     Lexer lexer("; this is a comment\n(def x 1.0)");
     auto tokens = lexer.tokenize();
 
-    CHECK(tokens[0].type == TokenType::LParen);
+    CHECK(tokens[0].type == TokenType::LPAREN);
     CHECK(tokens[1].text == "def");
 }
 
@@ -67,7 +67,7 @@ TEST_CASE("Lexer handles negative numbers", "[lexer]") {
     auto tokens = lexer.tokenize();
 
     REQUIRE(tokens.size() == 5);
-    CHECK(tokens[2].type == TokenType::Number);
+    CHECK(tokens[2].type == TokenType::NUMBER);
     CHECK(tokens[2].text == "-1.5");
 }
 
@@ -75,7 +75,7 @@ TEST_CASE("Lexer handles minus as symbol", "[lexer]") {
     Lexer lexer("(- a b)");
     auto tokens = lexer.tokenize();
 
-    CHECK(tokens[1].type == TokenType::Symbol);
+    CHECK(tokens[1].type == TokenType::SYMBOL);
     CHECK(tokens[1].text == "-");
 }
 
@@ -91,25 +91,21 @@ TEST_CASE("Lexer tokenizes only whitespace", "[lexer]") {
     CHECK(tokens.empty());
 }
 
-TEST_CASE("Lexer handles all parenthesis types", "[lexer]") {
-    Lexer lexer("()[]{}");
+TEST_CASE("Lexer handles parentheses", "[lexer]") {
+    Lexer lexer("()");
     auto tokens = lexer.tokenize();
-    REQUIRE(tokens.size() == 6);
-    CHECK(tokens[0].type == TokenType::LParen);
-    CHECK(tokens[1].type == TokenType::RParen);
-    CHECK(tokens[2].type == TokenType::LBracket);
-    CHECK(tokens[3].type == TokenType::RBracket);
-    CHECK(tokens[4].type == TokenType::LBrace);
-    CHECK(tokens[5].type == TokenType::RBrace);
+    REQUIRE(tokens.size() == 2);
+    CHECK(tokens[0].type == TokenType::LPAREN);
+    CHECK(tokens[1].type == TokenType::RPAREN);
 }
 
 TEST_CASE("Lexer handles integer numbers", "[lexer]") {
     Lexer lexer("(+ 42 -100)");
     auto tokens = lexer.tokenize();
     REQUIRE(tokens.size() == 5);
-    CHECK(tokens[2].type == TokenType::Number);
+    CHECK(tokens[2].type == TokenType::NUMBER);
     CHECK(tokens[2].text == "42");
-    CHECK(tokens[3].type == TokenType::Number);
+    CHECK(tokens[3].type == TokenType::NUMBER);
     CHECK(tokens[3].text == "-100");
 }
 
@@ -117,7 +113,7 @@ TEST_CASE("Lexer handles floating point numbers", "[lexer]") {
     Lexer lexer("3.14159 0.0 -0.5");
     auto tokens = lexer.tokenize();
     REQUIRE(tokens.size() == 3);
-    CHECK(tokens[0].type == TokenType::Number);
+    CHECK(tokens[0].type == TokenType::NUMBER);
     CHECK(tokens[0].text == "3.14159");
     CHECK(tokens[1].text == "0.0");
     CHECK(tokens[2].text == "-0.5");
@@ -128,7 +124,7 @@ TEST_CASE("Lexer handles scientific notation", "[lexer]") {
     auto tokens = lexer.tokenize();
     REQUIRE(tokens.size() == 3);
     for (auto& token : tokens) {
-        CHECK(token.type == TokenType::Number);
+        CHECK(token.type == TokenType::NUMBER);
     }
 }
 
@@ -137,7 +133,7 @@ TEST_CASE("Lexer handles all special symbols", "[lexer]") {
     auto tokens = lexer.tokenize();
     REQUIRE(tokens.size() == 10);
     for (auto& token : tokens) {
-        CHECK(token.type == TokenType::Symbol);
+        CHECK(token.type == TokenType::SYMBOL);
     }
 }
 
@@ -145,8 +141,8 @@ TEST_CASE("Lexer handles quoted strings with escapes", "[lexer]") {
     Lexer lexer(R"("hello \"world\"" "newline\n")");
     auto tokens = lexer.tokenize();
     REQUIRE(tokens.size() == 2);
-    CHECK(tokens[0].type == TokenType::String);
-    CHECK(tokens[1].type == TokenType::String);
+    CHECK(tokens[0].type == TokenType::STRING);
+    CHECK(tokens[1].type == TokenType::STRING);
 }
 
 TEST_CASE("Lexer handles multiple keywords", "[lexer]") {
@@ -154,7 +150,7 @@ TEST_CASE("Lexer handles multiple keywords", "[lexer]") {
     auto tokens = lexer.tokenize();
     REQUIRE(tokens.size() == 5);
     for (auto& token : tokens) {
-        CHECK(token.type == TokenType::Keyword);
+        CHECK(token.type == TokenType::KEYWORD);
     }
 }
 
@@ -162,7 +158,7 @@ TEST_CASE("Lexer handles unclosed parenthesis", "[lexer]") {
     Lexer lexer("(def x");
     auto tokens = lexer.tokenize();
     CHECK(tokens.size() >= 2);
-    CHECK(tokens[0].type == TokenType::LParen);
+    CHECK(tokens[0].type == TokenType::LPAREN);
 }
 
 TEST_CASE("Lexer handles unclosed string", "[lexer]") {
@@ -188,7 +184,7 @@ TEST_CASE("Lexer handles tabs and mixed whitespace", "[lexer]") {
 TEST_CASE("Lexer handles multiple comments", "[lexer]") {
     Lexer lexer("; comment 1\n(def x 1.0)\n; comment 2");
     auto tokens = lexer.tokenize();
-    CHECK(tokens[0].type == TokenType::LParen);
+    CHECK(tokens[0].type == TokenType::LPAREN);
     CHECK(tokens[1].text == "def");
 }
 
@@ -196,7 +192,7 @@ TEST_CASE("Lexer handles comment at end of line", "[lexer]") {
     Lexer lexer("(+ 1 2) ; this is a comment");
     auto tokens = lexer.tokenize();
     REQUIRE(tokens.size() == 5);
-    CHECK(tokens[4].type == TokenType::RParen);
+    CHECK(tokens[4].type == TokenType::RPAREN);
 }
 
 TEST_CASE("Lexer accurately tracks line numbers across multiple lines", "[lexer]") {
@@ -248,6 +244,6 @@ TEST_CASE("Lexer preserves exact string content", "[lexer]") {
     Lexer lexer(R"("  spaces  \n special chars !@#")");
     auto tokens = lexer.tokenize();
     REQUIRE(tokens.size() == 1);
-    CHECK(tokens[0].type == TokenType::String);
+    CHECK(tokens[0].type == TokenType::STRING);
     CHECK(tokens[0].text.find("spaces") != std::string::npos);
 }

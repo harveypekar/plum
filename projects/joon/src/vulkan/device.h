@@ -17,11 +17,15 @@ struct Device {
     VkCommandPool command_pool = VK_NULL_HANDLE;
     VmaAllocator allocator = VK_NULL_HANDLE;
 
-    static std::unique_ptr<Device> create(bool enable_validation = true);
+    Device() = default;
     ~Device();
 
     Device(const Device&) = delete;
+    Device(Device&&) = delete;
     Device& operator=(const Device&) = delete;
+    Device& operator=(Device&&) = delete;
+
+    static std::unique_ptr<Device> create(bool enable_validation = true);
 
     VkCommandBuffer begin_single_command() const;
     void end_single_command(VkCommandBuffer cmd) const;
