@@ -7,6 +7,10 @@
           {
             "type": "command",
             "command": ".claude/hooks/block-env.sh"
+          },
+          {
+            "type": "command",
+            "command": ".claude/hooks/block-main-edits.sh"
           }
         ]
       },
