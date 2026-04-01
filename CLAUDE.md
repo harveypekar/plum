@@ -23,6 +23,12 @@ Monorepo: sysadmin scripts (Windows/WSL2 + Linux VPS), side projects. Bash and P
 - `.env.example` has empty placeholders only
 - Pre-commit hook runs `scripts/common/validate-secrets.py` to block forbidden files
 
+## Worktree Workflow (Non-Negotiable)
+
+- **Never edit files in the main worktree.** Always create a git worktree + feature branch first, do all work there, then merge/PR back.
+- The main worktree (`/mnt/d/prg/plum`) must stay clean at all times. If `git status` shows changes, something went wrong.
+- For any task that creates or modifies files: `git worktree add -b <branch> ../plum-<branch> main` first.
+
 ## Conventions
 
 - Commit messages: imperative mood, prefixed with type (`feat:`, `fix:`, `docs:`, `chore:`)
