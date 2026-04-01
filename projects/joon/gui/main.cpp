@@ -66,6 +66,11 @@ int main() {
     ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 
+    // Set DisplaySize based on window dimensions
+    int display_w, display_h;
+    glfwGetWindowSize(window, &display_w, &display_h);
+    io.DisplaySize = ImVec2(static_cast<float>(display_w), static_cast<float>(display_h));
+
     ImGui::StyleColorsDark();
 
     // TODO: Initialize ImGui GLFW and Vulkan backends once swapchain is set up
