@@ -40,6 +40,34 @@ AstPtr Parser::parse_form() {
     expect(TokenType::LPAREN, "'('");
     advance();
 
+    // Handle empty list
+    if (peek().type == TokenType::RPAREN) {
+        auto node = std::make_unique<AstNode>();
+        node->data = CallNode{ "", {}, {} };
+        node->line = peek().line;
+        node->col = peek().col;
+        advance(); // skip ')'
+        return node;
+    }
+
+    // Handle nested form (starting with '(')
+    if (peek().type == TokenType::LPAREN) {
+        auto result = parse_form();
+        expect(TokenType::RPAREN, "')'");
+        advance();
+        return result;
+    }
+
+    // Handle regular form (starting with symbol or keyword)
+    // For keyword-only forms, treat as call with empty operator
+    if (peek().type == TokenType::KEYWORD) {
+        Token empty_op{ TokenType::SYMBOL, "", peek().line, peek().col };
+        auto result = parse_call(empty_op);
+        expect(TokenType::RPAREN, "')'");
+        advance();
+        return result;
+    }
+
     expect(TokenType::SYMBOL, "form name");
     const auto& op = peek();
 
