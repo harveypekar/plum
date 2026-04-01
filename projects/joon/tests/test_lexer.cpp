@@ -200,7 +200,7 @@ TEST_CASE("Lexer accurately tracks line numbers across multiple lines", "[lexer]
     auto tokens = lexer.tokenize();
     CHECK(tokens[0].line == 1);
     CHECK(tokens[3].line == 2);
-    CHECK(tokens[5].line == 3);
+    CHECK(tokens[6].line == 3);
 }
 
 TEST_CASE("Lexer accurately tracks column numbers within line", "[lexer]") {

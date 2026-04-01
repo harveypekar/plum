@@ -151,8 +151,17 @@ AstPtr Parser::parse_call(const Token& op) {
     while (peek().type != TokenType::RPAREN && !at_end()) {
         if (peek().type == TokenType::KEYWORD) {
             auto kw_name = advance().text.substr(1);
-            auto kw_value = parse_expr();
-            kwargs.push_back({ kw_name, std::move(kw_value) });
+            // If the next token is another keyword or closing paren, use nil value
+            if (peek().type == TokenType::KEYWORD || peek().type == TokenType::RPAREN) {
+                auto node = std::make_unique<AstNode>();
+                node->data = SymbolNode{ "nil" };
+                node->line = peek().line;
+                node->col = peek().col;
+                kwargs.push_back({ kw_name, std::move(node) });
+            } else {
+                auto kw_value = parse_expr();
+                kwargs.push_back({ kw_name, std::move(kw_value) });
+            }
         } else {
             args.push_back(parse_expr());
         }
