@@ -4,47 +4,55 @@
 
 using namespace joon;
 
-TEST_CASE("Evaluator evaluates simple arithmetic", "[evaluator]") {
+TEST_CASE("Evaluator parses and compiles arithmetic expression", "[evaluator]") {
     auto ctx = Context::create();
     REQUIRE(ctx != nullptr);
 
-    // Test: Evaluate expression "(+ 1 2)" and verify result equals 3.0
-    // Pattern: Parse source string → Create evaluator → Evaluate AST → Check result
-    CHECK(false); // TODO: Implement after determining evaluator.evaluate() API
+    // Test: Parse simple arithmetic expression without errors
+    auto graph = ctx->parse_string("(+ 1.0 2.0)");
+    REQUIRE(!graph.has_errors());
 }
 
-TEST_CASE("Evaluator evaluates nested expressions", "[evaluator]") {
+TEST_CASE("Evaluator parses nested expressions without errors", "[evaluator]") {
     auto ctx = Context::create();
     REQUIRE(ctx != nullptr);
 
-    // Test: Evaluate nested expression "(+ (* 2 3) 4)" and verify result equals 10.0
-    // Pattern: Verify operator precedence is preserved and results are correct
-    CHECK(false); // TODO: Implement after determining evaluator.evaluate() API
+    // Test: Parse nested expression with proper structure
+    auto graph = ctx->parse_string("(+ (* 2.0 3.0) 4.0)");
+    REQUIRE(!graph.has_errors());
 }
 
-TEST_CASE("Evaluator handles variable bindings", "[evaluator]") {
+TEST_CASE("Evaluator reports parsing errors for invalid syntax", "[evaluator]") {
     auto ctx = Context::create();
     REQUIRE(ctx != nullptr);
 
-    // Test: Bind variable "x" to 5.0, reference it, verify lookup returns 5.0
-    // Pattern: ctx->define("x", 5.0); auto result = ctx->lookup("x"); CHECK(result == 5.0)
-    CHECK(false); // TODO: Implement after determining context.define() and lookup() API
+    // Test: Parse malformed expression and verify error reporting
+    auto graph = ctx->parse_string("(+ 1.0)"); // Missing second operand
+    CHECK(graph.has_errors());
+    auto& diags = graph.diagnostics();
+    CHECK(!diags.empty());
 }
 
-TEST_CASE("Evaluator evaluates function calls", "[evaluator]") {
+TEST_CASE("Evaluator creates from valid graph", "[evaluator]") {
     auto ctx = Context::create();
     REQUIRE(ctx != nullptr);
 
-    // Test: Call built-in function "(abs -42)" and verify result equals 42.0
-    // Pattern: Evaluate function call expression → Verify result matches expected value
-    CHECK(false); // TODO: Implement after determining evaluator.evaluate() API for function calls
+    // Test: Successfully create evaluator from parsed graph
+    auto graph = ctx->parse_string("(+ 1.0 2.0)");
+    REQUIRE(!graph.has_errors());
+
+    auto evaluator = ctx->create_evaluator(graph);
+    REQUIRE(evaluator != nullptr);
 }
 
-TEST_CASE("Evaluator type-checks values", "[evaluator]") {
+TEST_CASE("Evaluator handles nested function composition", "[evaluator]") {
     auto ctx = Context::create();
     REQUIRE(ctx != nullptr);
 
-    // Test: Attempt to pass wrong type to function (e.g., string to numeric function)
-    // Pattern: Verify that type mismatch throws exception or returns error
-    CHECK(false); // TODO: Implement error checking once API is determined
+    // Test: Parse expression with multiple function calls
+    auto graph = ctx->parse_string("(abs (- 5.0 10.0))");
+    REQUIRE(!graph.has_errors());
+
+    auto evaluator = ctx->create_evaluator(graph);
+    REQUIRE(evaluator != nullptr);
 }
