@@ -1,24 +1,38 @@
 #include "app.h"
 #include <imgui.h>
-#include <cstring>
 
 void App::draw_code() {
     ImGui::Begin("Code Editor");
 
-    static char buf[8192];
-    if (dsl_source.size() < sizeof(buf)) {
-        strncpy(buf, dsl_source.c_str(), sizeof(buf) - 1);
-        buf[sizeof(buf) - 1] = '\0';
+    if (tabs.empty()) {
+        ImGui::TextDisabled("No graphs open");
+        ImGui::End();
+        return;
     }
 
-    ImGui::PushItemWidth(-1);
-    if (ImGui::InputTextMultiline("##code", buf, sizeof(buf),
-                                   ImVec2(-1, -1),
-                                   ImGuiInputTextFlags_AllowTabInput)) {
-        dsl_source = buf;
-        source_dirty = true;
+    // Tab bar — only force-select when active_tab changed externally
+    static int last_code_tab = -1;
+    bool tab_changed_externally = (active_tab != last_code_tab);
+
+    if (ImGui::BeginTabBar("##tabs", ImGuiTabBarFlags_Reorderable)) {
+        for (int i = 0; i < (int)tabs.size(); i++) {
+            ImGuiTabItemFlags flags = 0;
+            if (tab_changed_externally && active_tab == i)
+                flags = ImGuiTabItemFlags_SetSelected;
+
+            if (ImGui::BeginTabItem(tabs[i].name.c_str(), nullptr, flags)) {
+                active_tab = i;
+                ImGui::EndTabItem();
+            }
+        }
+        ImGui::EndTabBar();
     }
-    ImGui::PopItemWidth();
+    last_code_tab = active_tab;
+
+    // Render active tab's editor
+    if (active_tab >= 0 && active_tab < (int)tabs.size() && zep) {
+        render_zep_editor();
+    }
 
     ImGui::End();
 }

@@ -30,6 +30,11 @@ void type_check(IRGraph& graph) {
             continue;
         }
 
+        // Built-in globals — type already set during add_builtins()
+        if (node.op.rfind("builtin_", 0) == 0) {
+            continue;
+        }
+
         if (node.op == "image") {
             node.output_type = Type::IMAGE;
             continue;

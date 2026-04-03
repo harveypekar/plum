@@ -40,14 +40,6 @@ Token Lexer::read_number() {
         advance();
         while (m_pos < m_source.size() && isdigit(peek())) advance();
     }
-    // Handle scientific notation (e.g., 1e10, 1.5e-5, 2E+3)
-    if (m_pos < m_source.size() && (peek() == 'e' || peek() == 'E')) {
-        advance(); // consume 'e' or 'E'
-        if (m_pos < m_source.size() && (peek() == '+' || peek() == '-')) {
-            advance(); // consume optional sign
-        }
-        while (m_pos < m_source.size() && isdigit(peek())) advance();
-    }
 
     return { TokenType::NUMBER, std::string(m_source.substr(start, m_pos - start)),
              start_line, start_col };
@@ -58,15 +50,7 @@ Token Lexer::read_string() {
     uint32_t start_line = m_line;
     advance(); // skip opening "
     size_t start = m_pos;
-    while (m_pos < m_source.size()) {
-        if (peek() == '"') break;
-        if (peek() == '\\' && m_pos + 1 < m_source.size()) {
-            advance(); // skip backslash
-            advance(); // skip escaped character
-        } else {
-            advance();
-        }
-    }
+    while (m_pos < m_source.size() && peek() != '"') advance();
     std::string text(m_source.substr(start, m_pos - start));
     if (m_pos < m_source.size()) advance(); // skip closing "
     return { TokenType::STRING, text, start_line, start_col };

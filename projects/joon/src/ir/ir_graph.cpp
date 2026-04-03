@@ -6,8 +6,17 @@ namespace joon::ir {
 
 IRGraph IRGraph::from_ast(const dsl::Program& program) {
     IRGraph graph;
+    graph.add_builtins();
     graph.resolve_ast(program);
     return graph;
+}
+
+void IRGraph::add_builtins() {
+    // viewport_uv: RG = normalized pixel coordinates, B=0, A=1
+    uint32_t id = add_node("builtin_viewport_uv", Tier::CPU);
+    nodes[id].name = "viewport_uv";
+    nodes[id].output_type = Type::IMAGE;
+    m_nameToNode["viewport_uv"] = id;
 }
 
 uint32_t IRGraph::add_node(const std::string& op, Tier tier) {

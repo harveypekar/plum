@@ -5,7 +5,14 @@ namespace joon::nodes {
 
 void register_noise(NodeRegistry& reg) {
     reg.register_node("noise", [](const ir::Node& node, EvalContext& ctx) {
-        auto* img = ctx.pool.alloc_image(node.id, ctx.default_width, ctx.default_height);
+        // Inherit dimensions from first input if available, else use default
+        uint32_t w = ctx.default_width, h = ctx.default_height;
+        if (!node.inputs.empty()) {
+            auto* in = ctx.pool.get_image(node.inputs[0]);
+            if (in) { w = in->width; h = in->height; }
+        }
+
+        auto* img = ctx.pool.alloc_image(node.id, w, h);
 
         float scale = 4.0f, octaves = 1.0f;
         for (auto& kw : node.kwargs) {
@@ -14,13 +21,10 @@ void register_noise(NodeRegistry& reg) {
         }
 
         struct { float scale, octaves, width, height; } pc{
-            scale, octaves,
-            static_cast<float>(ctx.default_width),
-            static_cast<float>(ctx.default_height)
+            scale, octaves, static_cast<float>(w), static_cast<float>(h)
         };
 
-        gpu_dispatch(ctx, "noise", {img}, ctx.default_width, ctx.default_height,
-                     &pc, sizeof(pc));
+        gpu_dispatch(ctx, "noise", {img}, w, h, &pc, sizeof(pc));
     });
 }
 

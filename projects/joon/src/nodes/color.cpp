@@ -4,13 +4,40 @@ namespace joon::nodes {
 
 void register_color(NodeRegistry& reg) {
     reg.register_node("color", [](const ir::Node& node, EvalContext& ctx) {
-        // Color args come as constant node inputs
         float r = 0, g = 0, b = 0;
-        for (size_t i = 0; i < node.inputs.size() && i < 3; i++) {
-            // Input nodes are constants — read their values from the pool's graph
-            // For now we can't easily reach back to the IR from here,
-            // so color values would need to come through kwargs or be resolved differently.
-            // TODO: wire constant propagation through the interpreter
+
+        // Read constant values from kwargs (e.g., :r 0.5 :g 0.3 :b 0.8)
+        for (auto& kw : node.kwargs) {
+            if (kw.name == "r") r = std::get<float>(kw.value);
+            else if (kw.name == "g") g = std::get<float>(kw.value);
+            else if (kw.name == "b") b = std::get<float>(kw.value);
+        }
+
+        // Also support positional args — read the constant image's first pixel
+        // The interpreter fills constant images with the scalar value in all channels
+        if (node.inputs.size() >= 1) {
+            auto* ri = ctx.pool.get_image(node.inputs[0]);
+            if (ri) {
+                float px[4];
+                ctx.pool.download(ri, px, sizeof(px));
+                r = px[0];
+            }
+        }
+        if (node.inputs.size() >= 2) {
+            auto* gi = ctx.pool.get_image(node.inputs[1]);
+            if (gi) {
+                float px[4];
+                ctx.pool.download(gi, px, sizeof(px));
+                g = px[0];
+            }
+        }
+        if (node.inputs.size() >= 3) {
+            auto* bi = ctx.pool.get_image(node.inputs[2]);
+            if (bi) {
+                float px[4];
+                ctx.pool.download(bi, px, sizeof(px));
+                b = px[0];
+            }
         }
 
         auto* img = ctx.pool.alloc_image(node.id, ctx.default_width, ctx.default_height);

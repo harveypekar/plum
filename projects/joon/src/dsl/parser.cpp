@@ -40,34 +40,6 @@ AstPtr Parser::parse_form() {
     expect(TokenType::LPAREN, "'('");
     advance();
 
-    // Handle empty list
-    if (peek().type == TokenType::RPAREN) {
-        auto node = std::make_unique<AstNode>();
-        node->data = CallNode{ "", {}, {} };
-        node->line = peek().line;
-        node->col = peek().col;
-        advance(); // skip ')'
-        return node;
-    }
-
-    // Handle nested form (starting with '(')
-    if (peek().type == TokenType::LPAREN) {
-        auto result = parse_form();
-        expect(TokenType::RPAREN, "')'");
-        advance();
-        return result;
-    }
-
-    // Handle regular form (starting with symbol or keyword)
-    // For keyword-only forms, treat as call with empty operator
-    if (peek().type == TokenType::KEYWORD) {
-        Token empty_op{ TokenType::SYMBOL, "", peek().line, peek().col };
-        auto result = parse_call(empty_op);
-        expect(TokenType::RPAREN, "')'");
-        advance();
-        return result;
-    }
-
     expect(TokenType::SYMBOL, "form name");
     const auto& op = peek();
 
@@ -151,17 +123,8 @@ AstPtr Parser::parse_call(const Token& op) {
     while (peek().type != TokenType::RPAREN && !at_end()) {
         if (peek().type == TokenType::KEYWORD) {
             auto kw_name = advance().text.substr(1);
-            // If the next token is another keyword or closing paren, use nil value
-            if (peek().type == TokenType::KEYWORD || peek().type == TokenType::RPAREN) {
-                auto node = std::make_unique<AstNode>();
-                node->data = SymbolNode{ "nil" };
-                node->line = peek().line;
-                node->col = peek().col;
-                kwargs.push_back({ kw_name, std::move(node) });
-            } else {
-                auto kw_value = parse_expr();
-                kwargs.push_back({ kw_name, std::move(kw_value) });
-            }
+            auto kw_value = parse_expr();
+            kwargs.push_back({ kw_name, std::move(kw_value) });
         } else {
             args.push_back(parse_expr());
         }

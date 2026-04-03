@@ -28,14 +28,6 @@ std::unique_ptr<Device> Device::create(bool enable_validation) {
     create_info.enabledLayerCount = static_cast<uint32_t>(layers.size());
     create_info.ppEnabledLayerNames = layers.data();
 
-    // Enable required instance extensions for surface support
-    std::vector<const char*> instance_extensions = {
-        VK_KHR_SURFACE_EXTENSION_NAME,
-        "VK_KHR_win32_surface",  // Windows surface support
-    };
-    create_info.enabledExtensionCount = static_cast<uint32_t>(instance_extensions.size());
-    create_info.ppEnabledExtensionNames = instance_extensions.data();
-
     if (vkCreateInstance(&create_info, nullptr, &dev->instance) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create Vulkan instance");
     }
@@ -94,13 +86,6 @@ std::unique_ptr<Device> Device::create(bool enable_validation) {
     device_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
     device_info.queueCreateInfoCount = static_cast<uint32_t>(queue_infos.size());
     device_info.pQueueCreateInfos = queue_infos.data();
-
-    // Enable required device extensions for swapchain
-    std::vector<const char*> device_extensions = {
-        VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-    };
-    device_info.enabledExtensionCount = static_cast<uint32_t>(device_extensions.size());
-    device_info.ppEnabledExtensionNames = device_extensions.data();
 
     if (vkCreateDevice(dev->physical_device, &device_info, nullptr, &dev->device) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create Vulkan device");

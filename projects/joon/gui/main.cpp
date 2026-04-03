@@ -1,15 +1,102 @@
+#define NOMINMAX
+
 #include "app.h"
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 #include <imgui.h>
+#include <imgui_internal.h>
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_vulkan.h>
 
 #include "vulkan/device.h"
+#include "theme.h"
+#include "log.h"
 
 #include <thread>
 #include <chrono>
+#include <windows.h>
+#include <dbghelp.h>
+#include <ctime>
+#include <sstream>
+#include <iomanip>
+#include <iostream>
+#include <csignal>
+#include <cstdlib>
+
+#pragma comment(lib, "dbghelp.lib")
+
+// Minidump generation for crash diagnostics.
+// Works for SEH exceptions (access violations, asserts), C++ exceptions, and abort().
+
+static std::string GenerateMiniDump(EXCEPTION_POINTERS* pExceptionPointers = nullptr) {
+    auto now = std::time(nullptr);
+    auto tm = *std::localtime(&now);
+
+    std::ostringstream oss;
+    oss << "joon_crash_" << std::put_time(&tm, "%Y%m%d_%H%M%S") << ".dmp";
+    std::string filename = oss.str();
+
+    HANDLE hFile = CreateFileA(
+        filename.c_str(), GENERIC_WRITE, 0, nullptr,
+        CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+
+    if (hFile == INVALID_HANDLE_VALUE)
+        return "Failed to create minidump file";
+
+    MINIDUMP_EXCEPTION_INFORMATION mdei;
+    MINIDUMP_EXCEPTION_INFORMATION* pMdei = nullptr;
+    if (pExceptionPointers) {
+        mdei.ThreadId = GetCurrentThreadId();
+        mdei.ExceptionPointers = pExceptionPointers;
+        mdei.ClientPointers = FALSE;
+        pMdei = &mdei;
+    }
+
+    // MiniDumpWithDataSegs captures global variables for better debugging
+    BOOL success = MiniDumpWriteDump(
+        GetCurrentProcess(), GetCurrentProcessId(), hFile,
+        static_cast<MINIDUMP_TYPE>(MiniDumpNormal | MiniDumpWithDataSegs),
+        pMdei, nullptr, nullptr);
+
+    CloseHandle(hFile);
+    return success ? ("Minidump written to: " + filename) : "Failed to write minidump";
+}
+
+// Single crash entry point: write minidump, log message, break into debugger.
+// Every crash path funnels through here.
+static void Crash(const char* reason, EXCEPTION_POINTERS* ep = nullptr) {
+    static bool already_crashing = false;
+    if (already_crashing) return; // prevent recursion
+    already_crashing = true;
+
+    jlog("CRASH: %s", reason);
+    jlog("%s", GenerateMiniDump(ep).c_str());
+    __debugbreak();
+}
+
+static LONG WINAPI UnhandledExceptionHandler(EXCEPTION_POINTERS* ep) {
+    std::ostringstream msg;
+    msg << "Unhandled SEH exception 0x" << std::hex << ep->ExceptionRecord->ExceptionCode;
+    Crash(msg.str().c_str(), ep);
+    return EXCEPTION_EXECUTE_HANDLER;
+}
+
+static void AbortHandler(int) {
+    Crash("abort() called");
+}
+
+void JoonImGuiAssertHandler(const char* expr, const char* file, int line) {
+    std::ostringstream msg;
+    msg << "ImGui assert failed: " << expr << " at " << file << ":" << line;
+    Crash(msg.str().c_str());
+}
+
+static void InstallCrashHandlers() {
+    SetUnhandledExceptionFilter(UnhandledExceptionHandler);
+    signal(SIGABRT, AbortHandler);
+    _set_abort_behavior(0, _WRITE_ABORT_MSG | _CALL_REPORTFAULT);
+}
 
 // Minimal Vulkan swapchain for ImGui rendering.
 // The joon::Context owns the compute device; this adds presentation support.
@@ -20,28 +107,61 @@ struct SwapchainFrame {
     VkFramebuffer framebuffer;
 };
 
+static constexpr uint32_t MAX_FRAMES_IN_FLIGHT = 2;
+
 struct GuiVulkan {
     VkSurfaceKHR surface = VK_NULL_HANDLE;
     VkSwapchainKHR swapchain = VK_NULL_HANDLE;
     VkRenderPass render_pass = VK_NULL_HANDLE;
     VkDescriptorPool desc_pool = VK_NULL_HANDLE;
     VkCommandPool command_pool = VK_NULL_HANDLE;
-    VkCommandBuffer command_buffer = VK_NULL_HANDLE;
-    VkFence fence = VK_NULL_HANDLE;
-    VkSemaphore image_available = VK_NULL_HANDLE;
-    VkSemaphore render_finished = VK_NULL_HANDLE;
+
+    // Per-frame-in-flight resources
+    VkCommandBuffer command_buffers[MAX_FRAMES_IN_FLIGHT]{};
+    VkFence fences[MAX_FRAMES_IN_FLIGHT]{};
+    VkSemaphore image_available[MAX_FRAMES_IN_FLIGHT]{};
+    VkSemaphore render_finished[MAX_FRAMES_IN_FLIGHT]{};
+    uint32_t current_frame = 0;
+
     std::vector<SwapchainFrame> frames;
     VkFormat format = VK_FORMAT_B8G8R8A8_UNORM;
     VkExtent2D extent{};
+    bool framebuffer_resized = false;
 };
 
 static void check_vk(VkResult err) {
     if (err != VK_SUCCESS) {
-        // In production this would be a proper error handler
+        std::cerr << "Vulkan error: " << err << std::endl;
     }
 }
 
+static int app_main(); // forward declare
+
+// SEH filter — writes minidump with full exception context
+static LONG WINAPI SehFilter(EXCEPTION_POINTERS* ep) {
+    DWORD code = ep->ExceptionRecord->ExceptionCode;
+    // Skip first-chance C++ exceptions (0xE06D7363 = MSVC C++ throw)
+    if (code == 0xE06D7363)
+        return EXCEPTION_CONTINUE_SEARCH;
+
+    std::ostringstream msg;
+    msg << "SEH exception 0x" << std::hex << code;
+    Crash(msg.str().c_str(), ep);
+    return EXCEPTION_EXECUTE_HANDLER;
+}
+
 int main() {
+    InstallCrashHandlers();
+
+    __try {
+        return app_main();
+    }
+    __except (SehFilter(GetExceptionInformation())) {
+        return 1;
+    }
+}
+
+static int app_main() {
     // GLFW
     if (!glfwInit()) return 1;
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
@@ -79,7 +199,7 @@ int main() {
     VkSwapchainCreateInfoKHR swapchain_info{};
     swapchain_info.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
     swapchain_info.surface = gui.surface;
-    swapchain_info.minImageCount = std::max(2u, capabilities.minImageCount);
+    swapchain_info.minImageCount = (std::max)(2u, capabilities.minImageCount);
     swapchain_info.imageFormat = gui.format;
     swapchain_info.imageColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
     swapchain_info.imageExtent = gui.extent;
@@ -175,11 +295,11 @@ int main() {
     cmd_alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     cmd_alloc_info.commandPool = gui.command_pool;
     cmd_alloc_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    cmd_alloc_info.commandBufferCount = 1;
+    cmd_alloc_info.commandBufferCount = MAX_FRAMES_IN_FLIGHT;
 
-    check_vk(vkAllocateCommandBuffers(dev.device, &cmd_alloc_info, &gui.command_buffer));
+    check_vk(vkAllocateCommandBuffers(dev.device, &cmd_alloc_info, gui.command_buffers));
 
-    // Create synchronization primitives
+    // Create per-frame synchronization primitives
     VkSemaphoreCreateInfo sem_info{};
     sem_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
 
@@ -187,16 +307,18 @@ int main() {
     fence_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
     fence_info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
-    check_vk(vkCreateSemaphore(dev.device, &sem_info, nullptr, &gui.image_available));
-    check_vk(vkCreateSemaphore(dev.device, &sem_info, nullptr, &gui.render_finished));
-    check_vk(vkCreateFence(dev.device, &fence_info, nullptr, &gui.fence));
+    for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+        check_vk(vkCreateSemaphore(dev.device, &sem_info, nullptr, &gui.image_available[i]));
+        check_vk(vkCreateSemaphore(dev.device, &sem_info, nullptr, &gui.render_finished[i]));
+        check_vk(vkCreateFence(dev.device, &fence_info, nullptr, &gui.fences[i]));
+    }
 
     // Create ImGui descriptor pool
-    VkDescriptorPoolSize pool_size = { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1 };
+    VkDescriptorPoolSize pool_size = { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 64 };
     VkDescriptorPoolCreateInfo desc_pool_info{};
     desc_pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     desc_pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-    desc_pool_info.maxSets = 16;
+    desc_pool_info.maxSets = 64;
     desc_pool_info.poolSizeCount = 1;
     desc_pool_info.pPoolSizes = &pool_size;
 
@@ -209,7 +331,7 @@ int main() {
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
     io.DisplaySize = ImVec2(static_cast<float>(display_w), static_cast<float>(display_h));
 
-    ImGui::StyleColorsDark();
+    load_theme("settings.json");
 
     ImGui_ImplGlfw_InitForVulkan(window, true);
 
@@ -232,79 +354,224 @@ int main() {
     init_info.PipelineInfoMain = pipeline_info;
 
     ImGui_ImplVulkan_Init(&init_info);
+    app.imgui_ready = true;
+    app.update_viewport_desc();
+
+    // Resize callback
+    glfwSetWindowUserPointer(window, &gui);
+    glfwSetFramebufferSizeCallback(window, [](GLFWwindow* w, int, int) {
+        auto* g = static_cast<GuiVulkan*>(glfwGetWindowUserPointer(w));
+        g->framebuffer_resized = true;
+    });
+
+    // Lambda to recreate swapchain on resize
+    auto recreate_swapchain = [&]() {
+        int w = 0, h = 0;
+        glfwGetFramebufferSize(window, &w, &h);
+        while (w == 0 || h == 0) {
+            glfwGetFramebufferSize(window, &w, &h);
+            glfwWaitEvents();
+        }
+        vkDeviceWaitIdle(dev.device);
+
+        // Destroy old framebuffers and image views
+        for (auto& frame : gui.frames) {
+            vkDestroyFramebuffer(dev.device, frame.framebuffer, nullptr);
+            vkDestroyImageView(dev.device, frame.view, nullptr);
+        }
+        gui.frames.clear();
+
+        // Query new surface capabilities
+        VkSurfaceCapabilitiesKHR caps;
+        vkGetPhysicalDeviceSurfaceCapabilitiesKHR(dev.physical_device, gui.surface, &caps);
+        gui.extent = { static_cast<uint32_t>(w), static_cast<uint32_t>(h) };
+
+        VkSwapchainKHR old_swapchain = gui.swapchain;
+
+        VkSwapchainCreateInfoKHR sci{};
+        sci.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+        sci.surface = gui.surface;
+        sci.minImageCount = (std::max)(2u, caps.minImageCount);
+        sci.imageFormat = gui.format;
+        sci.imageColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
+        sci.imageExtent = gui.extent;
+        sci.imageArrayLayers = 1;
+        sci.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+        sci.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        sci.preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
+        sci.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+        sci.presentMode = VK_PRESENT_MODE_FIFO_KHR;
+        sci.clipped = VK_TRUE;
+        sci.oldSwapchain = old_swapchain;
+
+        check_vk(vkCreateSwapchainKHR(dev.device, &sci, nullptr, &gui.swapchain));
+        vkDestroySwapchainKHR(dev.device, old_swapchain, nullptr);
+
+        // Get new images
+        uint32_t ic = 0;
+        vkGetSwapchainImagesKHR(dev.device, gui.swapchain, &ic, nullptr);
+        std::vector<VkImage> imgs(ic);
+        vkGetSwapchainImagesKHR(dev.device, gui.swapchain, &ic, imgs.data());
+
+        VkImageViewCreateInfo vi{};
+        vi.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        vi.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        vi.format = gui.format;
+        vi.components = { VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY,
+                          VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY };
+        vi.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+
+        for (auto img : imgs) {
+            vi.image = img;
+            VkImageView view;
+            check_vk(vkCreateImageView(dev.device, &vi, nullptr, &view));
+
+            VkFramebufferCreateInfo fbi{};
+            fbi.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+            fbi.renderPass = gui.render_pass;
+            fbi.attachmentCount = 1;
+            fbi.pAttachments = &view;
+            fbi.width = gui.extent.width;
+            fbi.height = gui.extent.height;
+            fbi.layers = 1;
+
+            VkFramebuffer fb;
+            check_vk(vkCreateFramebuffer(dev.device, &fbi, nullptr, &fb));
+            gui.frames.push_back({ img, view, fb });
+        }
+
+        gui.framebuffer_resized = false;
+    };
 
     // Main loop
+    static bool load_layout_requested = false;
+
     while (!glfwWindowShouldClose(window)) {
-        glfwPollEvents();
+        try {
+            glfwPollEvents();
 
-        vkWaitForFences(dev.device, 1, &gui.fence, VK_TRUE, UINT64_MAX);
-        vkResetFences(dev.device, 1, &gui.fence);
+            // Skip rendering if minimized
+            int fb_w = 0, fb_h = 0;
+            glfwGetFramebufferSize(window, &fb_w, &fb_h);
+            if (fb_w == 0 || fb_h == 0) continue;
 
-        uint32_t image_index = 0;
-        vkAcquireNextImageKHR(dev.device, gui.swapchain, UINT64_MAX, gui.image_available, VK_NULL_HANDLE, &image_index);
+            uint32_t frame_idx = gui.current_frame;
+            VkCommandBuffer cmd = gui.command_buffers[frame_idx];
 
-        vkResetCommandBuffer(gui.command_buffer, 0);
+            vkWaitForFences(dev.device, 1, &gui.fences[frame_idx], VK_TRUE, UINT64_MAX);
 
-        VkCommandBufferBeginInfo begin_info{};
-        begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-        begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+            uint32_t image_index = 0;
+            VkResult acquire_result = vkAcquireNextImageKHR(
+                dev.device, gui.swapchain, UINT64_MAX,
+                gui.image_available[frame_idx], VK_NULL_HANDLE, &image_index);
 
-        vkBeginCommandBuffer(gui.command_buffer, &begin_info);
+            if (acquire_result == VK_ERROR_OUT_OF_DATE_KHR) {
+                recreate_swapchain();
+                continue;
+            }
 
-        VkClearValue clear_value = { { { 0.45f, 0.55f, 0.60f, 1.00f } } };
+            // Reset fence only after successful acquire (prevents deadlock)
+            vkResetFences(dev.device, 1, &gui.fences[frame_idx]);
 
-        VkRenderPassBeginInfo render_pass_begin{};
-        render_pass_begin.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-        render_pass_begin.renderPass = gui.render_pass;
-        render_pass_begin.framebuffer = gui.frames[image_index].framebuffer;
-        render_pass_begin.renderArea.extent = gui.extent;
-        render_pass_begin.clearValueCount = 1;
-        render_pass_begin.pClearValues = &clear_value;
+            vkResetCommandBuffer(cmd, 0);
 
-        vkCmdBeginRenderPass(gui.command_buffer, &render_pass_begin, VK_SUBPASS_CONTENTS_INLINE);
+            VkCommandBufferBeginInfo begin_info{};
+            begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+            begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
-        // ImGui frame
-        ImGui_ImplVulkan_NewFrame();
-        ImGui_ImplGlfw_NewFrame();
-        ImGui::NewFrame();
+            vkBeginCommandBuffer(cmd, &begin_info);
 
-        // Simple demo window
-        ImGui::SetNextWindowPos(ImVec2(10, 10), ImGuiCond_FirstUseEver);
-        ImGui::SetNextWindowSize(ImVec2(300, 200), ImGuiCond_FirstUseEver);
-        ImGui::Begin("Joon");
-        ImGui::Text("Graphics DSL System");
-        ImGui::Separator();
-        ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
-        ImGui::End();
+            auto& vp = app_colors().viewport_bg;
+            VkClearValue clear_value = { { { vp[0], vp[1], vp[2], vp[3] } } };
 
-        ImGui::Render();
-        ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), gui.command_buffer);
+            VkRenderPassBeginInfo render_pass_begin{};
+            render_pass_begin.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+            render_pass_begin.renderPass = gui.render_pass;
+            render_pass_begin.framebuffer = gui.frames[image_index].framebuffer;
+            render_pass_begin.renderArea.extent = gui.extent;
+            render_pass_begin.clearValueCount = 1;
+            render_pass_begin.pClearValues = &clear_value;
 
-        vkCmdEndRenderPass(gui.command_buffer);
-        vkEndCommandBuffer(gui.command_buffer);
+            vkCmdBeginRenderPass(cmd, &render_pass_begin, VK_SUBPASS_CONTENTS_INLINE);
 
-        VkPipelineStageFlags wait_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-        VkSubmitInfo submit_info{};
-        submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-        submit_info.waitSemaphoreCount = 1;
-        submit_info.pWaitSemaphores = &gui.image_available;
-        submit_info.pWaitDstStageMask = &wait_stage;
-        submit_info.commandBufferCount = 1;
-        submit_info.pCommandBuffers = &gui.command_buffer;
-        submit_info.signalSemaphoreCount = 1;
-        submit_info.pSignalSemaphores = &gui.render_finished;
+            // ImGui frame
+            ImGui_ImplVulkan_NewFrame();
+            ImGui_ImplGlfw_NewFrame();
+            ImGui::NewFrame();
 
-        vkQueueSubmit(dev.graphics_queue, 1, &submit_info, gui.fence);
+            // Menu bar
+            if (ImGui::BeginMainMenuBar()) {
+                if (ImGui::BeginMenu("File")) {
+                    if (ImGui::MenuItem("New Graph"))
+                        app.new_graph();
+                    ImGui::EndMenu();
+                }
+                if (ImGui::BeginMenu("Layout")) {
+                    if (ImGui::MenuItem("Save Layout"))
+                        ImGui::SaveIniSettingsToDisk("joon_layout.ini");
+                    if (ImGui::MenuItem("Load Layout"))
+                        load_layout_requested = true;
+                    ImGui::EndMenu();
+                }
+                ImGui::EndMainMenuBar();
+            }
 
-        VkPresentInfoKHR present_info{};
-        present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-        present_info.waitSemaphoreCount = 1;
-        present_info.pWaitSemaphores = &gui.render_finished;
-        present_info.swapchainCount = 1;
-        present_info.pSwapchains = &gui.swapchain;
-        present_info.pImageIndices = &image_index;
+            if (load_layout_requested) {
+                ImGui::LoadIniSettingsFromDisk("joon_layout.ini");
+                load_layout_requested = false;
+            }
 
-        vkQueuePresentKHR(dev.graphics_queue, &present_info);
+            ImGuiID dockspace_id = ImGui::GetID("MainDockSpace");
+            ImGui::DockSpaceOverViewport(dockspace_id, ImGui::GetMainViewport());
+
+            app.update();
+            app.draw_hierarchy();
+            app.draw_code();
+            app.draw_properties();
+            app.draw_viewport();
+            app.draw_log();
+
+            ImGui::Render();
+            ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmd);
+
+            vkCmdEndRenderPass(cmd);
+            vkEndCommandBuffer(cmd);
+
+            VkPipelineStageFlags wait_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+            VkSubmitInfo submit_info{};
+            submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+            submit_info.waitSemaphoreCount = 1;
+            submit_info.pWaitSemaphores = &gui.image_available[frame_idx];
+            submit_info.pWaitDstStageMask = &wait_stage;
+            submit_info.commandBufferCount = 1;
+            submit_info.pCommandBuffers = &cmd;
+            submit_info.signalSemaphoreCount = 1;
+            submit_info.pSignalSemaphores = &gui.render_finished[frame_idx];
+
+            vkQueueSubmit(dev.graphics_queue, 1, &submit_info, gui.fences[frame_idx]);
+
+            VkPresentInfoKHR present_info{};
+            present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+            present_info.waitSemaphoreCount = 1;
+            present_info.pWaitSemaphores = &gui.render_finished[frame_idx];
+            present_info.swapchainCount = 1;
+            present_info.pSwapchains = &gui.swapchain;
+            present_info.pImageIndices = &image_index;
+
+            VkResult present_result = vkQueuePresentKHR(dev.graphics_queue, &present_info);
+            if (present_result == VK_ERROR_OUT_OF_DATE_KHR ||
+                present_result == VK_SUBOPTIMAL_KHR || gui.framebuffer_resized) {
+                recreate_swapchain();
+            }
+
+            gui.current_frame = (gui.current_frame + 1) % MAX_FRAMES_IN_FLIGHT;
+        } catch (const std::exception& e) {
+            Crash(e.what());
+            break;
+        } catch (...) {
+            Crash("Unknown C++ exception");
+            break;
+        }
     }
 
     // Cleanup
@@ -314,11 +581,13 @@ int main() {
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
 
-    vkDestroyFence(dev.device, gui.fence, nullptr);
-    vkDestroySemaphore(dev.device, gui.image_available, nullptr);
-    vkDestroySemaphore(dev.device, gui.render_finished, nullptr);
+    for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+        vkDestroyFence(dev.device, gui.fences[i], nullptr);
+        vkDestroySemaphore(dev.device, gui.image_available[i], nullptr);
+        vkDestroySemaphore(dev.device, gui.render_finished[i], nullptr);
+    }
 
-    vkFreeCommandBuffers(dev.device, gui.command_pool, 1, &gui.command_buffer);
+    vkFreeCommandBuffers(dev.device, gui.command_pool, MAX_FRAMES_IN_FLIGHT, gui.command_buffers);
     vkDestroyCommandPool(dev.device, gui.command_pool, nullptr);
 
     for (auto& frame : gui.frames) {
