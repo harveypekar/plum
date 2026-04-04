@@ -34,7 +34,6 @@ private:
     std::unordered_map<std::string, uint32_t> m_nameToNode;
 
     uint32_t add_node(const std::string& op, Tier tier);
-    void add_builtins();
     void resolve_ast(const dsl::Program& program);
     uint32_t resolve_expr(const dsl::AstNode& expr);
 };

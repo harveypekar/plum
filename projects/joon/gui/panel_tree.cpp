@@ -4,15 +4,8 @@
 void App::draw_tree() {
     ImGui::Begin("Graph Tree");
 
-    if (active_tab < 0 || active_tab >= (int)tabs.size()) {
-        ImGui::TextDisabled("No graph open");
-        ImGui::End();
-        return;
-    }
-
-    auto& tab = tabs[active_tab];
-    if (!tab.graph.has_errors()) {
-        auto& ir = tab.graph.ir();
+    if (!graph.has_errors()) {
+        auto& ir = graph.ir();
 
         if (ImGui::TreeNodeEx("Params", ImGuiTreeNodeFlags_DefaultOpen)) {
             for (auto& p : ir.params) {

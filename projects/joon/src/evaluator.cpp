@@ -8,10 +8,10 @@
 #include "vulkan/resource_pool.h"
 #include "vulkan/pipeline_cache.h"
 
+#define STB_IMAGE_WRITE_STATIC
 #include <stb/stb_image_write.h>
 
 #include <algorithm>
-#include <cstdio>
 
 namespace joon {
 
@@ -68,9 +68,7 @@ Param<float>& Param<float>::operator=(const float& value) {
     for (auto& p : ir.params) {
         if (p.node_id == m_nodeId) {
             p.default_value = value;
-            if (m_nodeId < ir.nodes.size()) {
-                ir.nodes[m_nodeId].constant_value = value;
-            }
+            ir.nodes[m_nodeId].constant_value = value;
             break;
         }
     }
@@ -80,11 +78,7 @@ Param<float>& Param<float>::operator=(const float& value) {
 template<>
 Param<float>::operator float() const {
     auto& ir = m_graph.ir();
-    if (m_nodeId < ir.nodes.size()) {
-        auto* val = std::get_if<float>(&ir.nodes[m_nodeId].constant_value);
-        if (val) return *val;
-    }
-    return 0.0f;
+    return std::get<float>(ir.nodes[m_nodeId].constant_value);
 }
 
 // --- Evaluator implementation ---
@@ -101,9 +95,9 @@ struct Evaluator::Impl {
           registry(nodes::NodeRegistry::create_default()),
           pipelines(std::make_unique<vk::PipelineCache>(ctx.device(), "shaders")) {
 
-        // Copy the IR so we can mutate params during evaluation.
-        // Graph default-constructs with a valid empty impl.
-        graph.ir() = source_graph.ir();
+        // Copy the graph so we can mutate params
+        graph = ctx.parse_string(""); // placeholder
+        graph.ir() = source_graph.ir(); // copy IR
 
         VkDescriptorPoolSize pool_size{};
         pool_size.type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
@@ -131,22 +125,7 @@ Evaluator::Evaluator(Context& ctx, const Graph& graph)
 Evaluator::~Evaluator() = default;
 
 void Evaluator::evaluate() {
-    vkDeviceWaitIdle(m_impl->ctx.device().device);
     vkResetDescriptorPool(m_impl->ctx.device().device, m_impl->desc_pool, 0);
-
-    auto& ir = m_impl->graph.ir();
-    {
-        FILE* f = fopen("joon.log", "a");
-        if (f) {
-            fprintf(f, "[eval] nodes=%d edges=%d outputs=%d\n",
-                    (int)ir.nodes.size(), (int)ir.edges.size(), (int)ir.outputs.size());
-            for (size_t i = 0; i < ir.nodes.size(); i++) {
-                fprintf(f, "[eval]   node[%d] op=%s const=%d\n",
-                        (int)i, ir.nodes[i].op.c_str(), ir.nodes[i].is_constant);
-            }
-            fclose(f);
-        }
-    }
 
     nodes::EvalContext eval_ctx{
         m_impl->ctx.device(),
@@ -157,18 +136,7 @@ void Evaluator::evaluate() {
     };
 
     Interpreter interp(eval_ctx, m_impl->registry);
-    interp.evaluate(ir);
-
-    {
-        FILE* f = fopen("joon.log", "a");
-        if (f) {
-            for (size_t i = 0; i < ir.nodes.size(); i++) {
-                auto* img = m_impl->ctx.pool().get_image((uint32_t)i);
-                fprintf(f, "[eval]   pool[%d]=%p\n", (int)i, (void*)img);
-            }
-            fclose(f);
-        }
-    }
+    interp.evaluate(m_impl->graph.ir());
 }
 
 template<>

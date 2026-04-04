@@ -1,0 +1,37 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(sudo apt-get:*)",
+      "Bash(pdftotext:*)",
+      "Bash(python3:*)",
+      "Bash(pip3 install:*)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebSearch",
+      "WebFetch(domain:twilightstrategy.com)",
+      "WebFetch(domain:en.wikipedia.org)",
+      "WebFetch(domain:www.ultraboardgames.com)",
+      "WebFetch(domain:gambiter.com)",
+      "Bash(curl:*)",
+      "Bash(ss:*)",
+      "Bash(pip3 show:*)",
+      "Bash(.venv/bin/python:*)",
+      "Bash(ollama list:*)",
+      "Bash(ollama:*)",
+      "Bash(pip3 list:*)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:www.yifeihu.me)",
+      "WebFetch(domain:boardgamegeek.com)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(sqlite3:*)",
+      "Bash(ls:*)",
+      "Bash(python:*)",
+      "WebFetch(domain:premake.github.io)",
+      "Bash(apt list:*)",
+      "Bash(gh release:*)",
+      "Bash(cmake:*)",
+      "Bash(./build/ts:*)"
+    ]
+  }
+}

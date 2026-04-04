@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(code:*)",
+      "Bash(docker exec:*)",
+      "Bash(python3:*)",
+      "Bash(.venv/bin/python:*)",
+      "Bash(ln:*)",
+      "Bash(.venv/bin/pip install:*)",
+      "Bash(ls:*)",
+      "Bash(/mnt/d/prg/plum/.worktrees/vo2max-enrichment/projects/coach/.venv/bin/python:*)",
+      "Bash(git:*)",
+      "Bash(docker port:*)",
+      "Bash(grep:*)"
+    ]
+  }
+}

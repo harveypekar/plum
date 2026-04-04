@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "Read(//mnt/d/prg/plum/.worktrees/**)",
+      "Read(//mnt/d/prg/plum/**)",
+      "Bash(python3:*)",
+      "Bash(gh api:*)",
+      "Bash(source:*)",
+      "WebFetch(domain:github.com)",
+      "Bash(pkill:*)",
+      "Bash(ls:*)"
+    ]
+  }
+}

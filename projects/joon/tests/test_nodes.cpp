@@ -1,42 +1,30 @@
 #include "catch_amalgamated.hpp"
 #include "nodes/node_registry.h"
 
-using namespace joon::nodes;
+using namespace joon;
 
-TEST_CASE("NodeRegistry creates default registry", "[nodes]") {
-    // Test: Create default registry with all built-in nodes
-    auto registry = NodeRegistry::create_default();
-    // Registry should be created successfully
-    REQUIRE(true); // create_default() should not throw
+TEST_CASE("NodeRegistry registers nodes", "[nodes]") {
+    NodeRegistry registry;
+    // Test: Register a node type and verify it's accessible
+    // Pattern: registry.registerNode("add", ...) → registry.get("add") should return the node
+    CHECK(false); // TODO: Implement once registry.registerNode() API is determined
 }
 
-TEST_CASE("NodeRegistry provides access to math operators", "[nodes]") {
-    auto registry = NodeRegistry::create_default();
-
-    // Test: Verify that common arithmetic operators can be found
-    // The registry should support finding operators like add, sub, mul, div
-    auto add_op = registry.find("add");
-    CHECK(add_op != nullptr);
-
-    auto mul_op = registry.find("mul");
-    CHECK(mul_op != nullptr);
+TEST_CASE("NodeRegistry retrieves registered nodes", "[nodes]") {
+    NodeRegistry registry;
+    // Test: Register multiple nodes and retrieve each by name
+    // Pattern: Register 3 nodes → query each → verify all exist
+    CHECK(false); // TODO: Implement once registry API is determined
 }
 
-TEST_CASE("NodeRegistry provides image processing operations", "[nodes]") {
-    auto registry = NodeRegistry::create_default();
-
-    // Test: Verify image ops are registered (blur, noise, etc.)
-    auto blur_op = registry.find("blur");
-    // Blur may or may not be directly available; verify lookup mechanism works
-
-    auto noise_op = registry.find("noise");
-    // Noise should be available
+TEST_CASE("Node executes computation", "[nodes]") {
+    // Test: Create a node, provide inputs, execute, verify output
+    // Pattern: Create node instance → node.execute(inputs) → CHECK result matches expected
+    CHECK(false); // TODO: Implement once node execution API is determined
 }
 
-TEST_CASE("NodeRegistry lookup returns null for unknown operators", "[nodes]") {
-    auto registry = NodeRegistry::create_default();
-
-    // Test: Verify that querying for non-existent operator returns nullptr
-    auto unknown = registry.find("unknown_operator_xyz");
-    CHECK(unknown == nullptr);
+TEST_CASE("Node validates inputs", "[nodes]") {
+    // Test: Provide invalid inputs to node and verify validation catches it
+    // Pattern: node.execute(invalid_inputs) should throw or return error
+    CHECK(false); // TODO: Implement once input validation API is determined
 }

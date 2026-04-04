@@ -29,7 +29,7 @@ static const char* type_name(joon::Type t) {
 
 static void print_diagnostics(const char* path, const joon::Graph& graph) {
     for (auto& d : graph.diagnostics()) {
-        const char* level = d.level == joon::ir::Diagnostic::Level::ERROR ? "error" : "warning";
+        const char* level = d.level == joon::ir::Diagnostic::Level::Error ? "error" : "warning";
         std::cerr << path << ":" << d.line << ":" << d.col << ": "
                   << level << ": " << d.message << "\n";
     }
