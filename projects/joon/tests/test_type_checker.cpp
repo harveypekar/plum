@@ -76,7 +76,7 @@ TEST_CASE("Type: undefined symbol produces error", "[types]") {
     auto g = build("(def r (* x 1.0)) (output r)");
     bool has_error = false;
     for (auto& d : g.diagnostics) {
-        if (d.level == ir::Diagnostic::Level::Error &&
+        if (d.level == ir::Diagnostic::Level::ERROR &&
             d.message.find("Undefined symbol") != std::string::npos) {
             has_error = true;
         }
@@ -103,7 +103,7 @@ TEST_CASE("Diagnostics: no errors on valid graph", "[types]") {
         (output r)
     )");
     for (auto& d : g.diagnostics) {
-        CHECK(d.level != ir::Diagnostic::Level::Error);
+        CHECK(d.level != ir::Diagnostic::Level::ERROR);
     }
 }
 

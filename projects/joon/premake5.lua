@@ -209,6 +209,7 @@ project "joon-tests"
         "src",
         "third_party",
         "third_party/catch2/extras",
+        "third_party/vma/include",
         vulkan_sdk .. "/Include"
     }
 

@@ -1,5 +1,5 @@
 #include "catch_amalgamated.hpp"
-#include "graph.h"
+#include <joon/graph.h>
 
 using namespace joon;
 
