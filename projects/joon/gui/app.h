@@ -15,6 +15,7 @@ struct App {
 
     std::string dsl_source;
     bool source_dirty = true;
+    float codeFontScale = 1.0f;
     uint32_t selected_node_id = UINT32_MAX;
 
     VkDescriptorSet viewport_desc = VK_NULL_HANDLE;
