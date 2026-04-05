@@ -1,0 +1,15 @@
+[submodule "projects/joon/third_party/glfw"]
+	path = projects/joon/third_party/glfw
+	url = https://github.com/glfw/glfw.git
+[submodule "projects/joon/third_party/catch2"]
+	path = projects/joon/third_party/catch2
+	url = https://github.com/catchorg/Catch2.git
+[submodule "projects/joon/third_party/imgui"]
+	path = projects/joon/third_party/imgui
+	url = https://github.com/ocornut/imgui.git
+[submodule "projects/joon/third_party/vma"]
+	path = projects/joon/third_party/vma
+	url = https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git
+[submodule "projects/joon/third_party/stb"]
+	path = projects/joon/third_party/stb
+	url = https://github.com/nothings/stb.git
