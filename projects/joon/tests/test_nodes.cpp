@@ -1,7 +1,7 @@
 #include "catch_amalgamated.hpp"
 #include "nodes/node_registry.h"
 
-using namespace joon;
+using namespace joon::nodes;
 
 TEST_CASE("NodeRegistry registers nodes", "[nodes]") {
     NodeRegistry registry;
