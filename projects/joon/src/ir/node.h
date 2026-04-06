@@ -6,7 +6,7 @@
 #include <unordered_map>
 #include <cstdint>
 
-namespace joon::ir {
+namespace joon {
 
 enum class Tier { GPU, CPU };
 
@@ -48,4 +48,4 @@ struct OutputInfo {
     uint32_t node_id;
 };
 
-} // namespace joon::ir
+} // namespace joon

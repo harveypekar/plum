@@ -6,7 +6,7 @@
 #include <variant>
 #include <cstdint>
 
-namespace joon::dsl {
+namespace joon {
 
 struct AstNode;
 using AstPtr = std::unique_ptr<AstNode>;
@@ -68,4 +68,4 @@ struct Program {
     std::vector<AstPtr> statements;
 };
 
-} // namespace joon::dsl
+} // namespace joon

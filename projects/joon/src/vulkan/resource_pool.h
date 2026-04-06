@@ -4,7 +4,7 @@
 #include <joon/types.h>
 #include <unordered_map>
 
-namespace joon::vk {
+namespace joon {
 
 struct GpuImage {
     VkImage image = VK_NULL_HANDLE;
@@ -34,4 +34,4 @@ private:
     std::unordered_map<uint32_t, GpuImage> m_images;
 };
 
-} // namespace joon::vk
+} // namespace joon

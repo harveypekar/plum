@@ -3,7 +3,7 @@
 #include <stdexcept>
 #include <vector>
 
-namespace joon::vk {
+namespace joon {
 
 std::unique_ptr<Device> Device::create(bool enable_validation) {
     auto dev = std::make_unique<Device>();
@@ -148,4 +148,4 @@ void Device::end_single_command(VkCommandBuffer cmd) const {
     vkFreeCommandBuffers(device, command_pool, 1, &cmd);
 }
 
-} // namespace joon::vk
+} // namespace joon

@@ -1,7 +1,7 @@
 #include "catch_amalgamated.hpp"
 #include "dsl/parser.h"
 
-using namespace joon::dsl;
+using namespace joon;
 
 TEST_CASE("Parser parses def with call", "[parser]") {
     Parser parser("(def x (+ 1.0 2.0))");

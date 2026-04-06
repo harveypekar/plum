@@ -16,7 +16,7 @@ namespace joon {
 
 // --- Result implementation ---
 
-Result::Result(vk::ResourcePool& pool, uint32_t node_id)
+Result::Result(ResourcePool& pool, uint32_t node_id)
     : m_pool(pool), m_nodeId(node_id) {}
 
 uint32_t Result::width() const {
@@ -85,14 +85,14 @@ Param<float>::operator float() const {
 struct Evaluator::Impl {
     Context& ctx;
     Graph graph; // mutable copy for param updates
-    nodes::NodeRegistry registry;
-    std::unique_ptr<vk::PipelineCache> pipelines;
+    NodeRegistry registry;
+    std::unique_ptr<PipelineCache> pipelines;
     VkDescriptorPool desc_pool = VK_NULL_HANDLE;
 
     Impl(Context& ctx, const Graph& source_graph)
         : ctx(ctx),
-          registry(nodes::NodeRegistry::create_default()),
-          pipelines(std::make_unique<vk::PipelineCache>(ctx.device(), "shaders")) {
+          registry(NodeRegistry::create_default()),
+          pipelines(std::make_unique<PipelineCache>(ctx.device(), "shaders")) {
 
         // Copy the graph so we can mutate params
         graph = ctx.parse_string(""); // placeholder
@@ -126,7 +126,7 @@ Evaluator::~Evaluator() = default;
 void Evaluator::evaluate() {
     vkResetDescriptorPool(m_impl->ctx.device().device, m_impl->desc_pool, 0);
 
-    nodes::EvalContext eval_ctx{
+    EvalContext eval_ctx{
         m_impl->ctx.device(),
         m_impl->ctx.pool(),
         *m_impl->pipelines,
@@ -164,7 +164,7 @@ Result Evaluator::node_result(const std::string& name) {
     return Result(m_impl->ctx.pool(), 0);
 }
 
-const std::vector<ir::Diagnostic>& Evaluator::diagnostics() const {
+const std::vector<Diagnostic>& Evaluator::diagnostics() const {
     return m_impl->graph.ir().diagnostics;
 }
 

@@ -1,9 +1,9 @@
 #include "nodes/node_registry.h"
 
-namespace joon::nodes {
+namespace joon {
 
 void register_color(NodeRegistry& reg) {
-    reg.register_node("color", [](const ir::Node& node, EvalContext& ctx) {
+    reg.register_node("color", [](const Node& node, EvalContext& ctx) {
         // Color args come as constant node inputs
         float r = 0, g = 0, b = 0;
         for (size_t i = 0; i < node.inputs.size() && i < 3; i++) {
@@ -22,4 +22,4 @@ void register_color(NodeRegistry& reg) {
     });
 }
 
-} // namespace joon::nodes
+} // namespace joon

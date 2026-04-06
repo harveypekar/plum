@@ -7,13 +7,13 @@ namespace joon {
 
 class Interpreter {
 public:
-    Interpreter(nodes::EvalContext& ctx, const nodes::NodeRegistry& registry);
+    Interpreter(EvalContext& ctx, const NodeRegistry& registry);
 
-    void evaluate(const ir::IRGraph& graph);
+    void evaluate(const IRGraph& graph);
 
 private:
-    nodes::EvalContext& m_ctx;
-    const nodes::NodeRegistry& m_registry;
+    EvalContext& m_ctx;
+    const NodeRegistry& m_registry;
 };
 
 } // namespace joon

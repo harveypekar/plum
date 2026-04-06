@@ -1,7 +1,7 @@
 #include "dsl/parser.h"
 #include "dsl/lexer.h"
 
-namespace joon::dsl {
+namespace joon {
 
 Parser::Parser(std::string_view source) {
     Lexer lexer(source);
@@ -174,4 +174,4 @@ AstPtr Parser::parse_expr() {
     throw ParseError("Unexpected token: " + tok.text, tok.line, tok.col);
 }
 
-} // namespace joon::dsl
+} // namespace joon

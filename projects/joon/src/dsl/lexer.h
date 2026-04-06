@@ -5,7 +5,7 @@
 #include <string_view>
 #include <vector>
 
-namespace joon::dsl {
+namespace joon {
 
 class Lexer {
 public:
@@ -26,4 +26,4 @@ private:
     Token read_string();
 };
 
-} // namespace joon::dsl
+} // namespace joon

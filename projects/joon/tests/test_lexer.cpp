@@ -1,7 +1,7 @@
 #include "catch_amalgamated.hpp"
 #include "dsl/lexer.h"
 
-using namespace joon::dsl;
+using namespace joon;
 
 TEST_CASE("Lexer tokenizes S-expression", "[lexer]") {
     Lexer lexer("(def x (+ 1.0 2.0))");

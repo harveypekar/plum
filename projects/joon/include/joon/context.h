@@ -4,7 +4,8 @@
 
 namespace joon {
 
-namespace vk { struct Device; class ResourcePool; }
+struct Device;
+class ResourcePool;
 
 class Graph;
 class Evaluator;
@@ -18,8 +19,8 @@ public:
     Graph parse_string(const char* source);
     std::unique_ptr<Evaluator> create_evaluator(const Graph& graph);
 
-    vk::Device& device() const;
-    vk::ResourcePool& pool() const;
+    Device& device() const;
+    ResourcePool& pool() const;
 
 private:
     Context();

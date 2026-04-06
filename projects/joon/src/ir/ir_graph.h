@@ -6,7 +6,7 @@
 #include <unordered_map>
 #include <string>
 
-namespace joon::ir {
+namespace joon {
 
 struct Diagnostic {
     enum class Level { ERROR, WARNING };
@@ -23,7 +23,7 @@ public:
     std::vector<OutputInfo> outputs;
     std::vector<Diagnostic> diagnostics;
 
-    static IRGraph from_ast(const dsl::Program& program);
+    static IRGraph from_ast(const Program& program);
 
     std::vector<uint32_t> topological_order() const;
 
@@ -34,8 +34,8 @@ private:
     std::unordered_map<std::string, uint32_t> m_nameToNode;
 
     uint32_t add_node(const std::string& op, Tier tier);
-    void resolve_ast(const dsl::Program& program);
-    uint32_t resolve_expr(const dsl::AstNode& expr);
+    void resolve_ast(const Program& program);
+    uint32_t resolve_expr(const AstNode& expr);
 };
 
-} // namespace joon::ir
+} // namespace joon

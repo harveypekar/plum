@@ -2,9 +2,9 @@
 #include <algorithm>
 #include <queue>
 
-namespace joon::ir {
+namespace joon {
 
-IRGraph IRGraph::from_ast(const dsl::Program& program) {
+IRGraph IRGraph::from_ast(const Program& program) {
     IRGraph graph;
     graph.resolve_ast(program);
     return graph;
@@ -21,19 +21,19 @@ uint32_t IRGraph::add_node(const std::string& op, Tier tier) {
     return id;
 }
 
-void IRGraph::resolve_ast(const dsl::Program& program) {
+void IRGraph::resolve_ast(const Program& program) {
     for (auto& stmt : program.statements) {
-        if (auto* def = std::get_if<dsl::DefNode>(&stmt->data)) {
+        if (auto* def = std::get_if<DefNode>(&stmt->data)) {
             uint32_t node_id = resolve_expr(*def->value);
             nodes[node_id].name = def->name;
             m_nameToNode[def->name] = node_id;
 
-        } else if (auto* param = std::get_if<dsl::ParamNode>(&stmt->data)) {
+        } else if (auto* param = std::get_if<ParamNode>(&stmt->data)) {
             uint32_t id = add_node("param", Tier::CPU);
             nodes[id].name = param->name;
             nodes[id].is_constant = true;
 
-            auto* num = std::get_if<dsl::NumberNode>(&param->default_value->data);
+            auto* num = std::get_if<NumberNode>(&param->default_value->data);
             if (num) {
                 nodes[id].constant_value = static_cast<float>(num->value);
             }
@@ -54,35 +54,35 @@ void IRGraph::resolve_ast(const dsl::Program& program) {
             nodes[id].output_type = pi.type;
 
             for (auto& c : param->constraints) {
-                auto* cnum = std::get_if<dsl::NumberNode>(&c.value->data);
+                auto* cnum = std::get_if<NumberNode>(&c.value->data);
                 if (cnum) pi.constraints[c.name] = static_cast<float>(cnum->value);
             }
 
             params.push_back(std::move(pi));
             m_nameToNode[param->name] = id;
 
-        } else if (auto* output = std::get_if<dsl::OutputNode>(&stmt->data)) {
+        } else if (auto* output = std::get_if<OutputNode>(&stmt->data)) {
             uint32_t node_id = resolve_expr(*output->value);
             outputs.push_back({ node_id });
         }
     }
 }
 
-uint32_t IRGraph::resolve_expr(const dsl::AstNode& expr) {
-    if (auto* num = std::get_if<dsl::NumberNode>(&expr.data)) {
+uint32_t IRGraph::resolve_expr(const AstNode& expr) {
+    if (auto* num = std::get_if<NumberNode>(&expr.data)) {
         uint32_t id = add_node("constant", Tier::CPU);
         nodes[id].is_constant = true;
         nodes[id].constant_value = static_cast<float>(num->value);
         return id;
     }
 
-    if (auto* str = std::get_if<dsl::StringNode>(&expr.data)) {
+    if (auto* str = std::get_if<StringNode>(&expr.data)) {
         uint32_t id = add_node("string_constant", Tier::CPU);
         nodes[id].string_arg = str->value;
         return id;
     }
 
-    if (auto* sym = std::get_if<dsl::SymbolNode>(&expr.data)) {
+    if (auto* sym = std::get_if<SymbolNode>(&expr.data)) {
         auto it = m_nameToNode.find(sym->name);
         if (it == m_nameToNode.end()) {
             diagnostics.push_back({
@@ -95,7 +95,7 @@ uint32_t IRGraph::resolve_expr(const dsl::AstNode& expr) {
         return it->second;
     }
 
-    if (auto* call = std::get_if<dsl::CallNode>(&expr.data)) {
+    if (auto* call = std::get_if<CallNode>(&expr.data)) {
         Tier tier = Tier::GPU;
         if (call->op == "image" || call->op == "color" || call->op == "save") {
             tier = Tier::CPU;
@@ -111,11 +111,11 @@ uint32_t IRGraph::resolve_expr(const dsl::AstNode& expr) {
         }
 
         for (auto& kw : call->kwargs) {
-            if (auto* knum = std::get_if<dsl::NumberNode>(&kw.value->data)) {
+            if (auto* knum = std::get_if<NumberNode>(&kw.value->data)) {
                 nodes[id].kwargs.push_back({ kw.name, static_cast<float>(knum->value) });
-            } else if (auto* kstr = std::get_if<dsl::StringNode>(&kw.value->data)) {
+            } else if (auto* kstr = std::get_if<StringNode>(&kw.value->data)) {
                 nodes[id].string_arg = kstr->value;
-            } else if (auto* ksym = std::get_if<dsl::SymbolNode>(&kw.value->data)) {
+            } else if (auto* ksym = std::get_if<SymbolNode>(&kw.value->data)) {
                 // Keyword value is a symbol reference (e.g., :mode multiply)
                 // Store as string for now — node implementations interpret it
                 nodes[id].kwargs.push_back({ kw.name, 0.0f });
@@ -172,4 +172,4 @@ const Node* IRGraph::find_node_by_name(const std::string& name) const {
     return nullptr;
 }
 
-} // namespace joon::ir
+} // namespace joon

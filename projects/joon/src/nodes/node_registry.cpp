@@ -1,6 +1,6 @@
 #include "nodes/node_registry.h"
 
-namespace joon::nodes {
+namespace joon {
 
 void NodeRegistry::register_node(const std::string& op, NodeExecutor executor) {
     m_executors[op] = std::move(executor);
@@ -23,4 +23,4 @@ NodeRegistry NodeRegistry::create_default() {
     return reg;
 }
 
-} // namespace joon::nodes
+} // namespace joon

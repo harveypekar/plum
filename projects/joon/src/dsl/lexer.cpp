@@ -1,6 +1,6 @@
 #include "dsl/lexer.h"
 
-namespace joon::dsl {
+namespace joon {
 
 Lexer::Lexer(std::string_view source) : m_source(source) {}
 
@@ -98,4 +98,4 @@ std::vector<Token> Lexer::tokenize() {
     return tokens;
 }
 
-} // namespace joon::dsl
+} // namespace joon

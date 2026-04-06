@@ -1,11 +1,11 @@
 #include "nodes/node_registry.h"
 #include "nodes/gpu_dispatch.h"
 
-namespace joon::nodes {
+namespace joon {
 
 void register_image_ops(NodeRegistry& reg) {
     // Invert: no push constants
-    reg.register_node("invert", [](const ir::Node& node, EvalContext& ctx) {
+    reg.register_node("invert", [](const Node& node, EvalContext& ctx) {
         if (node.inputs.empty()) return;
         auto* input = ctx.pool.get_image(node.inputs[0]);
         if (!input) return;
@@ -15,7 +15,7 @@ void register_image_ops(NodeRegistry& reg) {
     });
 
     // Threshold: push constant float
-    reg.register_node("threshold", [](const ir::Node& node, EvalContext& ctx) {
+    reg.register_node("threshold", [](const Node& node, EvalContext& ctx) {
         if (node.inputs.empty()) return;
         auto* input = ctx.pool.get_image(node.inputs[0]);
         if (!input) return;
@@ -31,7 +31,7 @@ void register_image_ops(NodeRegistry& reg) {
     });
 
     // Levels: push constants (contrast, brightness)
-    reg.register_node("levels", [](const ir::Node& node, EvalContext& ctx) {
+    reg.register_node("levels", [](const Node& node, EvalContext& ctx) {
         if (node.inputs.empty()) return;
         auto* input = ctx.pool.get_image(node.inputs[0]);
         if (!input) return;
@@ -48,7 +48,7 @@ void register_image_ops(NodeRegistry& reg) {
     });
 
     // Blur: push constant (radius)
-    reg.register_node("blur", [](const ir::Node& node, EvalContext& ctx) {
+    reg.register_node("blur", [](const Node& node, EvalContext& ctx) {
         if (node.inputs.empty()) return;
         auto* input = ctx.pool.get_image(node.inputs[0]);
         if (!input) return;
@@ -64,7 +64,7 @@ void register_image_ops(NodeRegistry& reg) {
     });
 
     // Blend: push constants (opacity, mode)
-    reg.register_node("blend", [](const ir::Node& node, EvalContext& ctx) {
+    reg.register_node("blend", [](const Node& node, EvalContext& ctx) {
         if (node.inputs.size() < 2) return;
         auto* a = ctx.pool.get_image(node.inputs[0]);
         auto* b = ctx.pool.get_image(node.inputs[1]);
@@ -82,4 +82,4 @@ void register_image_ops(NodeRegistry& reg) {
     });
 }
 
-} // namespace joon::nodes
+} // namespace joon

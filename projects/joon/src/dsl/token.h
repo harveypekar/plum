@@ -3,7 +3,7 @@
 #include <string>
 #include <cstdint>
 
-namespace joon::dsl {
+namespace joon {
 
 enum class TokenType {
     LPAREN,      // (
@@ -22,4 +22,4 @@ struct Token {
     uint32_t col;
 };
 
-} // namespace joon::dsl
+} // namespace joon

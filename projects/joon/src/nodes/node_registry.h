@@ -8,18 +8,18 @@
 #include <string>
 #include <unordered_map>
 
-namespace joon::nodes {
+namespace joon {
 
 struct EvalContext {
-    vk::Device& device;
-    vk::ResourcePool& pool;
-    vk::PipelineCache& pipelines;
+    Device& device;
+    ResourcePool& pool;
+    PipelineCache& pipelines;
     uint32_t default_width;
     uint32_t default_height;
     VkDescriptorPool desc_pool;
 };
 
-using NodeExecutor = std::function<void(const ir::Node& node, EvalContext& ctx)>;
+using NodeExecutor = std::function<void(const Node& node, EvalContext& ctx)>;
 
 class NodeRegistry {
 public:
@@ -39,4 +39,4 @@ void register_math_ops(NodeRegistry& reg);
 void register_image_ops(NodeRegistry& reg);
 void register_save(NodeRegistry& reg);
 
-} // namespace joon::nodes
+} // namespace joon

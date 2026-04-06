@@ -5,11 +5,11 @@
 
 using namespace joon;
 
-static ir::IRGraph build(const char* src) {
-    dsl::Parser parser(src);
+static IRGraph build(const char* src) {
+    Parser parser(src);
     auto program = parser.parse();
-    auto graph = ir::IRGraph::from_ast(program);
-    ir::type_check(graph);
+    auto graph = IRGraph::from_ast(program);
+    type_check(graph);
     return graph;
 }
 
@@ -76,7 +76,7 @@ TEST_CASE("Type: undefined symbol produces error", "[types]") {
     auto g = build("(def r (* x 1.0)) (output r)");
     bool has_error = false;
     for (auto& d : g.diagnostics) {
-        if (d.level == ir::Diagnostic::Level::ERROR &&
+        if (d.level == Diagnostic::Level::ERROR &&
             d.message.find("Undefined symbol") != std::string::npos) {
             has_error = true;
         }
@@ -103,7 +103,7 @@ TEST_CASE("Diagnostics: no errors on valid graph", "[types]") {
         (output r)
     )");
     for (auto& d : g.diagnostics) {
-        CHECK(d.level != ir::Diagnostic::Level::ERROR);
+        CHECK(d.level != Diagnostic::Level::ERROR);
     }
 }
 

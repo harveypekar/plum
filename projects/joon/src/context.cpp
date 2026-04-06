@@ -12,8 +12,8 @@
 namespace joon {
 
 struct Context::Impl {
-    std::unique_ptr<vk::Device> device;
-    std::unique_ptr<vk::ResourcePool> pool;
+    std::unique_ptr<Device> device;
+    std::unique_ptr<ResourcePool> pool;
 };
 
 Context::Context() : m_impl(std::make_unique<Impl>()) {}
@@ -21,20 +21,20 @@ Context::~Context() = default;
 
 std::unique_ptr<Context> Context::create() {
     auto ctx = std::unique_ptr<Context>(new Context());
-    ctx->m_impl->device = vk::Device::create();
-    ctx->m_impl->pool = std::make_unique<vk::ResourcePool>(*ctx->m_impl->device);
+    ctx->m_impl->device = Device::create();
+    ctx->m_impl->pool = std::make_unique<ResourcePool>(*ctx->m_impl->device);
     return ctx;
 }
 
-vk::Device& Context::device() const { return *m_impl->device; }
-vk::ResourcePool& Context::pool() const { return *m_impl->pool; }
+Device& Context::device() const { return *m_impl->device; }
+ResourcePool& Context::pool() const { return *m_impl->pool; }
 
 Graph Context::parse_string(const char* source) {
     Graph g;
-    dsl::Parser parser(source);
+    Parser parser(source);
     auto program = parser.parse();
-    g.ir() = ir::IRGraph::from_ast(program);
-    ir::type_check(g.ir());
+    g.ir() = IRGraph::from_ast(program);
+    type_check(g.ir());
     return g;
 }
 

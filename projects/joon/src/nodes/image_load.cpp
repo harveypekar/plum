@@ -3,10 +3,10 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb/stb_image.h>
 
-namespace joon::nodes {
+namespace joon {
 
 void register_image_load(NodeRegistry& reg) {
-    reg.register_node("image", [](const ir::Node& node, EvalContext& ctx) {
+    reg.register_node("image", [](const Node& node, EvalContext& ctx) {
         // Get path from the string constant input node
         std::string path;
         if (!node.inputs.empty()) {
@@ -43,4 +43,4 @@ void register_image_load(NodeRegistry& reg) {
     });
 }
 
-} // namespace joon::nodes
+} // namespace joon

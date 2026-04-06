@@ -1,10 +1,10 @@
 #include "nodes/gpu_dispatch.h"
 
-namespace joon::nodes {
+namespace joon {
 
 void gpu_dispatch(EvalContext& ctx,
                   const std::string& shader_name,
-                  const std::vector<vk::GpuImage*>& images,
+                  const std::vector<GpuImage*>& images,
                   uint32_t width, uint32_t height,
                   const void* push_data,
                   uint32_t push_size) {
@@ -68,4 +68,4 @@ void gpu_dispatch(EvalContext& ctx,
     ctx.device.end_single_command(cmd);
 }
 
-} // namespace joon::nodes
+} // namespace joon

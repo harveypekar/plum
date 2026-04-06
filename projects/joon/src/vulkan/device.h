@@ -4,7 +4,7 @@
 #include <vk_mem_alloc.h>
 #include <memory>
 
-namespace joon::vk {
+namespace joon {
 
 struct Device {
     VkInstance instance = VK_NULL_HANDLE;
@@ -29,4 +29,4 @@ struct Device {
     void end_single_command(VkCommandBuffer cmd) const;
 };
 
-} // namespace joon::vk
+} // namespace joon

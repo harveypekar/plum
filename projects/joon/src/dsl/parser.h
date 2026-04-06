@@ -7,7 +7,7 @@
 #include <vector>
 #include <stdexcept>
 
-namespace joon::dsl {
+namespace joon {
 
 struct ParseError : std::runtime_error {
     uint32_t line, col;
@@ -37,4 +37,4 @@ private:
     AstPtr parse_expr();
 };
 
-} // namespace joon::dsl
+} // namespace joon

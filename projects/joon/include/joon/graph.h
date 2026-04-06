@@ -6,7 +6,8 @@
 
 namespace joon {
 
-namespace ir { class IRGraph; struct Diagnostic; }
+class IRGraph;
+struct Diagnostic;
 
 class Graph {
 public:
@@ -16,10 +17,10 @@ public:
     Graph& operator=(Graph&&) noexcept;
 
     bool has_errors() const;
-    const std::vector<ir::Diagnostic>& diagnostics() const;
+    const std::vector<Diagnostic>& diagnostics() const;
 
-    ir::IRGraph& ir();
-    const ir::IRGraph& ir() const;
+    IRGraph& ir();
+    const IRGraph& ir() const;
 
 private:
     friend class Context;

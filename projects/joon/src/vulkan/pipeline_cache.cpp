@@ -2,7 +2,7 @@
 #include <fstream>
 #include <stdexcept>
 
-namespace joon::vk {
+namespace joon {
 
 PipelineCache::PipelineCache(Device& device, const std::string& shader_dir)
     : m_device(device), m_shaderDir(shader_dir) {}
@@ -87,4 +87,4 @@ const ComputePipeline& PipelineCache::get(const std::string& name,
     return m_pipelines[name];
 }
 
-} // namespace joon::vk
+} // namespace joon

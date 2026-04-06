@@ -9,8 +9,9 @@ namespace joon {
 
 class Context;
 class Graph;
-namespace ir { struct Diagnostic; }
-namespace vk { class ResourcePool; struct GpuImage; }
+struct Diagnostic;
+class ResourcePool;
+struct GpuImage;
 
 template<typename T>
 class Param {
@@ -26,7 +27,7 @@ private:
 
 class Result {
 public:
-    Result(vk::ResourcePool& pool, uint32_t node_id);
+    Result(ResourcePool& pool, uint32_t node_id);
 
     uint32_t width() const;
     uint32_t height() const;
@@ -37,7 +38,7 @@ public:
     void* vk_image_view() const;
 
 private:
-    vk::ResourcePool& m_pool;
+    ResourcePool& m_pool;
     uint32_t m_nodeId;
 };
 
@@ -53,7 +54,7 @@ public:
     Result result(const std::string& name);
     Result node_result(const std::string& name);
 
-    const std::vector<ir::Diagnostic>& diagnostics() const;
+    const std::vector<Diagnostic>& diagnostics() const;
 
 private:
     friend class Context;

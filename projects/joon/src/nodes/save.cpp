@@ -5,10 +5,10 @@
 
 #include <algorithm>
 
-namespace joon::nodes {
+namespace joon {
 
 void register_save(NodeRegistry& reg) {
-    reg.register_node("save", [](const ir::Node& node, EvalContext& ctx) {
+    reg.register_node("save", [](const Node& node, EvalContext& ctx) {
         if (node.inputs.empty()) return;
         auto* input = ctx.pool.get_image(node.inputs[0]);
         if (!input) return;
@@ -31,4 +31,4 @@ void register_save(NodeRegistry& reg) {
     });
 }
 
-} // namespace joon::nodes
+} // namespace joon

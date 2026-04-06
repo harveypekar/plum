@@ -5,7 +5,7 @@
 #include <unordered_map>
 #include <vector>
 
-namespace joon::vk {
+namespace joon {
 
 struct ComputePipeline {
     VkShaderModule shader_module = VK_NULL_HANDLE;
@@ -31,4 +31,4 @@ private:
     std::vector<uint8_t> read_spirv(const std::string& name);
 };
 
-} // namespace joon::vk
+} // namespace joon

@@ -1,10 +1,10 @@
 #include "nodes/node_registry.h"
 #include "nodes/gpu_dispatch.h"
 
-namespace joon::nodes {
+namespace joon {
 
 void register_noise(NodeRegistry& reg) {
-    reg.register_node("noise", [](const ir::Node& node, EvalContext& ctx) {
+    reg.register_node("noise", [](const Node& node, EvalContext& ctx) {
         auto* img = ctx.pool.alloc_image(node.id, ctx.default_width, ctx.default_height);
 
         float scale = 4.0f, octaves = 1.0f;
@@ -24,4 +24,4 @@ void register_noise(NodeRegistry& reg) {
     });
 }
 
-} // namespace joon::nodes
+} // namespace joon

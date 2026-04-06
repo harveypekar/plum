@@ -4,7 +4,7 @@
 namespace joon {
 
 struct Graph::Impl {
-    ir::IRGraph ir;
+    IRGraph ir;
 };
 
 Graph::Graph() : m_impl(std::make_unique<Impl>()) {}
@@ -14,16 +14,16 @@ Graph& Graph::operator=(Graph&&) noexcept = default;
 
 bool Graph::has_errors() const {
     for (auto& d : m_impl->ir.diagnostics) {
-        if (d.level == ir::Diagnostic::Level::ERROR) return true;
+        if (d.level == Diagnostic::Level::ERROR) return true;
     }
     return false;
 }
 
-const std::vector<ir::Diagnostic>& Graph::diagnostics() const {
+const std::vector<Diagnostic>& Graph::diagnostics() const {
     return m_impl->ir.diagnostics;
 }
 
-ir::IRGraph& Graph::ir() { return m_impl->ir; }
-const ir::IRGraph& Graph::ir() const { return m_impl->ir; }
+IRGraph& Graph::ir() { return m_impl->ir; }
+const IRGraph& Graph::ir() const { return m_impl->ir; }
 
 } // namespace joon

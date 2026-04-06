@@ -1,6 +1,6 @@
 #include "ir/type_checker.h"
 
-namespace joon::ir {
+namespace joon {
 
 // Promotion lattice: FLOAT < INT < BOOL < VEC2 < VEC3 < VEC4 < IMAGE
 // FLOAT promotes into everything. IMAGE is the widest.
@@ -95,4 +95,4 @@ void type_check(IRGraph& graph) {
     }
 }
 
-} // namespace joon::ir
+} // namespace joon

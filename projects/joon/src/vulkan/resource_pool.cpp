@@ -2,7 +2,7 @@
 #include <cstring>
 #include <stdexcept>
 
-namespace joon::vk {
+namespace joon {
 
 ResourcePool::ResourcePool(Device& device) : m_device(device) {}
 
@@ -169,4 +169,4 @@ void ResourcePool::clear() {
     m_images.clear();
 }
 
-} // namespace joon::vk
+} // namespace joon

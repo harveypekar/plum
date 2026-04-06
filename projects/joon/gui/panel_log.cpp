@@ -11,7 +11,7 @@ void App::draw_log() {
     for (auto& d : graph.diagnostics()) {
         ImVec4 color;
         const char* prefix;
-        if (d.level == joon::ir::Diagnostic::Level::ERROR) {
+        if (d.level == joon::Diagnostic::Level::ERROR) {
             color = ImVec4(1.0f, 0.3f, 0.3f, 1.0f);
             prefix = "ERROR";
         } else {

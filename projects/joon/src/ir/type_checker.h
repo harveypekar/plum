@@ -2,8 +2,8 @@
 
 #include "ir/ir_graph.h"
 
-namespace joon::ir {
+namespace joon {
 
 void type_check(IRGraph& graph);
 
-} // namespace joon::ir
+} // namespace joon
