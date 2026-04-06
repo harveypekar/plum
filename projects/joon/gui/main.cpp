@@ -61,42 +61,17 @@ int main() {
     // For the vertical slice, this is a working skeleton.
     // The full implementation will be fleshed out when we first build and test on Windows.
 
-    IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
-    ImGuiIO& io = ImGui::GetIO();
-    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-
-    ImGui::StyleColorsDark();
-
-    // TODO: Initialize ImGui GLFW and Vulkan backends once swapchain is set up
-    // ImGui_ImplGlfw_InitForVulkan(window, true);
-    // ImGui_ImplVulkan_Init(&init_info);
+    // TODO: Full ImGui integration requires:
+    // 1. Create VkSurfaceKHR from GLFW window
+    // 2. Create swapchain
+    // 3. Create render pass
+    // 4. Initialize ImGui GLFW + Vulkan backends
+    // 5. Each frame: acquire image, record ImGui commands, present
+    // Until then, just show the GLFW window.
 
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
-
-        // ImGui_ImplVulkan_NewFrame();
-        // ImGui_ImplGlfw_NewFrame();
-        ImGui::NewFrame();
-        ImGui::DockSpaceOverViewport();
-
-        app.update();
-        app.draw_tree();
-        app.draw_properties();
-        app.draw_code();
-        app.draw_viewport();
-        app.draw_preview();
-        app.draw_log();
-
-        ImGui::Render();
-        // Submit ImGui draw data to Vulkan
     }
-
-    vkDeviceWaitIdle(dev.device);
-
-    // ImGui_ImplVulkan_Shutdown();
-    // ImGui_ImplGlfw_Shutdown();
-    ImGui::DestroyContext();
     glfwDestroyWindow(window);
     glfwTerminate();
     return 0;
