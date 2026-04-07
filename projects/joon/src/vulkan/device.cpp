@@ -17,9 +17,24 @@ std::unique_ptr<Device> Device::create(bool enable_validation) {
     app_info.engineVersion = VK_MAKE_VERSION(0, 1, 0);
     app_info.apiVersion = VK_API_VERSION_1_2;
 
+    // Instance extensions required for window-system presentation.
+    // Enabled unconditionally so the CLI and GUI share one Device::create path.
+    std::vector<const char*> instance_extensions = {
+        "VK_KHR_surface",
+#ifdef _WIN32
+        "VK_KHR_win32_surface",
+#elif defined(__APPLE__)
+        "VK_EXT_metal_surface",
+#else
+        "VK_KHR_xlib_surface",
+#endif
+    };
+
     VkInstanceCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
     create_info.pApplicationInfo = &app_info;
+    create_info.enabledExtensionCount = static_cast<uint32_t>(instance_extensions.size());
+    create_info.ppEnabledExtensionNames = instance_extensions.data();
 
     std::vector<const char*> layers;
     if (enable_validation) {
@@ -82,10 +97,17 @@ std::unique_ptr<Device> Device::create(bool enable_validation) {
         queue_infos.push_back(qi);
     }
 
+    // Device extensions — swapchain is needed by the GUI; harmless for the CLI.
+    std::vector<const char*> device_extensions = {
+        "VK_KHR_swapchain",
+    };
+
     VkDeviceCreateInfo device_info{};
     device_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
     device_info.queueCreateInfoCount = static_cast<uint32_t>(queue_infos.size());
     device_info.pQueueCreateInfos = queue_infos.data();
+    device_info.enabledExtensionCount = static_cast<uint32_t>(device_extensions.size());
+    device_info.ppEnabledExtensionNames = device_extensions.data();
 
     if (vkCreateDevice(dev->physical_device, &device_info, nullptr, &dev->device) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create Vulkan device");
