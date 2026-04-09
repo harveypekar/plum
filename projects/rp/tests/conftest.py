@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass, field
 
 import pytest
@@ -29,6 +30,7 @@ class StubOllama:
 
     async def get_num_ctx(self, model: str) -> int:
         self.show_calls[model] = self.show_calls.get(model, 0) + 1
+        await asyncio.sleep(0)
         if model not in self.num_ctx_map:
             from aiserver.ollama import OllamaError
             raise OllamaError(f"stub has no num_ctx for model {model!r}")

@@ -24,7 +24,7 @@ class TestBudgetReport:
             available=7168, overhead=500, messages_budget=6668,
             messages_kept=10, messages_dropped=0,
             summary_dropped=False, mes_example_truncated=False,
-            estimator_tokens=5000, actual_tokens=None, warnings=[],
+            estimator_tokens=5000, actual_tokens=None,
         )
         assert report.model == "m"
         assert report.warnings == []
