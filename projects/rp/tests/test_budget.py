@@ -5,7 +5,7 @@ import pytest
 
 from projects.rp import budget
 from projects.rp.budget import BudgetError, BudgetReport, _get_model_ctx, _ollama_count_messages, fit_prompt
-from projects.rp.context import SlidingWindow
+from projects.rp.context import SlidingWindow, SummaryBuffer
 
 
 @pytest.fixture(autouse=True)
@@ -198,3 +198,59 @@ class TestFitPromptHappyPath:
         assert report.available == 800
         assert report.overhead == 500
         assert report.messages_budget == 300
+
+
+class TestFitPromptPriority3:
+    @pytest.mark.asyncio
+    async def test_summary_kept_when_it_fits(self, stub_ollama_factory):
+        """Happy case: summary fits within budget, should not be dropped."""
+        stub = stub_ollama_factory(num_ctx_map={"m": 1000})
+        ctx = _build_ctx(
+            system_prompt="",
+            post_prompt="",
+            messages=[
+                {"role": "assistant", "content": "greeting", "_sequence": 1},
+                {"role": "user", "content": "X" * 1000, "_sequence": 10},
+            ],
+        )
+        ctx["_summary"] = "Y" * 800
+        ctx["_summary_through_sequence"] = 5
+
+        report = await fit_prompt(
+            ctx, model="m", ollama=stub, strategy=SummaryBuffer(),
+            num_predict=500, ground_truth=False,
+        )
+        assert report.summary_dropped is False
+
+    @pytest.mark.asyncio
+    async def test_summary_dropped_when_budget_too_tight(self, stub_ollama_factory):
+        """When even after strategy.fit the prompt is still over budget
+        (we check via the estimator on the rendered messages), drop summary.
+
+        Budget math (4-chars-per-token estimator):
+          model_ctx=1200, num_predict=300 -> available=900, messages_budget=900
+          summary "S"*400 -> 100 tokens; cap = 900*0.25 = 225; 100 <= 225, injected.
+          budget_for_recent = 900 - 0 (greeting "hi"=2 chars=0t) - 100 = 800
+          recent "Z"*3200 -> 800 tokens; 800 <= 800, kept by strategy.
+          Injected msg = "[Story so far]\\n" + "S"*400 = 416 chars = 104 tokens.
+          Post-strategy total = 104 + 0 + 800 = 904 > 900 -> Priority 3 fires.
+        """
+        stub = stub_ollama_factory(num_ctx_map={"m": 1200})
+        # 800 tokens exactly fills recent budget; "[Story so far]\\n" prefix (3t) pushes total over
+        huge_recent = "Z" * 3200  # 800 tokens
+        ctx = _build_ctx(
+            messages=[
+                {"role": "assistant", "content": "hi", "_sequence": 1},
+                {"role": "user", "content": huge_recent, "_sequence": 10},
+            ],
+        )
+        ctx["_summary"] = "S" * 400  # 100 tokens, within 25% cap
+        ctx["_summary_through_sequence"] = 5
+
+        report = await fit_prompt(
+            ctx, model="m", ollama=stub, strategy=SummaryBuffer(),
+            num_predict=300, ground_truth=False,
+        )
+        assert report.summary_dropped is True
+        for m in ctx["messages"]:
+            assert "[Story so far]" not in m.get("content", "")

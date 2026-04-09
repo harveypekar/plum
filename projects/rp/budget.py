@@ -128,6 +128,8 @@ async def fit_prompt(
     )
     messages_budget = available - overhead
 
+    summary_dropped = False
+
     # Priority 2: delegate to strategy.fit with the corrected budget.
     # The strategy (SlidingWindow / SummaryBuffer) handles greeting
     # protection, oldest-first drop, and summary injection.
@@ -135,6 +137,27 @@ async def fit_prompt(
         ctx["messages"] = strategy.fit(
             ctx.get("messages", []), messages_budget, ctx=ctx
         )
+
+    # Priority 3: if still over budget, drop the summary (if any) and re-fit.
+    def _current_messages_tokens() -> int:
+        return sum(
+            _estimate_tokens(m.get("content", ""))
+            for m in ctx.get("messages", [])
+        )
+
+    if ctx.get("_summary") and _current_messages_tokens() > messages_budget:
+        ctx["_summary"] = None
+        # Strip any injected summary message (added by SummaryBuffer) before re-fitting.
+        ctx["messages"] = [
+            m for m in ctx.get("messages", [])
+            if not m.get("content", "").startswith("[Story so far]")
+        ]
+        if messages_budget > 0:
+            ctx["messages"] = strategy.fit(
+                ctx.get("messages", []), messages_budget, ctx=ctx
+            )
+        summary_dropped = True
+        warnings.append("summary dropped to fit messages budget")
 
     messages_after = len(ctx.get("messages", []))
     messages_dropped = max(0, messages_before - messages_after)
@@ -148,7 +171,7 @@ async def fit_prompt(
         messages_budget=messages_budget,
         messages_kept=messages_after,
         messages_dropped=messages_dropped,
-        summary_dropped=False,
+        summary_dropped=summary_dropped,
         mes_example_truncated=False,
         estimator_tokens=overhead + sum(
             _estimate_tokens(m.get("content", "")) for m in ctx.get("messages", [])
