@@ -232,8 +232,8 @@ class TestFitPromptPriority3:
           summary "S"*400 -> 100 tokens; cap = 900*0.25 = 225; 100 <= 225, injected.
           budget_for_recent = 900 - 0 (greeting "hi"=2 chars=0t) - 100 = 800
           recent "Z"*3200 -> 800 tokens; 800 <= 800, kept by strategy.
-          Injected msg = "[Story so far]\\n" + "S"*400 = 416 chars = 104 tokens.
-          Post-strategy total = 104 + 0 + 800 = 904 > 900 -> Priority 3 fires.
+          Injected msg = "[Story so far]\\n" + "S"*400 = 415 chars = 103 tokens.
+          Post-strategy total = 103 + 0 + 800 = 903 > 900 -> Priority 3 fires.
         """
         stub = stub_ollama_factory(num_ctx_map={"m": 1200})
         # 800 tokens exactly fills recent budget; "[Story so far]\\n" prefix (3t) pushes total over
