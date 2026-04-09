@@ -72,3 +72,18 @@ async def _get_model_ctx(model: str, ollama: _OllamaLike) -> int:
         _ctx_cache[model] = num_ctx
         _log.info("Loaded num_ctx=%d for model %s", num_ctx, model)
         return num_ctx
+
+
+async def _ollama_count_messages(
+    messages: list[dict],
+    model: str,
+    ollama: _OllamaLike,
+) -> int:
+    """Ask Ollama for the ground-truth token count of `messages`.
+
+    Calls /api/chat and reads prompt_eval_count from the response.
+    Returns 0 if Ollama doesn't surface the field — caller decides
+    how to handle a missing value.
+    """
+    result = await ollama.chat(model=model, messages=messages)
+    return int(result.get("prompt_eval_count", 0) or 0)

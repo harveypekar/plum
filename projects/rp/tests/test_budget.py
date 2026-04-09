@@ -4,7 +4,7 @@ import asyncio
 import pytest
 
 from projects.rp import budget
-from projects.rp.budget import BudgetError, BudgetReport, _get_model_ctx
+from projects.rp.budget import BudgetError, BudgetReport, _get_model_ctx, _ollama_count_messages
 
 
 @pytest.fixture(autouse=True)
@@ -72,3 +72,24 @@ class TestGetModelCtx:
         assert await _get_model_ctx("A", stub) == 8192
         assert await _get_model_ctx("B", stub) == 32768
         assert stub.show_calls == {"A": 1, "B": 1}
+
+
+class TestOllamaCountMessages:
+    @pytest.mark.asyncio
+    async def test_returns_prompt_eval_count(self, stub_ollama_factory):
+        stub = stub_ollama_factory(count_map={"modelA": 1234})
+        messages = [
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user", "content": "Hi"},
+        ]
+        count = await _ollama_count_messages(messages, "modelA", stub)
+        assert count == 1234
+        assert stub.chat_calls == 1
+
+    @pytest.mark.asyncio
+    async def test_returns_zero_when_missing(self, stub_ollama_factory):
+        """If Ollama doesn't return prompt_eval_count, return 0 and let caller
+        decide. Never silently inflate or deflate."""
+        stub = stub_ollama_factory(count_map={})  # default_count=0
+        count = await _ollama_count_messages([{"role": "user", "content": "x"}], "modelA", stub)
+        assert count == 0
