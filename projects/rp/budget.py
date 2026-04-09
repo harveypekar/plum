@@ -8,7 +8,10 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass, field
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
+
+if TYPE_CHECKING:
+    from .context import ContextStrategy  # noqa: F401
 
 _log = logging.getLogger(__name__)
 
@@ -87,3 +90,73 @@ async def _ollama_count_messages(
     """
     result = await ollama.chat(model=model, messages=messages)
     return int(result.get("prompt_eval_count", 0) or 0)
+
+
+async def fit_prompt(
+    ctx: dict,
+    *,
+    model: str,
+    ollama: _OllamaLike,
+    strategy: "ContextStrategy",
+    num_predict: int | None = None,
+    ground_truth: bool = True,
+) -> BudgetReport:
+    """Shrink ctx["messages"] (and, if needed, other prompt pieces) so the
+    assembled prompt fits within model_ctx - response_reserve.
+
+    Mutates ctx:
+      - ctx["messages"]: potentially trimmed by the strategy
+      - ctx["_summary"]: potentially deleted (Priority 3)
+      - ctx["ai_card"]: mes_example potentially truncated (Priority 4)
+      - ctx["system_prompt"] / ctx["post_prompt"]: re-rendered on P4
+      - ctx["_num_ctx"]: set to the model's context window
+      - ctx["_budget_report"]: set to the returned BudgetReport
+
+    Raises BudgetError with a populated report if the minimum viable
+    prompt (system + greeting + most-recent user message) doesn't fit.
+    """
+    model_ctx = await _get_model_ctx(model, ollama)
+    response_reserve = num_predict if num_predict is not None else 1024
+    available = model_ctx - response_reserve
+
+    warnings: list[str] = []
+    messages_before = len(ctx.get("messages", []))
+
+    # Estimator-based overhead.
+    overhead = _estimate_tokens(ctx.get("system_prompt", "")) + _estimate_tokens(
+        ctx.get("post_prompt", "")
+    )
+    messages_budget = available - overhead
+
+    # Priority 2: delegate to strategy.fit with the corrected budget.
+    # The strategy (SlidingWindow / SummaryBuffer) handles greeting
+    # protection, oldest-first drop, and summary injection.
+    if messages_budget > 0:
+        ctx["messages"] = strategy.fit(
+            ctx.get("messages", []), messages_budget, ctx=ctx
+        )
+
+    messages_after = len(ctx.get("messages", []))
+    messages_dropped = max(0, messages_before - messages_after)
+
+    report = BudgetReport(
+        model=model,
+        model_ctx=model_ctx,
+        response_reserve=response_reserve,
+        available=available,
+        overhead=overhead,
+        messages_budget=messages_budget,
+        messages_kept=messages_after,
+        messages_dropped=messages_dropped,
+        summary_dropped=False,
+        mes_example_truncated=False,
+        estimator_tokens=overhead + sum(
+            _estimate_tokens(m.get("content", "")) for m in ctx.get("messages", [])
+        ),
+        actual_tokens=None,
+        warnings=warnings,
+    )
+
+    ctx["_num_ctx"] = model_ctx
+    ctx["_budget_report"] = report
+    return report

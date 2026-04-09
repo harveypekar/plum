@@ -4,7 +4,8 @@ import asyncio
 import pytest
 
 from projects.rp import budget
-from projects.rp.budget import BudgetError, BudgetReport, _get_model_ctx, _ollama_count_messages
+from projects.rp.budget import BudgetError, BudgetReport, _get_model_ctx, _ollama_count_messages, fit_prompt
+from projects.rp.context import SlidingWindow
 
 
 @pytest.fixture(autouse=True)
@@ -93,3 +94,107 @@ class TestOllamaCountMessages:
         stub = stub_ollama_factory(count_map={})  # default_count=0
         count = await _ollama_count_messages([{"role": "user", "content": "x"}], "modelA", stub)
         assert count == 0
+
+
+def _build_ctx(system_prompt="", post_prompt="", messages=None, ai_card=None):
+    """Build a minimal ctx dict for fit_prompt tests."""
+    return {
+        "system_prompt": system_prompt,
+        "post_prompt": post_prompt,
+        "messages": messages or [],
+        "ai_card": ai_card or {"card_data": {"data": {"mes_example": ""}}},
+    }
+
+
+class TestFitPromptHappyPath:
+    @pytest.mark.asyncio
+    async def test_everything_fits_no_shrink(self, stub_ollama_factory):
+        stub = stub_ollama_factory(num_ctx_map={"m": 8192})
+        ctx = _build_ctx(
+            system_prompt="system",  # ~1 token
+            post_prompt="post",       # ~1 token
+            messages=[
+                {"role": "assistant", "content": "greeting"},
+                {"role": "user", "content": "hi"},
+                {"role": "assistant", "content": "hello"},
+            ],
+        )
+        report = await fit_prompt(
+            ctx, model="m", ollama=stub, strategy=SlidingWindow(),
+            num_predict=512, ground_truth=False,
+        )
+        assert len(ctx["messages"]) == 3
+        assert report.model == "m"
+        assert report.model_ctx == 8192
+        assert report.response_reserve == 512
+        assert report.available == 8192 - 512
+        assert report.messages_kept == 3
+        assert report.messages_dropped == 0
+        assert report.summary_dropped is False
+        assert report.mes_example_truncated is False
+        assert ctx["_num_ctx"] == 8192
+        assert ctx["_budget_report"] is report
+
+    @pytest.mark.asyncio
+    async def test_default_response_reserve_is_1024(self, stub_ollama_factory):
+        stub = stub_ollama_factory(num_ctx_map={"m": 8192})
+        ctx = _build_ctx(messages=[{"role": "user", "content": "hi"}])
+        report = await fit_prompt(
+            ctx, model="m", ollama=stub, strategy=SlidingWindow(),
+            num_predict=None, ground_truth=False,
+        )
+        assert report.response_reserve == 1024
+
+    @pytest.mark.asyncio
+    async def test_priority_2_drops_oldest_messages(self, stub_ollama_factory):
+        """When messages exceed budget, SlidingWindow drops oldest first.
+
+        Budget math:
+          available = 2048 - 1900 = 148 tokens
+          overhead = 0 (no system/post prompt)
+          messages_budget = 148
+          Each message = len("X"*100) // 4 = 25 tokens
+
+        SlidingWindow keeps greeting (25t) then fills from newest:
+          E(25), D(25), C(25), B(25) = 100t total -> 25+100=125 <= 148
+          A: 125+25=150 > 148 -> break
+        Result: G (greeting) + B, C, D, E kept; A (oldest) dropped.
+        """
+        stub = stub_ollama_factory(num_ctx_map={"m": 2048})
+        messages = [
+            {"role": "assistant", "content": "G" * 100},   # greeting (kept)
+            {"role": "user", "content": "A" * 100},        # oldest (droppable)
+            {"role": "assistant", "content": "B" * 100},
+            {"role": "user", "content": "C" * 100},
+            {"role": "assistant", "content": "D" * 100},
+            {"role": "user", "content": "E" * 100},        # most recent (kept)
+        ]
+        ctx = _build_ctx(messages=messages)
+        report = await fit_prompt(
+            ctx, model="m", ollama=stub, strategy=SlidingWindow(),
+            num_predict=1900, ground_truth=False,
+        )
+        contents = [m["content"] for m in ctx["messages"]]
+        assert "G" * 100 in contents  # greeting
+        assert "E" * 100 in contents  # most recent
+        assert "A" * 100 not in contents  # oldest dropped
+        assert report.messages_dropped > 0
+
+    @pytest.mark.asyncio
+    async def test_overhead_counted_against_budget(self, stub_ollama_factory):
+        """Large system_prompt should reduce messages_budget accordingly."""
+        stub = stub_ollama_factory(num_ctx_map={"m": 1000})
+        ctx = _build_ctx(
+            system_prompt="X" * 2000,
+            messages=[{"role": "user", "content": "hi"}],
+        )
+        report = await fit_prompt(
+            ctx, model="m", ollama=stub, strategy=SlidingWindow(),
+            num_predict=200, ground_truth=False,
+        )
+        # available = 1000 - 200 = 800
+        # overhead = len("X"*2000)//4 = 500 (system) + 0 (post) = 500
+        # messages_budget = 300
+        assert report.available == 800
+        assert report.overhead == 500
+        assert report.messages_budget == 300
