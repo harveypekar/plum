@@ -379,6 +379,18 @@ int main() {
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
+        // Menu bar
+        if (ImGui::BeginMainMenuBar()) {
+            if (ImGui::BeginMenu("Layout")) {
+                if (ImGui::MenuItem("Save Layout"))
+                    ImGui::SaveIniSettingsToDisk("joon_layout.ini");
+                if (ImGui::MenuItem("Load Layout"))
+                    ImGui::LoadIniSettingsFromDisk("joon_layout.ini");
+                ImGui::EndMenu();
+            }
+            ImGui::EndMainMenuBar();
+        }
+
         ImGui::DockSpaceOverViewport();
 
         app.update();
