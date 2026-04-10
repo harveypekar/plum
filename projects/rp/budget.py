@@ -92,6 +92,50 @@ async def _ollama_count_messages(
     return int(result.get("prompt_eval_count", 0) or 0)
 
 
+def _truncate_mes_example(ctx: dict) -> bool:
+    """Truncate ai_card's mes_example in place and re-run the assembly hooks.
+
+    Keeps whole lines up to max(25% of original tokens, 200 tokens).
+    Returns True if truncation happened, False if there was nothing to
+    truncate (empty or already small).
+
+    Imports from .pipeline are local to avoid a circular import: pipeline
+    can freely import budget without risk.
+    """
+    ai_card = ctx.get("ai_card") or {}
+    card_data = ai_card.get("card_data") or {}
+    ai_data = card_data.get("data", card_data)
+    original = ai_data.get("mes_example", "") or ""
+    if not original:
+        return False
+
+    original_tokens = _estimate_tokens(original)
+    target_tokens = max(original_tokens // 4, 200)
+    if original_tokens <= target_tokens:
+        return False
+
+    target_chars = target_tokens * 4
+    truncated_lines: list[str] = []
+    running = 0
+    for line in original.splitlines():
+        next_len = running + len(line) + 1
+        if next_len > target_chars:
+            break
+        truncated_lines.append(line)
+        running = next_len
+    truncated = "\n".join(truncated_lines).rstrip()
+    if not truncated:
+        truncated = original[:target_chars]
+    ai_data["mes_example"] = truncated
+
+    # Re-run the prompt assembly chain to rebuild system_prompt/post_prompt.
+    from .pipeline import assemble_prompt, expand_variables, inject_tools
+    assemble_prompt(ctx)
+    expand_variables(ctx)
+    inject_tools(ctx)
+    return True
+
+
 async def fit_prompt(
     ctx: dict,
     *,
@@ -129,7 +173,13 @@ async def fit_prompt(
     messages_budget = available - overhead
 
     summary_dropped = False
+    mes_example_truncated = False
     messages_snapshot = list(ctx.get("messages", []))
+
+    def _current_overhead() -> int:
+        return _estimate_tokens(ctx.get("system_prompt", "")) + _estimate_tokens(
+            ctx.get("post_prompt", "")
+        )
 
     # Priority 2: delegate to strategy.fit with the corrected budget.
     # The strategy (SlidingWindow / SummaryBuffer) handles greeting
@@ -156,23 +206,31 @@ async def fit_prompt(
         summary_dropped = True
         warnings.append("summary dropped to fit messages budget")
 
-    messages_after = len(ctx.get("messages", []))
-    messages_dropped = max(0, messages_before - messages_after)
+    # Priority 4: if overhead alone exceeds available (or messages_budget <= 0),
+    # truncate mes_example and re-run assembly.
+    if messages_budget <= 0 or _current_overhead() > available:
+        if _truncate_mes_example(ctx):
+            mes_example_truncated = True
+            warnings.append("mes_example truncated to fit system prompt")
+            overhead = _current_overhead()
+            messages_budget = available - overhead
+            if messages_budget > 0:
+                ctx["messages"] = strategy.fit(
+                    messages_snapshot, messages_budget, ctx=ctx
+                )
 
     report = BudgetReport(
         model=model,
         model_ctx=model_ctx,
         response_reserve=response_reserve,
         available=available,
-        overhead=overhead,
+        overhead=_current_overhead(),
         messages_budget=messages_budget,
-        messages_kept=messages_after,
-        messages_dropped=messages_dropped,
+        messages_kept=len(ctx.get("messages", [])),
+        messages_dropped=max(0, messages_before - len(ctx.get("messages", []))),
         summary_dropped=summary_dropped,
-        mes_example_truncated=False,
-        estimator_tokens=overhead + sum(
-            _estimate_tokens(m.get("content", "")) for m in ctx.get("messages", [])
-        ),
+        mes_example_truncated=mes_example_truncated,
+        estimator_tokens=_current_overhead() + _current_messages_tokens(),
         actual_tokens=None,
         warnings=warnings,
     )

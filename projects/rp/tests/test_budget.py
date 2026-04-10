@@ -254,3 +254,33 @@ class TestFitPromptPriority3:
         assert report.summary_dropped is True
         for m in ctx["messages"]:
             assert "[Story so far]" not in m.get("content", "")
+
+
+class TestFitPromptPriority4:
+    @pytest.mark.asyncio
+    async def test_mes_example_truncated_when_overhead_dominates(
+        self, stub_ollama_factory
+    ):
+        """When system_prompt (which includes mes_example) exceeds the
+        available budget, truncate mes_example and re-render."""
+        stub = stub_ollama_factory(num_ctx_map={"m": 1000})
+
+        mes_example = "Example line.\n" * 200
+        system_prompt = "character intro\n\nExample dialogue:\n" + mes_example + "\n\nmore intro"
+
+        ctx = _build_ctx(
+            system_prompt=system_prompt,
+            messages=[{"role": "user", "content": "hi"}],
+            ai_card={"card_data": {"data": {"mes_example": mes_example}}},
+        )
+        ctx["user_card"] = {"card_data": {"data": {}}}
+        ctx["scenario"] = {}
+        ctx["prompt_template"] = ""
+
+        report = await fit_prompt(
+            ctx, model="m", ollama=stub, strategy=SlidingWindow(),
+            num_predict=500, ground_truth=False,
+        )
+        assert report.mes_example_truncated is True
+        truncated = ctx["ai_card"]["card_data"]["data"]["mes_example"]
+        assert len(truncated) < len(mes_example)
