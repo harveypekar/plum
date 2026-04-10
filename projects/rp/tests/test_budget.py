@@ -262,20 +262,31 @@ class TestFitPromptPriority4:
         self, stub_ollama_factory
     ):
         """When system_prompt (which includes mes_example) exceeds the
-        available budget, truncate mes_example and re-render."""
+        available budget, truncate mes_example and re-render.
+
+        Uses a minimal template (system section only, no post) so that after
+        truncation the re-assembled overhead fits within available.
+        Budget math:
+          model_ctx=1000, num_predict=500 -> available=500
+          mes_example = "Example line.\\n" * 200 = 2800 chars = 700 tokens
+          template "## system\\n{{mes_example}}" -> system_prompt = mes_example (~700t)
+          initial overhead = 700 > 500 -> P4 fires
+          after truncation: target = max(700//4, 200) = 200 tokens -> ~800 chars
+          re-assembled overhead ~200t <= 500 -> P5 does not fire
+        """
         stub = stub_ollama_factory(num_ctx_map={"m": 1000})
 
         mes_example = "Example line.\n" * 200
-        system_prompt = "character intro\n\nExample dialogue:\n" + mes_example + "\n\nmore intro"
 
         ctx = _build_ctx(
-            system_prompt=system_prompt,
+            system_prompt=mes_example,  # initial system_prompt includes mes_example
             messages=[{"role": "user", "content": "hi"}],
             ai_card={"card_data": {"data": {"mes_example": mes_example}}},
         )
         ctx["user_card"] = {"card_data": {"data": {}}}
         ctx["scenario"] = {}
-        ctx["prompt_template"] = ""
+        # Minimal template: system section only, no post — keeps overhead low after re-assembly
+        ctx["prompt_template"] = "## system\n{{mes_example}}"
 
         report = await fit_prompt(
             ctx, model="m", ollama=stub, strategy=SlidingWindow(),
@@ -284,3 +295,50 @@ class TestFitPromptPriority4:
         assert report.mes_example_truncated is True
         truncated = ctx["ai_card"]["card_data"]["data"]["mes_example"]
         assert len(truncated) < len(mes_example)
+
+
+class TestFitPromptPriority5:
+    @pytest.mark.asyncio
+    async def test_budget_error_when_single_user_message_too_big(
+        self, stub_ollama_factory
+    ):
+        """A user message larger than model_ctx on its own can't be shrunk."""
+        stub = stub_ollama_factory(num_ctx_map={"m": 500})
+        huge = "X" * 20000  # ~5000 tokens
+        ctx = _build_ctx(
+            messages=[
+                {"role": "assistant", "content": "greeting"},
+                {"role": "user", "content": huge},
+            ],
+        )
+        with pytest.raises(BudgetError) as exc_info:
+            await fit_prompt(
+                ctx, model="m", ollama=stub, strategy=SlidingWindow(),
+                num_predict=100, ground_truth=False,
+            )
+        report = exc_info.value.report
+        assert report.model == "m"
+        assert report.model_ctx == 500
+        assert "fit" in str(exc_info.value).lower()
+
+    @pytest.mark.asyncio
+    async def test_budget_error_when_system_alone_exceeds_available(
+        self, stub_ollama_factory
+    ):
+        """Even after mes_example truncation, if the rest of the system
+        prompt exceeds available, we raise."""
+        stub = stub_ollama_factory(num_ctx_map={"m": 200})
+        ctx = _build_ctx(
+            system_prompt="X" * 4000,
+            messages=[{"role": "user", "content": "hi"}],
+            ai_card={"card_data": {"data": {"mes_example": ""}}},
+        )
+        ctx["user_card"] = {"card_data": {"data": {}}}
+        ctx["scenario"] = {}
+        ctx["prompt_template"] = ""
+
+        with pytest.raises(BudgetError):
+            await fit_prompt(
+                ctx, model="m", ollama=stub, strategy=SlidingWindow(),
+                num_predict=50, ground_truth=False,
+            )

@@ -219,6 +219,46 @@ async def fit_prompt(
                     messages_snapshot, messages_budget, ctx=ctx
                 )
 
+    # Priority 5: if after all shrinking the messages still can't fit,
+    # raise BudgetError with a populated report.
+    #
+    # Two failure modes:
+    # (a) Total size still exceeds available after all shrink steps.
+    # (b) The most recent user message was dropped entirely — a broken
+    #     conversation where we have no user turn to respond to.
+    final_msg_tokens = _current_messages_tokens()
+    final_overhead = _current_overhead()
+    last_user_msg = next(
+        (m for m in reversed(messages_snapshot) if m.get("role") == "user"),
+        None,
+    )
+    last_user_dropped = last_user_msg is not None and not any(
+        m is last_user_msg for m in ctx.get("messages", [])
+    )
+    if final_overhead + final_msg_tokens > available or messages_budget <= 0 or last_user_dropped:
+        failing_report = BudgetReport(
+            model=model,
+            model_ctx=model_ctx,
+            response_reserve=response_reserve,
+            available=available,
+            overhead=final_overhead,
+            messages_budget=messages_budget,
+            messages_kept=len(ctx.get("messages", [])),
+            messages_dropped=max(0, messages_before - len(ctx.get("messages", []))),
+            summary_dropped=summary_dropped,
+            mes_example_truncated=mes_example_truncated,
+            estimator_tokens=final_overhead + final_msg_tokens,
+            actual_tokens=None,
+            warnings=warnings + ["prompt does not fit after all shrink steps"],
+        )
+        ctx["_budget_report"] = failing_report
+        raise BudgetError(
+            f"Prompt does not fit: model_ctx={model_ctx}, reserve={response_reserve}, "
+            f"overhead={final_overhead}, messages={final_msg_tokens}. "
+            f"The most recent user message may be too long for this model.",
+            failing_report,
+        )
+
     report = BudgetReport(
         model=model,
         model_ctx=model_ctx,
