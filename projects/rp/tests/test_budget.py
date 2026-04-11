@@ -4,7 +4,14 @@ import asyncio
 import pytest
 
 from projects.rp import budget
-from projects.rp.budget import BudgetError, BudgetReport, _get_model_ctx, _ollama_count_messages, fit_prompt
+from projects.rp.budget import (
+    BudgetError,
+    BudgetReport,
+    _get_model_ctx,
+    _ollama_count_messages,
+    fit_prompt,
+    fit_raw_prompt,
+)
 from projects.rp.context import SlidingWindow, SummaryBuffer
 from projects.rp.tests.conftest import StubOllama
 
@@ -470,3 +477,63 @@ class TestFitPromptGroundTruth:
         )
         assert report.actual_tokens is None
         assert any("non-positive prompt_eval_count" in w for w in report.warnings)
+
+
+class TestFitRawPrompt:
+    @pytest.mark.asyncio
+    async def test_small_prompt_fits(self, stub_ollama_factory):
+        stub = stub_ollama_factory(
+            num_ctx_map={"m": 8192},
+            count_map={"m": 200},
+        )
+        prompt, report = await fit_raw_prompt(
+            prompt="hello world",
+            system="be helpful",
+            model="m",
+            ollama=stub,
+            num_predict=500,
+            ground_truth=True,
+        )
+        assert prompt == "hello world"
+        assert report.actual_tokens == 200
+        assert report.model_ctx == 8192
+
+    @pytest.mark.asyncio
+    async def test_oversized_prompt_raises(self, stub_ollama_factory):
+        stub = stub_ollama_factory(
+            num_ctx_map={"m": 500},
+            count_map={"m": 10000},  # ground-truth says way over
+        )
+        with pytest.raises(BudgetError) as exc_info:
+            await fit_raw_prompt(
+                prompt="X" * 40000,
+                system="",
+                model="m",
+                ollama=stub,
+                num_predict=100,
+                ground_truth=True,
+            )
+        assert exc_info.value.report.model_ctx == 500
+
+    @pytest.mark.asyncio
+    async def test_ground_truth_off_uses_estimator(self, stub_ollama_factory):
+        stub = stub_ollama_factory(num_ctx_map={"m": 8192})
+        prompt, report = await fit_raw_prompt(
+            prompt="hi",
+            system=None,
+            model="m",
+            ollama=stub,
+            num_predict=1024,
+            ground_truth=False,
+        )
+        assert report.actual_tokens is None
+        assert stub.chat_calls == 0
+
+    @pytest.mark.asyncio
+    async def test_default_num_predict_is_1024(self, stub_ollama_factory):
+        stub = stub_ollama_factory(num_ctx_map={"m": 8192})
+        _, report = await fit_raw_prompt(
+            prompt="hi", system=None, model="m", ollama=stub,
+            num_predict=None, ground_truth=False,
+        )
+        assert report.response_reserve == 1024

@@ -331,3 +331,71 @@ async def fit_prompt(
     ctx["_num_ctx"] = model_ctx
     ctx["_budget_report"] = report
     return report
+
+
+async def fit_raw_prompt(
+    *,
+    prompt: str,
+    system: str | None,
+    model: str,
+    ollama: _OllamaLike,
+    num_predict: int | None = None,
+    ground_truth: bool = True,
+) -> tuple[str, BudgetReport]:
+    """Budget a single-shot raw prompt (used by lora_generate).
+
+    Does NOT shrink — single-shot prompts have no safe shrink heuristic.
+    If it doesn't fit, raises BudgetError and the caller decides to skip
+    that scenario/turn.
+    """
+    model_ctx = await _get_model_ctx(model, ollama)
+    response_reserve = num_predict if num_predict is not None else 1024
+    available = model_ctx - response_reserve
+
+    prompt = prompt or ""
+    system = system or ""
+    overhead = _estimate_tokens(prompt) + _estimate_tokens(system)
+
+    actual_tokens: int | None = None
+    warnings: list[str] = []
+    if ground_truth:
+        gt_messages: list[dict] = []
+        if system:
+            gt_messages.append({"role": "system", "content": system})
+        gt_messages.append({"role": "user", "content": prompt})
+        actual_tokens = await _ollama_count_messages(gt_messages, model, ollama)
+        # Silent-failure guard: treat non-positive counts as estimator fallback
+        # (matches fit_prompt behavior added in Task 8 review).
+        if actual_tokens <= 0:
+            warnings.append(
+                f"ollama returned non-positive prompt_eval_count ({actual_tokens}); "
+                "falling back to estimator"
+            )
+            actual_tokens = None
+
+    effective_total = actual_tokens if actual_tokens is not None else overhead
+    fits = (effective_total + response_reserve) <= model_ctx
+
+    report = BudgetReport(
+        model=model,
+        model_ctx=model_ctx,
+        response_reserve=response_reserve,
+        available=available,
+        overhead=overhead,
+        messages_budget=available - overhead,
+        messages_kept=1,
+        messages_dropped=0,
+        summary_dropped=False,
+        mes_example_truncated=False,
+        estimator_tokens=overhead,
+        actual_tokens=actual_tokens,
+        warnings=warnings,
+    )
+
+    if not fits:
+        raise BudgetError(
+            f"Raw prompt does not fit: model_ctx={model_ctx}, reserve={response_reserve}, "
+            f"prompt_tokens={effective_total}.",
+            report,
+        )
+    return prompt, report
