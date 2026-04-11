@@ -136,6 +136,20 @@ def _truncate_mes_example(ctx: dict) -> bool:
     return True
 
 
+def _render_for_count(ctx: dict) -> list[dict]:
+    """Build the messages list that would actually be sent to Ollama.
+
+    Mirrors routes.py chat message assembly: system_prompt, then the
+    budgeted messages, then post_prompt (if any) as a trailing system
+    message.
+    """
+    msgs = [{"role": "system", "content": ctx.get("system_prompt", "")}]
+    msgs.extend(ctx.get("messages", []))
+    if ctx.get("post_prompt"):
+        msgs.append({"role": "system", "content": ctx["post_prompt"]})
+    return msgs
+
+
 async def fit_prompt(
     ctx: dict,
     *,
@@ -219,6 +233,20 @@ async def fit_prompt(
                     messages_snapshot, messages_budget, ctx=ctx
                 )
 
+    # Ground-truth check: ask Ollama for the real prompt_eval_count.
+    actual_tokens: int | None = None
+    if ground_truth and messages_budget > 0:
+        gt_messages = _render_for_count(ctx)
+        actual_tokens = await _ollama_count_messages(gt_messages, model, ollama)
+
+        if actual_tokens + response_reserve > model_ctx:
+            # One more shrink: drop one more oldest non-greeting message and recount.
+            if len(ctx.get("messages", [])) > 2:
+                ctx["messages"] = [ctx["messages"][0]] + ctx["messages"][2:]
+                gt_messages = _render_for_count(ctx)
+                actual_tokens = await _ollama_count_messages(gt_messages, model, ollama)
+            # If still over, let Priority 5 below raise.
+
     # Priority 5: if after all shrinking the messages still can't fit,
     # raise BudgetError with a populated report.
     #
@@ -235,7 +263,11 @@ async def fit_prompt(
     last_user_dropped = last_user_msg is not None and not any(
         m is last_user_msg for m in ctx.get("messages", [])
     )
-    if final_overhead + final_msg_tokens > available or messages_budget <= 0 or last_user_dropped:
+    effective_total = (
+        actual_tokens if actual_tokens is not None
+        else final_overhead + final_msg_tokens
+    )
+    if effective_total + response_reserve > model_ctx or messages_budget <= 0 or last_user_dropped:
         failing_report = BudgetReport(
             model=model,
             model_ctx=model_ctx,
@@ -248,7 +280,7 @@ async def fit_prompt(
             summary_dropped=summary_dropped,
             mes_example_truncated=mes_example_truncated,
             estimator_tokens=final_overhead + final_msg_tokens,
-            actual_tokens=None,
+            actual_tokens=actual_tokens,
             warnings=warnings + ["prompt does not fit after all shrink steps"],
         )
         ctx["_budget_report"] = failing_report
@@ -271,7 +303,7 @@ async def fit_prompt(
         summary_dropped=summary_dropped,
         mes_example_truncated=mes_example_truncated,
         estimator_tokens=_current_overhead() + _current_messages_tokens(),
-        actual_tokens=None,
+        actual_tokens=actual_tokens,
         warnings=warnings,
     )
 

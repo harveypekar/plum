@@ -6,6 +6,7 @@ import pytest
 from projects.rp import budget
 from projects.rp.budget import BudgetError, BudgetReport, _get_model_ctx, _ollama_count_messages, fit_prompt
 from projects.rp.context import SlidingWindow, SummaryBuffer
+from projects.rp.tests.conftest import StubOllama
 
 
 @pytest.fixture(autouse=True)
@@ -341,4 +342,93 @@ class TestFitPromptPriority5:
             await fit_prompt(
                 ctx, model="m", ollama=stub, strategy=SlidingWindow(),
                 num_predict=50, ground_truth=False,
+            )
+
+
+class TestFitPromptGroundTruth:
+    def _render_messages_for_count(self, ctx):
+        """Build the messages list as it would be sent to Ollama."""
+        msgs = [{"role": "system", "content": ctx["system_prompt"]}]
+        msgs.extend(ctx["messages"])
+        if ctx.get("post_prompt"):
+            msgs.append({"role": "system", "content": ctx["post_prompt"]})
+        return msgs
+
+    @pytest.mark.asyncio
+    async def test_ground_truth_fits_first_try(self, stub_ollama_factory):
+        """Estimator says fits, ground-truth confirms."""
+        stub = stub_ollama_factory(
+            num_ctx_map={"m": 8192},
+            count_map={"m": 100},  # ground truth says 100 tokens
+            default_count=100,
+        )
+        ctx = _build_ctx(
+            system_prompt="hello",
+            messages=[{"role": "user", "content": "hi"}],
+        )
+        report = await fit_prompt(
+            ctx, model="m", ollama=stub, strategy=SlidingWindow(),
+            num_predict=1024, ground_truth=True,
+        )
+        assert report.actual_tokens == 100
+        assert stub.chat_calls == 1
+
+    @pytest.mark.asyncio
+    async def test_ground_truth_triggers_one_more_shrink(self, stub_ollama_factory):
+        """Estimator said fits but ground truth says over -> shrink once more."""
+        class ShrinkingStub(StubOllama):
+            def __init__(self):
+                super().__init__(
+                    num_ctx_map={"m": 1000},
+                    default_count=2000,  # first call: over
+                )
+                self.counts = [2000, 400]  # decreasing per call
+                self.call_idx = 0
+
+            async def chat(self, model, messages, tools=None, think=False):
+                self.chat_calls += 1
+                idx = min(self.call_idx, len(self.counts) - 1)
+                self.call_idx += 1
+                return {"done": True, "prompt_eval_count": self.counts[idx]}
+
+        stub = ShrinkingStub()
+        ctx = _build_ctx(
+            messages=[
+                {"role": "assistant", "content": "g"},
+                {"role": "user", "content": "A" * 100},
+                {"role": "user", "content": "B" * 100},
+            ],
+        )
+        report = await fit_prompt(
+            ctx, model="m", ollama=stub, strategy=SlidingWindow(),
+            num_predict=100, ground_truth=True,
+        )
+        assert stub.chat_calls == 2  # first check + recount after shrink
+        assert report.actual_tokens == 400
+
+    @pytest.mark.asyncio
+    async def test_ground_truth_over_twice_raises(self, stub_ollama_factory):
+        """Ground truth still over after one more shrink -> BudgetError."""
+        class OverStub(StubOllama):
+            def __init__(self):
+                super().__init__(
+                    num_ctx_map={"m": 500},
+                    default_count=1000,  # always over
+                )
+
+            async def chat(self, model, messages, tools=None, think=False):
+                self.chat_calls += 1
+                return {"done": True, "prompt_eval_count": 1000}
+
+        stub = OverStub()
+        ctx = _build_ctx(
+            messages=[
+                {"role": "assistant", "content": "g"},
+                {"role": "user", "content": "hi"},
+            ],
+        )
+        with pytest.raises(BudgetError):
+            await fit_prompt(
+                ctx, model="m", ollama=stub, strategy=SlidingWindow(),
+                num_predict=100, ground_truth=True,
             )
