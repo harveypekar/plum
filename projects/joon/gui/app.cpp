@@ -23,6 +23,7 @@ void App::init() {
 }
 
 void App::reparse() {
+    eval_error.clear();
     try {
         graph = ctx->parse_string(dsl_source.c_str());
         if (!graph.has_errors()) {
@@ -31,8 +32,9 @@ void App::reparse() {
         } else {
             eval.reset();
         }
-    } catch (const std::exception&) {
+    } catch (const std::exception& e) {
         eval.reset();
+        eval_error = e.what();
     }
     source_dirty = false;
 }
