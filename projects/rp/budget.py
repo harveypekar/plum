@@ -19,6 +19,9 @@ _log = logging.getLogger(__name__)
 class _OllamaLike(Protocol):
     async def get_num_ctx(self, model: str) -> int: ...
     async def chat(self, model, messages, tools=None, think=False): ...
+    async def count_generate_prompt(
+        self, model: str, prompt: str, system: str | None = None
+    ) -> int: ...
 
 
 # Module-level cache: model name -> num_ctx. Populated on first use per model.
@@ -90,6 +93,22 @@ async def _ollama_count_messages(
     """
     result = await ollama.chat(model=model, messages=messages)
     return int(result.get("prompt_eval_count", 0) or 0)
+
+
+async def _ollama_count_raw_prompt(
+    prompt: str,
+    system: str | None,
+    model: str,
+    ollama: _OllamaLike,
+) -> int:
+    """Ask Ollama for the ground-truth token count of a /api/generate prompt.
+
+    Chat and generate apply different templates (role markers vs raw),
+    so `_ollama_count_messages` would systematically over-count for the
+    generate endpoint. Raw-prompt callers (lora_generate) must use this
+    helper to match what they actually send.
+    """
+    return await ollama.count_generate_prompt(model=model, prompt=prompt, system=system)
 
 
 def _truncate_mes_example(ctx: dict) -> bool:
@@ -359,11 +378,12 @@ async def fit_raw_prompt(
     actual_tokens: int | None = None
     warnings: list[str] = []
     if ground_truth:
-        gt_messages: list[dict] = []
-        if system:
-            gt_messages.append({"role": "system", "content": system})
-        gt_messages.append({"role": "user", "content": prompt})
-        actual_tokens = await _ollama_count_messages(gt_messages, model, ollama)
+        # Count via /api/generate to match how lora_generate actually sends
+        # the prompt. /api/chat applies role markers that /api/generate
+        # doesn't, so counting via chat would systematically over-count.
+        actual_tokens = await _ollama_count_raw_prompt(
+            prompt, system or None, model, ollama
+        )
         # Silent-failure guard: treat non-positive counts as estimator fallback
         # (matches fit_prompt behavior added in Task 8 review).
         if actual_tokens <= 0:

@@ -172,6 +172,39 @@ class OllamaClient:
                 tokens.append(chunk["token"])
         return "".join(tokens)
 
+    async def count_generate_prompt(
+        self,
+        model: str,
+        prompt: str,
+        system: str | None = None,
+    ) -> int:
+        """Tokenize a prompt via /api/generate and return prompt_eval_count.
+
+        Posts with `num_predict: 0` so Ollama tokenizes the prompt but
+        generates no output. Used by budget.fit_raw_prompt for ground-truth
+        counting that matches the generate endpoint's template — /api/chat
+        would apply chat role markers that /api/generate does not.
+        """
+        body: dict = {
+            "model": model,
+            "prompt": prompt,
+            "stream": False,
+            "options": {"num_predict": 0},
+        }
+        if system:
+            body["system"] = system
+        try:
+            async with httpx.AsyncClient(timeout=120.0) as client:
+                resp = await client.post(f"{self.base_url}/api/generate", json=body)
+                if resp.status_code != 200:
+                    raise OllamaError(f"Ollama returned {resp.status_code}: {resp.text}")
+                data = resp.json()
+                return int(data.get("prompt_eval_count", 0) or 0)
+        except httpx.ConnectError:
+            raise OllamaError(f"Cannot connect to Ollama at {self.base_url}")
+        except httpx.HTTPError as e:
+            raise OllamaError(f"HTTP error communicating with Ollama: {e}") from e
+
     async def chat(
         self,
         model: str,

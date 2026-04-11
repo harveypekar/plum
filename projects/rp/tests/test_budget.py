@@ -537,3 +537,35 @@ class TestFitRawPrompt:
             num_predict=None, ground_truth=False,
         )
         assert report.response_reserve == 1024
+
+    @pytest.mark.asyncio
+    async def test_zero_prompt_eval_count_falls_back_to_estimator(
+        self, stub_ollama_factory
+    ):
+        """Non-positive count from Ollama must fall back to estimator,
+        not silently report success. Mirrors the Task 8 guard for fit_prompt."""
+        stub = stub_ollama_factory(num_ctx_map={"m": 8192}, default_count=0)
+        prompt, report = await fit_raw_prompt(
+            prompt="hi", system=None, model="m", ollama=stub,
+            num_predict=1024, ground_truth=True,
+        )
+        assert report.actual_tokens is None
+        assert any("non-positive prompt_eval_count" in w for w in report.warnings)
+
+    @pytest.mark.asyncio
+    async def test_oversized_via_estimator_raises(self, stub_ollama_factory):
+        """With ground_truth=False, the estimator path alone must still
+        reject prompts larger than model_ctx - reserve. Prevents the
+        previous test from silently short-circuiting via ground-truth."""
+        stub = stub_ollama_factory(num_ctx_map={"m": 500})
+        with pytest.raises(BudgetError) as exc_info:
+            await fit_raw_prompt(
+                prompt="X" * 40000,  # estimator: 10000 tokens
+                system="",
+                model="m",
+                ollama=stub,
+                num_predict=100,
+                ground_truth=False,
+            )
+        assert exc_info.value.report.model_ctx == 500
+        assert stub.chat_calls == 0

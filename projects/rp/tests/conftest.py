@@ -52,6 +52,18 @@ class StubOllama:
             "prompt_eval_count": count,
         }
 
+    async def count_generate_prompt(
+        self, model: str, prompt: str, system: str | None = None
+    ) -> int:
+        """Stub /api/generate counting path used by fit_raw_prompt.
+
+        Reuses `count_map` / `default_count` and increments `chat_calls`
+        as the unified "ground-truth call counter" so tests can assert
+        that counting happened without caring which endpoint was used.
+        """
+        self.chat_calls += 1
+        return self.count_map.get(model, self.default_count)
+
 
 @pytest.fixture
 def stub_ollama_factory():
