@@ -37,7 +37,9 @@ struct GuiVulkan {
     VkCommandBuffer command_buffers[MAX_FRAMES_IN_FLIGHT]{};
     VkFence fences[MAX_FRAMES_IN_FLIGHT]{};
     VkSemaphore image_available[MAX_FRAMES_IN_FLIGHT]{};
-    VkSemaphore render_finished[MAX_FRAMES_IN_FLIGHT]{};
+    // Per-swapchain-image (not per frame-in-flight). The present op waits on
+    // this semaphore, so it must not be re-signaled while present is pending.
+    std::vector<VkSemaphore> render_finished;
     uint32_t current_frame = 0;
 
     std::vector<SwapchainFrame> frames;
@@ -113,6 +115,20 @@ static void create_swapchain(const joon::Device& dev, GuiVulkan& gui, GLFWwindow
     gui.frames.clear();
     gui.frames.reserve(image_count);
 
+    // Per-image render_finished semaphores. Size may change on recreate.
+    for (VkSemaphore s : gui.render_finished) {
+        if (s) vkDestroySemaphore(dev.device, s, nullptr);
+    }
+    gui.render_finished.assign(image_count, VK_NULL_HANDLE);
+    {
+        VkSemaphoreCreateInfo sem_ci{};
+        sem_ci.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+        for (uint32_t i = 0; i < image_count; i++) {
+            check_vk(vkCreateSemaphore(dev.device, &sem_ci, nullptr, &gui.render_finished[i]),
+                     "vkCreateSemaphore(render_finished)");
+        }
+    }
+
     for (VkImage img : images) {
         VkImageViewCreateInfo vi{};
         vi.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -180,6 +196,19 @@ int main() {
     // Surface from GLFW
     check_vk(glfwCreateWindowSurface(dev.instance, window, nullptr, &gui.surface),
              "glfwCreateWindowSurface");
+
+    // Spec: VUID-VkSwapchainCreateInfoKHR-surface-01270. We also present via
+    // the graphics queue so it must actually support this surface.
+    {
+        VkBool32 present_supported = VK_FALSE;
+        vkGetPhysicalDeviceSurfaceSupportKHR(dev.physical_device, dev.graphics_family,
+                                             gui.surface, &present_supported);
+        if (!present_supported) {
+            std::fprintf(stderr, "graphics queue family %u does not support presentation\n",
+                         dev.graphics_family);
+            return 1;
+        }
+    }
 
     // Pick a reasonable swapchain format
     {
@@ -262,6 +291,7 @@ int main() {
     }
 
     // Sync primitives — fences start signaled so the first frame can proceed.
+    // render_finished is per-swapchain-image and lives in create_swapchain.
     {
         VkSemaphoreCreateInfo sci{};
         sci.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
@@ -272,7 +302,6 @@ int main() {
 
         for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
             check_vk(vkCreateSemaphore(dev.device, &sci, nullptr, &gui.image_available[i]), "vkCreateSemaphore");
-            check_vk(vkCreateSemaphore(dev.device, &sci, nullptr, &gui.render_finished[i]), "vkCreateSemaphore");
             check_vk(vkCreateFence(dev.device, &fci, nullptr, &gui.fences[i]), "vkCreateFence");
         }
     }
@@ -416,13 +445,13 @@ int main() {
         submit.commandBufferCount = 1;
         submit.pCommandBuffers = &cmd;
         submit.signalSemaphoreCount = 1;
-        submit.pSignalSemaphores = &gui.render_finished[frame_idx];
+        submit.pSignalSemaphores = &gui.render_finished[image_index];
         vkQueueSubmit(dev.graphics_queue, 1, &submit, gui.fences[frame_idx]);
 
         VkPresentInfoKHR present{};
         present.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
         present.waitSemaphoreCount = 1;
-        present.pWaitSemaphores = &gui.render_finished[frame_idx];
+        present.pWaitSemaphores = &gui.render_finished[image_index];
         present.swapchainCount = 1;
         present.pSwapchains = &gui.swapchain;
         present.pImageIndices = &image_index;
@@ -445,7 +474,9 @@ int main() {
     for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
         vkDestroyFence(dev.device, gui.fences[i], nullptr);
         vkDestroySemaphore(dev.device, gui.image_available[i], nullptr);
-        vkDestroySemaphore(dev.device, gui.render_finished[i], nullptr);
+    }
+    for (VkSemaphore s : gui.render_finished) {
+        if (s) vkDestroySemaphore(dev.device, s, nullptr);
     }
 
     vkFreeCommandBuffers(dev.device, gui.command_pool, MAX_FRAMES_IN_FLIGHT, gui.command_buffers);
