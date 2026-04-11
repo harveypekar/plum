@@ -206,11 +206,15 @@ def inject_tools(ctx: dict) -> dict:
 
 
 def create_default_pipeline() -> Pipeline:
-    """Create pipeline with standard hooks."""
+    """Create pipeline with standard hooks.
+
+    NOTE: context budgeting is no longer part of the pipeline — it's
+    now done explicitly at each call site via budget.fit_prompt, which
+    needs access to the ollama client and resolved model name.
+    """
     p = Pipeline()
     p.add_pre(assemble_prompt)
     p.add_pre(expand_variables)
     p.add_pre(inject_tools)
-    p.add_pre(apply_context_strategy)
     p.add_post(clean_response)
     return p
