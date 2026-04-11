@@ -147,6 +147,7 @@ project "joon-cli"
     kind "ConsoleApp"
     targetdir "build/bin/%{cfg.buildcfg}"
     objdir "build/obj/%{cfg.buildcfg}/cli"
+    debugdir "."
 
     files { "cli/**.cpp" }
 
@@ -165,6 +166,7 @@ project "joon-gui"
     kind "ConsoleApp"
     targetdir "build/bin/%{cfg.buildcfg}"
     objdir "build/obj/%{cfg.buildcfg}/gui"
+    debugdir "."
 
     files {
         "gui/**.h",
