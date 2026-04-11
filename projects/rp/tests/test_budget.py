@@ -346,14 +346,6 @@ class TestFitPromptPriority5:
 
 
 class TestFitPromptGroundTruth:
-    def _render_messages_for_count(self, ctx):
-        """Build the messages list as it would be sent to Ollama."""
-        msgs = [{"role": "system", "content": ctx["system_prompt"]}]
-        msgs.extend(ctx["messages"])
-        if ctx.get("post_prompt"):
-            msgs.append({"role": "system", "content": ctx["post_prompt"]})
-        return msgs
-
     @pytest.mark.asyncio
     async def test_ground_truth_fits_first_try(self, stub_ollama_factory):
         """Estimator says fits, ground-truth confirms."""
@@ -432,3 +424,49 @@ class TestFitPromptGroundTruth:
                 ctx, model="m", ollama=stub, strategy=SlidingWindow(),
                 num_predict=100, ground_truth=True,
             )
+
+    @pytest.mark.asyncio
+    async def test_rendered_messages_match_routes_assembly(self, stub_ollama_factory):
+        """Regression: _render_for_count must produce the same shape as
+        routes.py `_build_chat_messages` — system, messages, optional
+        post_prompt, and the assistant priming anchor. A drift here would
+        make every ground-truth count systematically low."""
+        stub = stub_ollama_factory(num_ctx_map={"m": 8192}, default_count=100)
+        ctx = _build_ctx(
+            system_prompt="SYS",
+            post_prompt="POST",
+            messages=[
+                {"role": "assistant", "content": "greeting"},
+                {"role": "user", "content": "hello"},
+            ],
+            ai_card={"card_data": {"data": {"name": "Ada"}}},
+        )
+        await fit_prompt(
+            ctx, model="m", ollama=stub, strategy=SlidingWindow(),
+            num_predict=1024, ground_truth=True,
+        )
+        assert stub.last_chat_messages == [
+            {"role": "system", "content": "SYS"},
+            {"role": "assistant", "content": "greeting"},
+            {"role": "user", "content": "hello"},
+            {"role": "system", "content": "POST"},
+            {"role": "assistant", "content": "Ada "},
+        ]
+
+    @pytest.mark.asyncio
+    async def test_zero_prompt_eval_count_falls_back_to_estimator(
+        self, stub_ollama_factory
+    ):
+        """If Ollama returns 0 / missing prompt_eval_count, don't silently
+        declare success — fall back to the estimator and emit a warning."""
+        stub = stub_ollama_factory(num_ctx_map={"m": 8192}, default_count=0)
+        ctx = _build_ctx(
+            system_prompt="hi",
+            messages=[{"role": "user", "content": "hello"}],
+        )
+        report = await fit_prompt(
+            ctx, model="m", ollama=stub, strategy=SlidingWindow(),
+            num_predict=1024, ground_truth=True,
+        )
+        assert report.actual_tokens is None
+        assert any("non-positive prompt_eval_count" in w for w in report.warnings)

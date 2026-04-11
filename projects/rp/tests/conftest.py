@@ -27,6 +27,7 @@ class StubOllama:
     show_calls: dict[str, int] = field(default_factory=dict)
     chat_calls: int = 0
     default_count: int = 0
+    last_chat_messages: list | None = None
 
     async def get_num_ctx(self, model: str) -> int:
         self.show_calls[model] = self.show_calls.get(model, 0) + 1
@@ -43,6 +44,7 @@ class StubOllama:
         our stub returns count_map[model] or default_count.
         """
         self.chat_calls += 1
+        self.last_chat_messages = list(messages)
         count = self.count_map.get(model, self.default_count)
         return {
             "message": {"role": "assistant", "content": ""},

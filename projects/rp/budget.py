@@ -139,14 +139,20 @@ def _truncate_mes_example(ctx: dict) -> bool:
 def _render_for_count(ctx: dict) -> list[dict]:
     """Build the messages list that would actually be sent to Ollama.
 
-    Mirrors routes.py chat message assembly: system_prompt, then the
-    budgeted messages, then post_prompt (if any) as a trailing system
-    message.
+    Must stay in lockstep with routes.py `_build_chat_messages`: system_prompt,
+    the budgeted messages, optional post_prompt as a trailing system message,
+    and the assistant priming anchor "{ai_name} " that anchors the model's
+    voice. Omitting the anchor would systematically undercount prompt_eval_count.
     """
     msgs = [{"role": "system", "content": ctx.get("system_prompt", "")}]
     msgs.extend(ctx.get("messages", []))
     if ctx.get("post_prompt"):
         msgs.append({"role": "system", "content": ctx["post_prompt"]})
+    ai_data = ctx.get("ai_card", {}).get("card_data", {}).get(
+        "data", ctx.get("ai_card", {}).get("card_data", {})
+    )
+    ai_name = ai_data.get("name", "Character")
+    msgs.append({"role": "assistant", "content": ai_name + " "})
     return msgs
 
 
@@ -239,12 +245,27 @@ async def fit_prompt(
         gt_messages = _render_for_count(ctx)
         actual_tokens = await _ollama_count_messages(gt_messages, model, ollama)
 
-        if actual_tokens + response_reserve > model_ctx:
+        # If Ollama returned a nonsense value (missing field, zero, negative),
+        # discard it and fall back to the estimator. A silent "0 tokens" would
+        # otherwise make any prompt appear to fit.
+        if actual_tokens <= 0:
+            warnings.append(
+                f"ollama returned non-positive prompt_eval_count ({actual_tokens}); "
+                "falling back to estimator"
+            )
+            actual_tokens = None
+        elif actual_tokens + response_reserve > model_ctx:
             # One more shrink: drop one more oldest non-greeting message and recount.
             if len(ctx.get("messages", [])) > 2:
                 ctx["messages"] = [ctx["messages"][0]] + ctx["messages"][2:]
                 gt_messages = _render_for_count(ctx)
                 actual_tokens = await _ollama_count_messages(gt_messages, model, ollama)
+                if actual_tokens <= 0:
+                    warnings.append(
+                        f"ollama returned non-positive prompt_eval_count on recount "
+                        f"({actual_tokens}); falling back to estimator"
+                    )
+                    actual_tokens = None
             # If still over, let Priority 5 below raise.
 
     # Priority 5: if after all shrinking the messages still can't fit,
