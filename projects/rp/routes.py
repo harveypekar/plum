@@ -474,7 +474,7 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         scenario = ctx.get("scenario") or {}
         settings = scenario.get("settings", {})
         strategy = get_strategy(settings.get("context_strategy", "summary_buffer"))
-        num_predict = ollama_options.get("num_predict") if ollama_options else None
+        num_predict = ollama_options.get("num_predict")
         try:
             return await fit_prompt(
                 ctx, model=model, ollama=_ollama,
