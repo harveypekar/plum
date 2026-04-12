@@ -898,6 +898,23 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         settings = scenario.get("settings", {})
         ollama_options = _build_ollama_options(settings)
 
+        try:
+            await _budget_ctx(ctx, model, ollama_options)
+        except BudgetError as e:
+            err_msg = f"Prompt does not fit model context: {e}"
+            async def _err_stream():
+                yield json.dumps({
+                    "error": err_msg,
+                    "done": True,
+                }) + "\n"
+            return StreamingResponse(
+                _err_stream(), media_type="application/x-ndjson",
+                status_code=413,
+            )
+
+        # Tell Ollama to load the model with its real context window
+        ollama_options = {**ollama_options, "num_ctx": ctx["_num_ctx"]}
+
         chat_messages = _build_chat_messages(ctx)
         user_name = _get_user_name(ctx)
         conv_log.log_prompt(conv_id, "regenerate", model,
@@ -955,6 +972,23 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         scenario = ctx.get("scenario") or {}
         settings = scenario.get("settings", {})
         ollama_options = _build_ollama_options(settings)
+
+        try:
+            await _budget_ctx(ctx, model, ollama_options)
+        except BudgetError as e:
+            err_msg = f"Prompt does not fit model context: {e}"
+            async def _err_stream():
+                yield json.dumps({
+                    "error": err_msg,
+                    "done": True,
+                }) + "\n"
+            return StreamingResponse(
+                _err_stream(), media_type="application/x-ndjson",
+                status_code=413,
+            )
+
+        # Tell Ollama to load the model with its real context window
+        ollama_options = {**ollama_options, "num_ctx": ctx["_num_ctx"]}
 
         chat_messages = _build_chat_messages(ctx)
         user_name = _get_user_name(ctx)
@@ -1060,6 +1094,23 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         if generating_as_user:
             # Instruct model: lower temperature, no thinking
             ollama_options = {"temperature": 0.7, "num_predict": 256, "think": False}
+
+        try:
+            await _budget_ctx(ctx, model, ollama_options)
+        except BudgetError as e:
+            err_msg = f"Prompt does not fit model context: {e}"
+            async def _err_stream():
+                yield json.dumps({
+                    "error": err_msg,
+                    "done": True,
+                }) + "\n"
+            return StreamingResponse(
+                _err_stream(), media_type="application/x-ndjson",
+                status_code=413,
+            )
+
+        # Tell Ollama to load the model with its real context window
+        ollama_options = {**ollama_options, "num_ctx": ctx["_num_ctx"]}
 
         chat_messages = _build_chat_messages(ctx)
         user_name = _get_user_name(ctx)
