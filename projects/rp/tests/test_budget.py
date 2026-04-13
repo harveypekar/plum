@@ -569,3 +569,28 @@ class TestFitRawPrompt:
             )
         assert exc_info.value.report.model_ctx == 500
         assert stub.chat_calls == 0
+
+
+class TestEquivalenceWithOldBehavior:
+    @pytest.mark.asyncio
+    async def test_empty_system_prompt_matches_sliding_window(
+        self, stub_ollama_factory
+    ):
+        """With an empty system prompt, fit_prompt should produce the same
+        messages trimming that the old apply_context_strategy did — that is,
+        pure SlidingWindow behavior against the raw max_tokens."""
+        stub = stub_ollama_factory(num_ctx_map={"m": 1000})
+        messages = [
+            {"role": "assistant", "content": "G" * 100},  # greeting
+        ]
+        for i in range(30):
+            messages.append({"role": "user", "content": f"msg {i:02d} " + "X" * 100})
+
+        ctx = _build_ctx(system_prompt="", post_prompt="", messages=messages)
+        expected = SlidingWindow().fit(list(messages), max_tokens=500)
+
+        await fit_prompt(
+            ctx, model="m", ollama=stub, strategy=SlidingWindow(),
+            num_predict=500, ground_truth=False,
+        )
+        assert ctx["messages"] == expected

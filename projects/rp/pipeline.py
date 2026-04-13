@@ -1,7 +1,6 @@
 import asyncio
 import logging
 from typing import Callable
-from .context import get_strategy
 from .mcp_client import get_router
 
 _log = logging.getLogger(__name__)
@@ -167,17 +166,6 @@ def render_template(template: str, values: dict) -> str:
     for key, val in values.items():
         result = result.replace("{{" + key + "}}", str(val))
     return result.strip()
-
-
-def apply_context_strategy(ctx: dict) -> dict:
-    """Fit messages within token budget using the active strategy."""
-    settings = ctx.get("scenario", {}).get("settings", {})
-    strategy_name = settings.get("context_strategy", "summary_buffer")
-    max_tokens = settings.get("max_context_tokens", 6144)
-
-    strategy = get_strategy(strategy_name)
-    ctx["messages"] = strategy.fit(ctx["messages"], max_tokens, ctx=ctx)
-    return ctx
 
 
 # -- Built-in post-processing hooks --
