@@ -10,6 +10,7 @@ char Lexer::peek() const {
 }
 
 char Lexer::advance() {
+    if (m_pos >= m_source.size()) return '\0';
     char c = m_source[m_pos++];
     if (c == '\n') { m_line++; m_col = 1; }
     else { m_col++; }

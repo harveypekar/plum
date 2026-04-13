@@ -81,6 +81,11 @@ std::unique_ptr<Device> Device::create(bool enable_validation) {
         }
     }
 
+    if (dev->graphics_family == UINT32_MAX)
+        throw std::runtime_error("No graphics queue family found");
+    if (dev->compute_family == UINT32_MAX)
+        throw std::runtime_error("No compute queue family found");
+
     // Logical device
     float priority = 1.0f;
     std::vector<VkDeviceQueueCreateInfo> queue_infos;
@@ -121,7 +126,8 @@ std::unique_ptr<Device> Device::create(bool enable_validation) {
     pool_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
     pool_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
     pool_info.queueFamilyIndex = dev->compute_family;
-    vkCreateCommandPool(dev->device, &pool_info, nullptr, &dev->command_pool);
+    if (vkCreateCommandPool(dev->device, &pool_info, nullptr, &dev->command_pool) != VK_SUCCESS)
+        throw std::runtime_error("Failed to create command pool");
 
     // VMA allocator
     VmaAllocatorCreateInfo alloc_info{};
@@ -129,7 +135,8 @@ std::unique_ptr<Device> Device::create(bool enable_validation) {
     alloc_info.device = dev->device;
     alloc_info.instance = dev->instance;
     alloc_info.vulkanApiVersion = VK_API_VERSION_1_2;
-    vmaCreateAllocator(&alloc_info, &dev->allocator);
+    if (vmaCreateAllocator(&alloc_info, &dev->allocator) != VK_SUCCESS)
+        throw std::runtime_error("Failed to create VMA allocator");
 
     return dev;
 }

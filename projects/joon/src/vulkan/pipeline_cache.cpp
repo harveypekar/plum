@@ -36,11 +36,15 @@ const ComputePipeline& PipelineCache::get(const std::string& name,
     ComputePipeline p{};
 
     auto spirv = read_spirv(name);
+    if (spirv.size() % 4 != 0)
+        throw std::runtime_error("SPIR-V size not a multiple of 4: " + name);
+
     VkShaderModuleCreateInfo shader_info{};
     shader_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
     shader_info.codeSize = spirv.size();
     shader_info.pCode = reinterpret_cast<const uint32_t*>(spirv.data());
-    vkCreateShaderModule(m_device.device, &shader_info, nullptr, &p.shader_module);
+    if (vkCreateShaderModule(m_device.device, &shader_info, nullptr, &p.shader_module) != VK_SUCCESS)
+        throw std::runtime_error("Failed to create shader module: " + name);
 
     std::vector<VkDescriptorSetLayoutBinding> bindings(num_images);
     for (uint32_t i = 0; i < num_images; i++) {
@@ -54,7 +58,10 @@ const ComputePipeline& PipelineCache::get(const std::string& name,
     desc_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
     desc_info.bindingCount = num_images;
     desc_info.pBindings = bindings.data();
-    vkCreateDescriptorSetLayout(m_device.device, &desc_info, nullptr, &p.desc_layout);
+    if (vkCreateDescriptorSetLayout(m_device.device, &desc_info, nullptr, &p.desc_layout) != VK_SUCCESS) {
+        vkDestroyShaderModule(m_device.device, p.shader_module, nullptr);
+        throw std::runtime_error("Failed to create descriptor set layout: " + name);
+    }
 
     VkPipelineLayoutCreateInfo layout_info{};
     layout_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
@@ -70,7 +77,11 @@ const ComputePipeline& PipelineCache::get(const std::string& name,
         layout_info.pPushConstantRanges = &push_range;
     }
 
-    vkCreatePipelineLayout(m_device.device, &layout_info, nullptr, &p.layout);
+    if (vkCreatePipelineLayout(m_device.device, &layout_info, nullptr, &p.layout) != VK_SUCCESS) {
+        vkDestroyDescriptorSetLayout(m_device.device, p.desc_layout, nullptr);
+        vkDestroyShaderModule(m_device.device, p.shader_module, nullptr);
+        throw std::runtime_error("Failed to create pipeline layout: " + name);
+    }
 
     VkComputePipelineCreateInfo pipeline_info{};
     pipeline_info.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
@@ -80,8 +91,13 @@ const ComputePipeline& PipelineCache::get(const std::string& name,
     pipeline_info.stage.pName = "main";
     pipeline_info.layout = p.layout;
 
-    vkCreateComputePipelines(m_device.device, VK_NULL_HANDLE, 1, &pipeline_info, nullptr,
-                             &p.pipeline);
+    if (vkCreateComputePipelines(m_device.device, VK_NULL_HANDLE, 1, &pipeline_info, nullptr,
+                                 &p.pipeline) != VK_SUCCESS) {
+        vkDestroyPipelineLayout(m_device.device, p.layout, nullptr);
+        vkDestroyDescriptorSetLayout(m_device.device, p.desc_layout, nullptr);
+        vkDestroyShaderModule(m_device.device, p.shader_module, nullptr);
+        throw std::runtime_error("Failed to create compute pipeline: " + name);
+    }
 
     m_pipelines[name] = p;
     return m_pipelines[name];

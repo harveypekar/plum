@@ -17,7 +17,7 @@ void Interpreter::evaluate(const IRGraph& graph) {
             // For constant float nodes that feed into GPU ops,
             // we need to create a constant image so math ops can consume them
             if ((node.op == "constant" || node.op == "param") && node.is_constant) {
-                float val = std::get<float>(node.constant_value);
+                float val = value_as_float(node.constant_value);
                 auto* img = m_ctx.pool.alloc_image(node.id,
                                                    m_ctx.default_width,
                                                    m_ctx.default_height);

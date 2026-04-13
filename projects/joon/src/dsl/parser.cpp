@@ -15,6 +15,8 @@ const Token& Parser::peek() const {
 }
 
 const Token& Parser::advance() {
+    static Token eof{ TokenType::EOF_TOKEN, "", 0, 0 };
+    if (m_pos >= m_tokens.size()) return eof;
     return m_tokens[m_pos++];
 }
 

@@ -9,8 +9,8 @@ void register_noise(NodeRegistry& reg) {
 
         float scale = 4.0f, octaves = 1.0f;
         for (auto& kw : node.kwargs) {
-            if (kw.name == "scale") scale = std::get<float>(kw.value);
-            else if (kw.name == "octaves") octaves = std::get<float>(kw.value);
+            if (kw.name == "scale") scale = value_as_float(kw.value);
+            else if (kw.name == "octaves") octaves = value_as_float(kw.value);
         }
 
         struct { float scale, octaves, width, height; } pc{
