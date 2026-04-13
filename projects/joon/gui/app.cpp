@@ -22,6 +22,14 @@ void App::init() {
     reparse();
 }
 
+void App::shutdown() {
+    eval.reset();
+    if (sampler && ctx) {
+        vkDestroySampler(ctx->device().device, sampler, nullptr);
+        sampler = VK_NULL_HANDLE;
+    }
+}
+
 void App::reparse() {
     eval_error.clear();
     try {

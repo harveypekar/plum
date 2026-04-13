@@ -25,6 +25,7 @@ struct App {
     VkDescriptorPool imgui_desc_pool = VK_NULL_HANDLE;
 
     void init();
+    void shutdown();
     void reparse();
     void update();
 

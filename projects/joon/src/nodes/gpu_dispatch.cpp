@@ -1,4 +1,5 @@
 #include "nodes/gpu_dispatch.h"
+#include <stdexcept>
 
 namespace joon {
 
@@ -20,7 +21,8 @@ void gpu_dispatch(EvalContext& ctx,
     alloc_info.pSetLayouts = &pipeline.desc_layout;
 
     VkDescriptorSet desc_set;
-    vkAllocateDescriptorSets(ctx.device.device, &alloc_info, &desc_set);
+    if (vkAllocateDescriptorSets(ctx.device.device, &alloc_info, &desc_set) != VK_SUCCESS)
+        throw std::runtime_error("Failed to allocate descriptor set for " + shader_name);
 
     // Update descriptors
     std::vector<VkDescriptorImageInfo> img_infos(num_images);

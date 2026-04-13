@@ -30,7 +30,8 @@ std::vector<uint8_t> PipelineCache::read_spirv(const std::string& name) {
 const ComputePipeline& PipelineCache::get(const std::string& name,
                                            uint32_t num_images,
                                            uint32_t push_constant_size) {
-    auto it = m_pipelines.find(name);
+    std::string key = name + ":" + std::to_string(num_images) + ":" + std::to_string(push_constant_size);
+    auto it = m_pipelines.find(key);
     if (it != m_pipelines.end()) return it->second;
 
     ComputePipeline p{};
@@ -99,8 +100,8 @@ const ComputePipeline& PipelineCache::get(const std::string& name,
         throw std::runtime_error("Failed to create compute pipeline: " + name);
     }
 
-    m_pipelines[name] = p;
-    return m_pipelines[name];
+    m_pipelines[key] = p;
+    return m_pipelines[key];
 }
 
 } // namespace joon
