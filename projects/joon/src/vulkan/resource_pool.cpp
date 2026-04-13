@@ -55,7 +55,8 @@ GpuImage* ResourcePool::alloc_image(uint32_t node_id, uint32_t width, uint32_t h
     view_info.subresourceRange.levelCount = 1;
     view_info.subresourceRange.layerCount = 1;
 
-    vkCreateImageView(m_device.device, &view_info, nullptr, &img.view);
+    if (vkCreateImageView(m_device.device, &view_info, nullptr, &img.view) != VK_SUCCESS)
+        throw std::runtime_error("Failed to create image view");
 
     m_images[node_id] = img;
     return &m_images[node_id];
@@ -78,10 +79,15 @@ void ResourcePool::upload(GpuImage* img, const void* data, size_t size) {
 
     VkBuffer staging;
     VmaAllocation staging_alloc;
-    vmaCreateBuffer(m_device.allocator, &buf_info, &alloc_info, &staging, &staging_alloc, nullptr);
+    if (vmaCreateBuffer(m_device.allocator, &buf_info, &alloc_info,
+                        &staging, &staging_alloc, nullptr) != VK_SUCCESS)
+        throw std::runtime_error("Failed to create staging buffer");
 
     void* mapped;
-    vmaMapMemory(m_device.allocator, staging_alloc, &mapped);
+    if (vmaMapMemory(m_device.allocator, staging_alloc, &mapped) != VK_SUCCESS) {
+        vmaDestroyBuffer(m_device.allocator, staging, staging_alloc);
+        throw std::runtime_error("Failed to map staging buffer");
+    }
     memcpy(mapped, data, size);
     vmaUnmapMemory(m_device.allocator, staging_alloc);
 
@@ -89,6 +95,8 @@ void ResourcePool::upload(GpuImage* img, const void* data, size_t size) {
 
     VkImageMemoryBarrier barrier{};
     barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
     barrier.image = img->image;
@@ -128,12 +136,16 @@ void ResourcePool::download(GpuImage* img, void* data, size_t size) {
 
     VkBuffer staging;
     VmaAllocation staging_alloc;
-    vmaCreateBuffer(m_device.allocator, &buf_info, &alloc_info, &staging, &staging_alloc, nullptr);
+    if (vmaCreateBuffer(m_device.allocator, &buf_info, &alloc_info,
+                        &staging, &staging_alloc, nullptr) != VK_SUCCESS)
+        throw std::runtime_error("Failed to create staging buffer");
 
     auto cmd = m_device.begin_single_command();
 
     VkImageMemoryBarrier barrier{};
     barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     barrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
     barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
     barrier.image = img->image;
