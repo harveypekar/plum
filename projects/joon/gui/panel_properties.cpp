@@ -6,6 +6,7 @@ void App::draw_properties() {
 
     if (eval && !graph.has_errors()) {
         for (auto& p : graph.ir().params) {
+            if (!std::holds_alternative<float>(p.default_value)) continue;
             float val = std::get<float>(p.default_value);
             float min_v = 0.0f, max_v = 1.0f;
 

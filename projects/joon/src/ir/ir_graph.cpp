@@ -134,7 +134,7 @@ uint32_t IRGraph::resolve_expr(const AstNode& expr) {
     return add_node("error", Tier::CPU);
 }
 
-std::vector<uint32_t> IRGraph::topological_order() const {
+std::vector<uint32_t> IRGraph::topological_order() {
     std::vector<uint32_t> in_degree(nodes.size(), 0);
     std::vector<std::vector<uint32_t>> dependents(nodes.size());
 
@@ -156,6 +156,14 @@ std::vector<uint32_t> IRGraph::topological_order() const {
         for (uint32_t dep : dependents[n]) {
             if (--in_degree[dep] == 0) queue.push(dep);
         }
+    }
+
+    if (order.size() != nodes.size()) {
+        diagnostics.push_back({
+            Diagnostic::Level::ERROR,
+            "Cycle detected in compute graph",
+            0, 0
+        });
     }
 
     return order;

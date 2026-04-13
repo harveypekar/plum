@@ -206,6 +206,10 @@ int main() {
         if (!present_supported) {
             std::fprintf(stderr, "graphics queue family %u does not support presentation\n",
                          dev.graphics_family);
+            vkDestroySurfaceKHR(dev.instance, gui.surface, nullptr);
+            app.shutdown();
+            glfwDestroyWindow(window);
+            glfwTerminate();
             return 1;
         }
     }
@@ -466,6 +470,8 @@ int main() {
 
     // Cleanup
     vkDeviceWaitIdle(dev.device);
+
+    app.shutdown();
 
     ImGui_ImplVulkan_Shutdown();
     ImGui_ImplGlfw_Shutdown();
