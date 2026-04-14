@@ -5,7 +5,7 @@ namespace joon {
 Interpreter::Interpreter(EvalContext& ctx, const NodeRegistry& registry)
     : m_ctx(ctx), m_registry(registry) {}
 
-void Interpreter::evaluate(const IRGraph& graph) {
+void Interpreter::evaluate(IRGraph& graph) {
     auto order = graph.topological_order();
 
     for (uint32_t id : order) {
