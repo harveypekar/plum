@@ -1,6 +1,7 @@
 #include "catch_amalgamated.hpp"
 #include <joon/graph.h>
 #include <joon/context.h>
+#include "ir/ir_graph.h"
 
 using namespace joon;
 
