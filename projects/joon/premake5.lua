@@ -153,7 +153,7 @@ project "joon-cli"
     filter "system:windows"
         prebuildcommands {
             "{CHDIR} %{wks.location}/../shaders",
-            "call compile_if_changed.bat"
+            "call .\\compile_if_changed.bat"
         }
     filter {}
 
@@ -191,7 +191,7 @@ project "joon-gui"
         links { "gdi32", "shell32", "user32" }
         prebuildcommands {
             "{CHDIR} %{wks.location}/../shaders",
-            "call compile_if_changed.bat"
+            "call .\\compile_if_changed.bat"
         }
 
     filter {}
