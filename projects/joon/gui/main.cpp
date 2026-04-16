@@ -9,6 +9,7 @@
 #include <imgui_impl_vulkan.h>
 
 #include "vulkan/device.h"
+#include "log.h"
 
 #include <algorithm>
 #include <cstdio>
@@ -52,7 +53,7 @@ struct GuiVulkan {
 
 static void check_vk(VkResult err, const char* where) {
     if (err != VK_SUCCESS) {
-        std::fprintf(stderr, "Vulkan error (%d) at %s\n", err, where);
+        joon_log::write("Vulkan error (%d) at %s\n", err, where);
     }
 }
 
@@ -175,14 +176,17 @@ static void recreate_swapchain(const joon::Device& dev, GuiVulkan& gui, GLFWwind
 }
 
 int main() {
+    joon_log::init("joon-gui.log");
+
     if (!glfwInit()) {
-        std::fprintf(stderr, "glfwInit failed\n");
+        joon_log::write("glfwInit failed\n");
+        joon_log::close();
         return 1;
     }
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     GLFWwindow* window = glfwCreateWindow(1280, 720, "Joon", nullptr, nullptr);
     if (!window) {
-        std::fprintf(stderr, "glfwCreateWindow failed\n");
+        joon_log::write("glfwCreateWindow failed\n");
         glfwTerminate();
         return 1;
     }
@@ -204,8 +208,8 @@ int main() {
         vkGetPhysicalDeviceSurfaceSupportKHR(dev.physical_device, dev.graphics_family,
                                              gui.surface, &present_supported);
         if (!present_supported) {
-            std::fprintf(stderr, "graphics queue family %u does not support presentation\n",
-                         dev.graphics_family);
+            joon_log::write("graphics queue family %u does not support presentation\n",
+                           dev.graphics_family);
             vkDestroySurfaceKHR(dev.instance, gui.surface, nullptr);
             app.shutdown();
             glfwDestroyWindow(window);
@@ -500,5 +504,6 @@ int main() {
 
     glfwDestroyWindow(window);
     glfwTerminate();
+    joon_log::close();
     return 0;
 }
