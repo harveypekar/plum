@@ -151,7 +151,7 @@ class TestGetNumCtx:
             mock_post.return_value.status_code = 200
             mock_post.return_value.json = lambda: show_response
             result = await client.get_num_ctx("mymodel")
-        assert result == 16384
+        assert result == 8192
 
     @pytest.mark.asyncio
     async def test_uses_context_length_when_small(self):
@@ -175,7 +175,7 @@ class TestGetNumCtx:
             mock_post.return_value.status_code = 200
             mock_post.return_value.json = lambda: show_response
             result = await client.get_num_ctx("mymodel")
-        assert result == 16384
+        assert result == 8192
 
     @pytest.mark.asyncio
     async def test_explicit_num_ctx_not_capped(self):
