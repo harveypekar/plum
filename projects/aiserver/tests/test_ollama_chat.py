@@ -140,41 +140,28 @@ class TestGetNumCtx:
         assert result == 32768
 
     @pytest.mark.asyncio
-    async def test_falls_back_to_model_info_context_length(self):
+    async def test_no_num_ctx_returns_ollama_default(self):
+        """Models without explicit num_ctx get Ollama's default (2048)."""
         client = OllamaClient("http://localhost:11434")
         show_response = {
             "parameters": "temperature                    0.8",
-            "model_info": {"llama.context_length": 8192},
+            "model_info": {"llama.context_length": 1024000},
         }
         with patch("httpx.AsyncClient.post") as mock_post:
             mock_post.return_value.status_code = 200
             mock_post.return_value.json = lambda: show_response
             result = await client.get_num_ctx("mymodel")
-        assert result == 8192
+        assert result == 2048
 
     @pytest.mark.asyncio
-    async def test_tries_any_arch_context_length(self):
-        """model_info keys look like <arch>.context_length — e.g. qwen2.context_length."""
+    async def test_no_parameters_returns_ollama_default(self):
         client = OllamaClient("http://localhost:11434")
-        show_response = {
-            "parameters": "",
-            "model_info": {"qwen2.context_length": 4096, "general.architecture": "qwen2"},
-        }
+        show_response = {"parameters": "", "model_info": {}}
         with patch("httpx.AsyncClient.post") as mock_post:
             mock_post.return_value.status_code = 200
             mock_post.return_value.json = lambda: show_response
             result = await client.get_num_ctx("mymodel")
-        assert result == 4096
-
-    @pytest.mark.asyncio
-    async def test_raises_when_neither_present(self):
-        client = OllamaClient("http://localhost:11434")
-        show_response = {"parameters": "temperature 0.8", "model_info": {}}
-        with patch("httpx.AsyncClient.post") as mock_post:
-            mock_post.return_value.status_code = 200
-            mock_post.return_value.json = lambda: show_response
-            with pytest.raises(OllamaError, match="context length"):
-                await client.get_num_ctx("mymodel")
+        assert result == 2048
 
     @pytest.mark.asyncio
     async def test_raises_on_show_http_error(self):
