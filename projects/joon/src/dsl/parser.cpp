@@ -15,6 +15,8 @@ const Token& Parser::peek() const {
 }
 
 const Token& Parser::advance() {
+    static Token eof{ TokenType::EOF_TOKEN, "", 0, 0 };
+    if (m_pos >= m_tokens.size()) return eof;
     return m_tokens[m_pos++];
 }
 
@@ -146,8 +148,13 @@ AstPtr Parser::parse_expr() {
 
     if (tok.type == TokenType::NUMBER) {
         auto t = advance();
+        double val = 0.0;
+        try { val = std::stod(t.text); }
+        catch (const std::exception&) {
+            throw ParseError("Invalid number: " + t.text, t.line, t.col);
+        }
         auto node = std::make_unique<AstNode>();
-        node->data = NumberNode{ std::stod(t.text) };
+        node->data = NumberNode{ val };
         node->line = t.line;
         node->col = t.col;
         return node;

@@ -14,6 +14,7 @@ struct App {
     std::unique_ptr<joon::Evaluator> eval;
 
     std::string dsl_source;
+    std::string eval_error;
     bool source_dirty = true;
     float codeFontScale = 1.0f;
     uint32_t selected_node_id = UINT32_MAX;
@@ -24,6 +25,7 @@ struct App {
     VkDescriptorPool imgui_desc_pool = VK_NULL_HANDLE;
 
     void init();
+    void shutdown();
     void reparse();
     void update();
 

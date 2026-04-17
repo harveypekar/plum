@@ -63,7 +63,9 @@ void Result::save_image(const char* path) {
 
 template<>
 Param<float>& Param<float>::operator=(const float& value) {
+    if (m_nodeId == UINT32_MAX) return *this;
     auto& ir = m_graph.ir();
+    if (m_nodeId >= ir.nodes.size()) return *this;
     for (auto& p : ir.params) {
         if (p.node_id == m_nodeId) {
             p.default_value = value;
@@ -77,7 +79,8 @@ Param<float>& Param<float>::operator=(const float& value) {
 template<>
 Param<float>::operator float() const {
     auto& ir = m_graph.ir();
-    return std::get<float>(ir.nodes[m_nodeId].constant_value);
+    if (m_nodeId >= ir.nodes.size()) return 0.0f;
+    return value_as_float(ir.nodes[m_nodeId].constant_value);
 }
 
 // --- Evaluator implementation ---
@@ -146,22 +149,25 @@ Param<float> Evaluator::param(const std::string& name) {
             return Param<float>(p.node_id, m_impl->graph);
         }
     }
-    // Not found — return a dummy param pointing at node 0
-    return Param<float>(0, m_impl->graph);
+    return Param<float>(UINT32_MAX, m_impl->graph);
 }
 
 Result Evaluator::result(const std::string& name) {
     auto& ir = m_impl->graph.ir();
-    if (!ir.outputs.empty()) {
-        return Result(m_impl->ctx.pool(), ir.outputs[0].node_id);
+    for (auto& out : ir.outputs) {
+        auto* node = ir.find_node(out.node_id);
+        if (node && node->name == name)
+            return Result(m_impl->ctx.pool(), out.node_id);
     }
-    return Result(m_impl->ctx.pool(), 0);
+    if (!ir.outputs.empty())
+        return Result(m_impl->ctx.pool(), ir.outputs[0].node_id);
+    return Result(m_impl->ctx.pool(), UINT32_MAX);
 }
 
 Result Evaluator::node_result(const std::string& name) {
     auto* node = m_impl->graph.ir().find_node_by_name(name);
     if (node) return Result(m_impl->ctx.pool(), node->id);
-    return Result(m_impl->ctx.pool(), 0);
+    return Result(m_impl->ctx.pool(), UINT32_MAX);
 }
 
 const std::vector<Diagnostic>& Evaluator::diagnostics() const {

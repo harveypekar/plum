@@ -1,4 +1,5 @@
 #include "dsl/lexer.h"
+#include "dsl/parser.h"
 
 namespace joon {
 
@@ -10,6 +11,7 @@ char Lexer::peek() const {
 }
 
 char Lexer::advance() {
+    if (m_pos >= m_source.size()) return '\0';
     char c = m_source[m_pos++];
     if (c == '\n') { m_line++; m_col = 1; }
     else { m_col++; }
@@ -51,8 +53,10 @@ Token Lexer::read_string() {
     advance(); // skip opening "
     size_t start = m_pos;
     while (m_pos < m_source.size() && peek() != '"') advance();
+    if (m_pos >= m_source.size())
+        throw ParseError("Unterminated string literal", start_line, start_col);
     std::string text(m_source.substr(start, m_pos - start));
-    if (m_pos < m_source.size()) advance(); // skip closing "
+    advance(); // skip closing "
     return { TokenType::STRING, text, start_line, start_col };
 }
 

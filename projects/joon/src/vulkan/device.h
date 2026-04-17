@@ -12,8 +12,8 @@ struct Device {
     VkDevice device = VK_NULL_HANDLE;
     VkQueue compute_queue = VK_NULL_HANDLE;
     VkQueue graphics_queue = VK_NULL_HANDLE;
-    uint32_t compute_family = 0;
-    uint32_t graphics_family = 0;
+    uint32_t compute_family = UINT32_MAX;
+    uint32_t graphics_family = UINT32_MAX;
     VkCommandPool command_pool = VK_NULL_HANDLE;
     VmaAllocator allocator = VK_NULL_HANDLE;
 

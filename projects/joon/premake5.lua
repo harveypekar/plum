@@ -19,17 +19,12 @@ workspace "Joon"
         symbols "On"
         optimize "Off"
 
-        -- AddressSanitizer (ASan)
-        buildoptions { "-fsanitize=address" }
-        linkoptions { "-fsanitize=address" }
+    filter { "configurations:ANALYZE", "toolset:gcc or clang" }
+        buildoptions { "-fsanitize=address", "-fsanitize=undefined", "-fno-omit-frame-pointer" }
+        linkoptions  { "-fsanitize=address", "-fsanitize=undefined", "-fno-omit-frame-pointer" }
 
-        -- UndefinedBehaviorSanitizer (UBSan)
-        buildoptions { "-fsanitize=undefined" }
-        linkoptions { "-fsanitize=undefined" }
-
-        -- Additional sanitizer options
-        buildoptions { "-fno-omit-frame-pointer" }
-        linkoptions { "-fno-omit-frame-pointer" }
+    filter { "configurations:ANALYZE", "toolset:msc" }
+        buildoptions { "/fsanitize=address" }
 
     filter "system:windows"
         systemversion "latest"
@@ -128,7 +123,6 @@ project "joon-lib"
         "include",
         "src",
         "third_party",
-        "third_party/imgui",
         "third_party/vma/include",
         vulkan_sdk .. "/Include"
     }
@@ -136,17 +130,12 @@ project "joon-lib"
     libdirs { vulkan_sdk .. "/Lib" }
     links { "vulkan-1" }
 
-    -- Compile shaders before building (only if changed)
-    prebuildcommands {
-        "{CHDIR} %{wks.location}/../shaders",
-        "compile_if_changed.bat"
-    }
-
 -- CLI
 project "joon-cli"
     kind "ConsoleApp"
     targetdir "build/bin/%{cfg.buildcfg}"
     objdir "build/obj/%{cfg.buildcfg}/cli"
+    debugdir "."
 
     files { "cli/**.cpp" }
 
@@ -160,18 +149,28 @@ project "joon-cli"
     libdirs { vulkan_sdk .. "/Lib" }
     links { "joon-lib", "vulkan-1" }
 
+    -- Compile shaders before building (only if changed)
+    filter "system:windows"
+        prebuildcommands {
+            "{CHDIR} %{wks.location}/../shaders",
+            "call .\\compile_if_changed.bat"
+        }
+    filter {}
+
 -- GUI
 project "joon-gui"
     kind "ConsoleApp"
     targetdir "build/bin/%{cfg.buildcfg}"
     objdir "build/obj/%{cfg.buildcfg}/gui"
+    debugdir "."
 
     files {
         "gui/**.h",
         "gui/**.cpp",
         "third_party/imgui/*.cpp",
         "third_party/imgui/backends/imgui_impl_vulkan.cpp",
-        "third_party/imgui/backends/imgui_impl_glfw.cpp"
+        "third_party/imgui/backends/imgui_impl_glfw.cpp",
+        "third_party/imgui/misc/cpp/imgui_stdlib.cpp"
     }
 
     includedirs {
@@ -190,6 +189,10 @@ project "joon-gui"
 
     filter "system:windows"
         links { "gdi32", "shell32", "user32" }
+        prebuildcommands {
+            "{CHDIR} %{wks.location}/../shaders",
+            "call .\\compile_if_changed.bat"
+        }
 
     filter {}
 

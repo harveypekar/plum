@@ -9,7 +9,7 @@ class Interpreter {
 public:
     Interpreter(EvalContext& ctx, const NodeRegistry& registry);
 
-    void evaluate(const IRGraph& graph);
+    void evaluate(IRGraph& graph);
 
 private:
     EvalContext& m_ctx;

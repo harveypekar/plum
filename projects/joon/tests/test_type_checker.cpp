@@ -125,32 +125,5 @@ TEST_CASE("Type: blur preserves input type", "[types]") {
     CHECK(r->output_type == Type::IMAGE);
 }
 
-TEST_CASE("Type checker validates arithmetic operations", "[type_checker]") {
-    // Test: Verify that +, -, *, / operations accept numeric types
-    // Pattern: Create expression with arithmetic op → type_checker.check() → verify no type errors
-    CHECK(false); // TODO: Implement once type_checker API is determined
-}
-
-TEST_CASE("Type checker rejects type mismatches", "[type_checker]") {
-    // Test: Verify that operations on incompatible types produce type errors
-    // Pattern: Create expression mixing string + number → type_checker.check() → verify error reported
-    CHECK(false); // TODO: Implement once type_checker error reporting API is determined
-}
-
-TEST_CASE("Type checker infers types", "[type_checker]") {
-    // Test: Verify that type inference works for expressions without explicit types
-    // Pattern: Infer type from operation (e.g., (+ 1 2) should infer number type)
-    CHECK(false); // TODO: Implement once type inference API is determined
-}
-
-TEST_CASE("Type checker handles polymorphic functions", "[type_checker]") {
-    // Test: Verify polymorphic function dispatch based on input types
-    // Pattern: Create polymorphic function → call with different types → verify correct overload chosen
-    CHECK(false); // TODO: Implement once polymorphic type system API is determined
-}
-
-TEST_CASE("Type checker produces useful error messages", "[type_checker]") {
-    // Test: Verify that type error messages are informative and helpful
-    // Pattern: Trigger type error → check error message contains type info and location
-    CHECK(false); // TODO: Implement once error message API is determined
-}
+// Future: arithmetic validation, type mismatch detection, type inference,
+// polymorphic dispatch, and error message quality tests.

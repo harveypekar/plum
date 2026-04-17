@@ -22,7 +22,7 @@ void register_image_ops(NodeRegistry& reg) {
 
         float threshold = 0.5f;
         for (auto& kw : node.kwargs) {
-            if (kw.name == "threshold") threshold = std::get<float>(kw.value);
+            if (kw.name == "threshold") threshold = value_as_float(kw.value);
         }
 
         auto* out = ctx.pool.alloc_image(node.id, input->width, input->height);
@@ -38,8 +38,8 @@ void register_image_ops(NodeRegistry& reg) {
 
         struct { float contrast, brightness; } pc{ 1.0f, 0.0f };
         for (auto& kw : node.kwargs) {
-            if (kw.name == "contrast") pc.contrast = std::get<float>(kw.value);
-            else if (kw.name == "brightness") pc.brightness = std::get<float>(kw.value);
+            if (kw.name == "contrast") pc.contrast = value_as_float(kw.value);
+            else if (kw.name == "brightness") pc.brightness = value_as_float(kw.value);
         }
 
         auto* out = ctx.pool.alloc_image(node.id, input->width, input->height);
@@ -55,7 +55,7 @@ void register_image_ops(NodeRegistry& reg) {
 
         float radius = 1.0f;
         for (auto& kw : node.kwargs) {
-            if (kw.name == "radius") radius = std::get<float>(kw.value);
+            if (kw.name == "radius") radius = value_as_float(kw.value);
         }
 
         auto* out = ctx.pool.alloc_image(node.id, input->width, input->height);
@@ -72,8 +72,8 @@ void register_image_ops(NodeRegistry& reg) {
 
         struct { float opacity; int mode; } pc{ 1.0f, 0 };
         for (auto& kw : node.kwargs) {
-            if (kw.name == "opacity") pc.opacity = std::get<float>(kw.value);
-            else if (kw.name == "mode") pc.mode = static_cast<int>(std::get<float>(kw.value));
+            if (kw.name == "opacity") pc.opacity = value_as_float(kw.value);
+            else if (kw.name == "mode") pc.mode = static_cast<int>(value_as_float(kw.value));
         }
 
         uint32_t w = a->width, h = a->height;

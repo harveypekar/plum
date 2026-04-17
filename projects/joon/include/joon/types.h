@@ -51,6 +51,11 @@ using Value = std::variant<
     mat3, mat4
 >;
 
+inline float value_as_float(const Value& v, float fallback = 0.0f) {
+    auto* p = std::get_if<float>(&v);
+    return p ? *p : fallback;
+}
+
 struct ImageHandle {
     uint32_t id;
     uint32_t width;

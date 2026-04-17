@@ -1,32 +1,39 @@
 #include "catch_amalgamated.hpp"
 #include <joon/graph.h>
+#include <joon/context.h>
+#include "ir/ir_graph.h"
 
 using namespace joon;
 
-TEST_CASE("Graph creates nodes", "[graph]") {
-    Graph graph;
-    // Test: Create 2 nodes in the graph and verify they exist
-    // Pattern: graph.addNode(...) returns node ID; graph.nodeCount() should be 2
-    CHECK(false); // TODO: Implement once graph.addNode() API is determined
+TEST_CASE("Graph creates nodes from DSL", "[graph]") {
+    auto ctx = Context::create();
+    auto graph = ctx->parse_string("(def a (noise)) (def b (invert a)) (output b)");
+    REQUIRE_FALSE(graph.has_errors());
+    auto& ir = graph.ir();
+    CHECK(ir.nodes.size() > 0);
+    CHECK(ir.outputs.size() == 1);
 }
 
-TEST_CASE("Graph connects nodes", "[graph]") {
-    Graph graph;
-    // Test: Create two nodes and connect them with an edge
-    // Pattern: graph.addNode(...) → get node IDs → graph.addEdge(id1, id2) → verify edge exists
-    CHECK(false); // TODO: Implement once graph.addEdge() API is determined
+TEST_CASE("Graph tracks edges between nodes", "[graph]") {
+    auto ctx = Context::create();
+    auto graph = ctx->parse_string("(def a (noise)) (def b (invert a)) (output b)");
+    REQUIRE_FALSE(graph.has_errors());
+    auto& ir = graph.ir();
+    auto* b = ir.find_node_by_name("b");
+    REQUIRE(b);
+    REQUIRE(b->inputs.size() == 1);
 }
 
-TEST_CASE("Graph detects cycles", "[graph]") {
-    Graph graph;
-    // Test: Create nodes A→B→C→A (cycle) and verify detection returns true
-    // Pattern: Create chain of connections → graph.hasCycle() should return true
-    CHECK(false); // TODO: Implement cycle detection API
+TEST_CASE("Graph reports undefined symbol", "[graph]") {
+    auto ctx = Context::create();
+    auto graph = ctx->parse_string("(def b (invert nonexistent)) (output b)");
+    CHECK(graph.has_errors());
 }
 
-TEST_CASE("Graph validates connections", "[graph]") {
-    Graph graph;
-    // Test: Attempt invalid connection (e.g., self-loop, non-existent node) and verify rejection
-    // Pattern: graph.addEdge(invalid_id, ...) should throw or return error
-    CHECK(false); // TODO: Implement once validation API is determined
+TEST_CASE("Graph topological order covers all nodes", "[graph]") {
+    auto ctx = Context::create();
+    auto graph = ctx->parse_string("(def a (noise)) (def b (invert a)) (output b)");
+    REQUIRE_FALSE(graph.has_errors());
+    auto order = graph.ir().topological_order();
+    CHECK(order.size() == graph.ir().nodes.size());
 }

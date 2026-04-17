@@ -1,7 +1,7 @@
 #include "app.h"
 #include <imgui.h>
+#include <misc/cpp/imgui_stdlib.h>
 #include <algorithm>
-#include <cstring>
 
 void App::draw_code() {
     ImGui::Begin("Code Editor");
@@ -15,17 +15,10 @@ void App::draw_code() {
 
     ImGui::SetWindowFontScale(codeFontScale);
 
-    static char buf[8192];
-    if (dsl_source.size() < sizeof(buf)) {
-        strncpy(buf, dsl_source.c_str(), sizeof(buf) - 1);
-        buf[sizeof(buf) - 1] = '\0';
-    }
-
     ImGui::PushItemWidth(-1);
-    if (ImGui::InputTextMultiline("##code", buf, sizeof(buf),
+    if (ImGui::InputTextMultiline("##code", &dsl_source,
                                    ImVec2(-1, -1),
                                    ImGuiInputTextFlags_AllowTabInput)) {
-        dsl_source = buf;
         source_dirty = true;
     }
     ImGui::PopItemWidth();

@@ -25,7 +25,7 @@ public:
 
     static IRGraph from_ast(const Program& program);
 
-    std::vector<uint32_t> topological_order() const;
+    std::vector<uint32_t> topological_order();
 
     const Node* find_node(uint32_t id) const;
     const Node* find_node_by_name(const std::string& name) const;
