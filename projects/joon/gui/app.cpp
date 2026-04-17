@@ -1,6 +1,7 @@
 #include "app.h"
 #include "log.h"
 #include <imgui.h>
+#include <imgui_impl_vulkan.h>
 
 void App::init() {
     ctx = joon::Context::create();
@@ -24,11 +25,33 @@ void App::init() {
 }
 
 void App::shutdown() {
+    if (viewport_desc) {
+        ImGui_ImplVulkan_RemoveTexture(viewport_desc);
+        viewport_desc = VK_NULL_HANDLE;
+    }
+    if (preview_desc) {
+        ImGui_ImplVulkan_RemoveTexture(preview_desc);
+        preview_desc = VK_NULL_HANDLE;
+    }
     eval.reset();
     if (sampler && ctx) {
         vkDestroySampler(ctx->device().device, sampler, nullptr);
         sampler = VK_NULL_HANDLE;
     }
+}
+
+void App::bind_viewport() {
+    if (viewport_desc) {
+        ImGui_ImplVulkan_RemoveTexture(viewport_desc);
+        viewport_desc = VK_NULL_HANDLE;
+    }
+    if (!eval || graph.has_errors() || graph.ir().outputs.empty()) return;
+
+    auto result = eval->result("");
+    auto* view = static_cast<VkImageView>(result.vk_image_view());
+    if (!view || !sampler) return;
+
+    viewport_desc = ImGui_ImplVulkan_AddTexture(sampler, view, VK_IMAGE_LAYOUT_GENERAL);
 }
 
 void App::reparse() {
@@ -42,6 +65,7 @@ void App::reparse() {
         if (!graph.has_errors()) {
             eval = ctx->create_evaluator(graph);
             eval->evaluate();
+            bind_viewport();
         } else {
             eval.reset();
         }

@@ -27,6 +27,7 @@ struct App {
     void init();
     void shutdown();
     void reparse();
+    void bind_viewport();
     void update();
 
     void draw_tree();
