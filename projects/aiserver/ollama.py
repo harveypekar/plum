@@ -285,13 +285,18 @@ class OllamaClient:
             pass
         return []
 
+    _OLLAMA_DEFAULT_CTX = 2048
+
     async def get_num_ctx(self, model: str) -> int:
         """Return effective context length for a model via /api/show.
 
-        Prefers the runtime-loaded num_ctx from the parameters field (a
-        whitespace-formatted string). Falls back to any <arch>.context_length
-        entry in model_info (the architectural max from the GGUF file).
-        Raises OllamaError if neither is present or the request fails.
+        Prefers the runtime num_ctx from the parameters field (what Ollama
+        actually allocates). Falls back to Ollama's built-in default (2048).
+
+        Does NOT use model_info.<arch>.context_length — that is the
+        architectural maximum from the GGUF file (often 1M+), not the
+        runtime allocation. Passing it as num_ctx would force Ollama to
+        allocate an enormous KV cache.
         """
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
@@ -308,7 +313,6 @@ class OllamaClient:
         except httpx.HTTPError as e:
             raise OllamaError(f"HTTP error from /api/show: {e}") from e
 
-        # Parse parameters for "num_ctx <value>"
         params_str = data.get("parameters", "") or ""
         for line in params_str.splitlines():
             parts = line.split()
@@ -318,16 +322,7 @@ class OllamaClient:
                 except ValueError:
                     pass
 
-        # Fall back to model_info[<arch>.context_length]
-        model_info = data.get("model_info", {}) or {}
-        for key, value in model_info.items():
-            if key.endswith(".context_length") and isinstance(value, int):
-                return value
-
-        raise OllamaError(
-            f"Could not determine context length for model {model!r}: "
-            f"no num_ctx in parameters and no <arch>.context_length in model_info"
-        )
+        return self._OLLAMA_DEFAULT_CTX
 
     async def embed(self, model: str, text: str) -> list[float]:
         """Get embedding vector for text via Ollama /api/embed."""
