@@ -140,8 +140,8 @@ class TestGetNumCtx:
         assert result == 32768
 
     @pytest.mark.asyncio
-    async def test_no_num_ctx_returns_ollama_default(self):
-        """Models without explicit num_ctx get Ollama's default (2048)."""
+    async def test_caps_large_context_length(self):
+        """Architectural max (1M) gets capped to _MAX_AUTO_CTX."""
         client = OllamaClient("http://localhost:11434")
         show_response = {
             "parameters": "temperature                    0.8",
@@ -151,17 +151,45 @@ class TestGetNumCtx:
             mock_post.return_value.status_code = 200
             mock_post.return_value.json = lambda: show_response
             result = await client.get_num_ctx("mymodel")
-        assert result == 2048
+        assert result == 16384
 
     @pytest.mark.asyncio
-    async def test_no_parameters_returns_ollama_default(self):
+    async def test_uses_context_length_when_small(self):
+        """context_length below cap is used as-is."""
+        client = OllamaClient("http://localhost:11434")
+        show_response = {
+            "parameters": "",
+            "model_info": {"qwen2.context_length": 4096},
+        }
+        with patch("httpx.AsyncClient.post") as mock_post:
+            mock_post.return_value.status_code = 200
+            mock_post.return_value.json = lambda: show_response
+            result = await client.get_num_ctx("mymodel")
+        assert result == 4096
+
+    @pytest.mark.asyncio
+    async def test_no_context_info_returns_cap(self):
         client = OllamaClient("http://localhost:11434")
         show_response = {"parameters": "", "model_info": {}}
         with patch("httpx.AsyncClient.post") as mock_post:
             mock_post.return_value.status_code = 200
             mock_post.return_value.json = lambda: show_response
             result = await client.get_num_ctx("mymodel")
-        assert result == 2048
+        assert result == 16384
+
+    @pytest.mark.asyncio
+    async def test_explicit_num_ctx_not_capped(self):
+        """Explicit num_ctx in parameters is never capped."""
+        client = OllamaClient("http://localhost:11434")
+        show_response = {
+            "parameters": "num_ctx                        32768",
+            "model_info": {},
+        }
+        with patch("httpx.AsyncClient.post") as mock_post:
+            mock_post.return_value.status_code = 200
+            mock_post.return_value.json = lambda: show_response
+            result = await client.get_num_ctx("mymodel")
+        assert result == 32768
 
     @pytest.mark.asyncio
     async def test_raises_on_show_http_error(self):

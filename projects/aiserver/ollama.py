@@ -285,18 +285,15 @@ class OllamaClient:
             pass
         return []
 
-    _OLLAMA_DEFAULT_CTX = 2048
+    _MAX_AUTO_CTX = 16384
 
     async def get_num_ctx(self, model: str) -> int:
         """Return effective context length for a model via /api/show.
 
         Prefers the runtime num_ctx from the parameters field (what Ollama
-        actually allocates). Falls back to Ollama's built-in default (2048).
-
-        Does NOT use model_info.<arch>.context_length — that is the
-        architectural maximum from the GGUF file (often 1M+), not the
-        runtime allocation. Passing it as num_ctx would force Ollama to
-        allocate an enormous KV cache.
+        actually allocates). Falls back to model_info.<arch>.context_length
+        capped at _MAX_AUTO_CTX to avoid allocating enormous KV caches for
+        models that report large architectural maximums (e.g. 1M).
         """
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
@@ -322,7 +319,12 @@ class OllamaClient:
                 except ValueError:
                     pass
 
-        return self._OLLAMA_DEFAULT_CTX
+        model_info = data.get("model_info", {}) or {}
+        for key, value in model_info.items():
+            if key.endswith(".context_length") and isinstance(value, int):
+                return min(value, self._MAX_AUTO_CTX)
+
+        return self._MAX_AUTO_CTX
 
     async def embed(self, model: str, text: str) -> list[float]:
         """Get embedding vector for text via Ollama /api/embed."""
