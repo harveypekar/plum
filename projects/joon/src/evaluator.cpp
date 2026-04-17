@@ -8,9 +8,12 @@
 #include "vulkan/resource_pool.h"
 #include "vulkan/pipeline_cache.h"
 
+#include "util/exe_dir.h"
+
 #include <stb/stb_image_write.h>
 
 #include <algorithm>
+#include <filesystem>
 
 namespace joon {
 
@@ -83,6 +86,16 @@ Param<float>::operator float() const {
     return value_as_float(ir.nodes[m_nodeId].constant_value);
 }
 
+static std::string resolve_shader_dir() {
+    namespace fs = std::filesystem;
+    // Try CWD first
+    if (fs::is_directory("shaders")) return "shaders";
+    // Try relative to exe (exe is in build/bin/<config>/)
+    auto from_exe = fs::path(joon::exe_dir()) / ".." / ".." / ".." / "shaders";
+    if (fs::is_directory(from_exe)) return from_exe.string();
+    return "shaders";
+}
+
 // --- Evaluator implementation ---
 
 struct Evaluator::Impl {
@@ -95,7 +108,7 @@ struct Evaluator::Impl {
     Impl(Context& ctx, const Graph& source_graph)
         : ctx(ctx),
           registry(NodeRegistry::create_default()),
-          pipelines(std::make_unique<PipelineCache>(ctx.device(), "shaders")) {
+          pipelines(std::make_unique<PipelineCache>(ctx.device(), resolve_shader_dir())) {
 
         // Copy the graph so we can mutate params
         graph = ctx.parse_string(""); // placeholder
