@@ -285,7 +285,7 @@ class OllamaClient:
             pass
         return []
 
-    _MAX_AUTO_CTX = 16384
+    _MAX_AUTO_CTX = 8192
 
     async def get_num_ctx(self, model: str) -> int:
         """Return effective context length for a model via /api/show.
