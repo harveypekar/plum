@@ -1,6 +1,7 @@
 import json
 import sys
 from pathlib import Path
+from unittest.mock import patch
 
 import httpx
 import pytest
@@ -8,7 +9,7 @@ import pytest
 # Allow imports from aiserver directory
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from ollama import OllamaClient
+from ollama import OllamaClient, OllamaError
 
 
 class FakeStreamResponse:
@@ -122,3 +123,64 @@ async def test_chat_stream_passes_options_and_stop(monkeypatch):
 
     assert fake_client.last_request["options"] == {"temperature": 0.8, "repeat_penalty": 1.1}
     assert fake_client.last_request["stop"] == ["Valentina:"]
+
+
+class TestGetNumCtx:
+    @pytest.mark.asyncio
+    async def test_prefers_parameters_num_ctx(self):
+        client = OllamaClient("http://localhost:11434")
+        show_response = {
+            "parameters": "num_ctx                        32768\ntemperature                    0.8",
+            "model_info": {"llama.context_length": 131072},
+        }
+        with patch("httpx.AsyncClient.post") as mock_post:
+            mock_post.return_value.status_code = 200
+            mock_post.return_value.json = lambda: show_response
+            result = await client.get_num_ctx("mymodel")
+        assert result == 32768
+
+    @pytest.mark.asyncio
+    async def test_falls_back_to_model_info_context_length(self):
+        client = OllamaClient("http://localhost:11434")
+        show_response = {
+            "parameters": "temperature                    0.8",
+            "model_info": {"llama.context_length": 8192},
+        }
+        with patch("httpx.AsyncClient.post") as mock_post:
+            mock_post.return_value.status_code = 200
+            mock_post.return_value.json = lambda: show_response
+            result = await client.get_num_ctx("mymodel")
+        assert result == 8192
+
+    @pytest.mark.asyncio
+    async def test_tries_any_arch_context_length(self):
+        """model_info keys look like <arch>.context_length — e.g. qwen2.context_length."""
+        client = OllamaClient("http://localhost:11434")
+        show_response = {
+            "parameters": "",
+            "model_info": {"qwen2.context_length": 4096, "general.architecture": "qwen2"},
+        }
+        with patch("httpx.AsyncClient.post") as mock_post:
+            mock_post.return_value.status_code = 200
+            mock_post.return_value.json = lambda: show_response
+            result = await client.get_num_ctx("mymodel")
+        assert result == 4096
+
+    @pytest.mark.asyncio
+    async def test_raises_when_neither_present(self):
+        client = OllamaClient("http://localhost:11434")
+        show_response = {"parameters": "temperature 0.8", "model_info": {}}
+        with patch("httpx.AsyncClient.post") as mock_post:
+            mock_post.return_value.status_code = 200
+            mock_post.return_value.json = lambda: show_response
+            with pytest.raises(OllamaError, match="context length"):
+                await client.get_num_ctx("mymodel")
+
+    @pytest.mark.asyncio
+    async def test_raises_on_show_http_error(self):
+        client = OllamaClient("http://localhost:11434")
+        with patch("httpx.AsyncClient.post") as mock_post:
+            mock_post.return_value.status_code = 404
+            mock_post.return_value.text = "model not found"
+            with pytest.raises(OllamaError):
+                await client.get_num_ctx("nope")

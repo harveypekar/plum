@@ -14,6 +14,8 @@ from .models import (
     MessageResponse, SendMessageRequest, EditMessageRequest, SceneStateRequest,
 )
 from .pipeline import create_default_pipeline
+from .budget import fit_prompt, BudgetError
+from .context import get_strategy
 from .mcp_client import get_router as get_mcp_router
 from .research import research_dispatch
 from .fewshot import get_fewshot_messages
@@ -463,6 +465,26 @@ def setup(app: FastAPI, ollama, resolve_model=None):
 
         return await _pipeline.run_pre(ctx)
 
+    async def _budget_ctx(ctx, model, ollama_options):
+        """Run fit_prompt against ctx, using scenario-configured strategy.
+
+        On BudgetError, logs a WARNING and re-raises — callers handle the
+        response (HTTP 413, stream error chunk, etc.).
+        """
+        scenario = ctx.get("scenario") or {}
+        settings = scenario.get("settings", {})
+        strategy = get_strategy(settings.get("context_strategy", "summary_buffer"))
+        num_predict = ollama_options.get("num_predict")
+        try:
+            return await fit_prompt(
+                ctx, model=model, ollama=_ollama,
+                strategy=strategy, num_predict=num_predict,
+                ground_truth=True,
+            )
+        except BudgetError as e:
+            _log.warning("Budget error for model=%s: %s", model, e)
+            raise
+
     def _get_ai_name(ctx):
         """Extract AI character name for response prefixing."""
         ai_data = ctx.get("ai_card", {}).get("card_data", {}).get("data", ctx.get("ai_card", {}).get("card_data", {}))
@@ -740,6 +762,23 @@ def setup(app: FastAPI, ollama, resolve_model=None):
             # Prepend after greeting (messages[0]), before real conversation
             ctx["messages"] = [ctx["messages"][0]] + fewshot_msgs + ctx["messages"][1:]
 
+        try:
+            await _budget_ctx(ctx, model, ollama_options)
+        except BudgetError as e:
+            err_msg = f"Prompt does not fit model context: {e}"
+            async def _err_stream():
+                yield json.dumps({
+                    "error": err_msg,
+                    "done": True,
+                }) + "\n"
+            return StreamingResponse(
+                _err_stream(), media_type="application/x-ndjson",
+                status_code=413,
+            )
+
+        # Tell Ollama to load the model with its real context window
+        ollama_options = {**ollama_options, "num_ctx": ctx["_num_ctx"]}
+
         chat_messages = _build_chat_messages(ctx)
         user_name = _get_user_name(ctx)
         conv_log.log_prompt(conv_id, "send_message", model,
@@ -859,6 +898,23 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         settings = scenario.get("settings", {})
         ollama_options = _build_ollama_options(settings)
 
+        try:
+            await _budget_ctx(ctx, model, ollama_options)
+        except BudgetError as e:
+            err_msg = f"Prompt does not fit model context: {e}"
+            async def _err_stream():
+                yield json.dumps({
+                    "error": err_msg,
+                    "done": True,
+                }) + "\n"
+            return StreamingResponse(
+                _err_stream(), media_type="application/x-ndjson",
+                status_code=413,
+            )
+
+        # Tell Ollama to load the model with its real context window
+        ollama_options = {**ollama_options, "num_ctx": ctx["_num_ctx"]}
+
         chat_messages = _build_chat_messages(ctx)
         user_name = _get_user_name(ctx)
         conv_log.log_prompt(conv_id, "regenerate", model,
@@ -916,6 +972,23 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         scenario = ctx.get("scenario") or {}
         settings = scenario.get("settings", {})
         ollama_options = _build_ollama_options(settings)
+
+        try:
+            await _budget_ctx(ctx, model, ollama_options)
+        except BudgetError as e:
+            err_msg = f"Prompt does not fit model context: {e}"
+            async def _err_stream():
+                yield json.dumps({
+                    "error": err_msg,
+                    "done": True,
+                }) + "\n"
+            return StreamingResponse(
+                _err_stream(), media_type="application/x-ndjson",
+                status_code=413,
+            )
+
+        # Tell Ollama to load the model with its real context window
+        ollama_options = {**ollama_options, "num_ctx": ctx["_num_ctx"]}
 
         chat_messages = _build_chat_messages(ctx)
         user_name = _get_user_name(ctx)
@@ -1021,6 +1094,23 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         if generating_as_user:
             # Instruct model: lower temperature, no thinking
             ollama_options = {"temperature": 0.7, "num_predict": 256, "think": False}
+
+        try:
+            await _budget_ctx(ctx, model, ollama_options)
+        except BudgetError as e:
+            err_msg = f"Prompt does not fit model context: {e}"
+            async def _err_stream():
+                yield json.dumps({
+                    "error": err_msg,
+                    "done": True,
+                }) + "\n"
+            return StreamingResponse(
+                _err_stream(), media_type="application/x-ndjson",
+                status_code=413,
+            )
+
+        # Tell Ollama to load the model with its real context window
+        ollama_options = {**ollama_options, "num_ctx": ctx["_num_ctx"]}
 
         chat_messages = _build_chat_messages(ctx)
         user_name = _get_user_name(ctx)

@@ -1,7 +1,6 @@
 import asyncio
 import logging
 from typing import Callable
-from .context import get_strategy
 from .mcp_client import get_router
 
 _log = logging.getLogger(__name__)
@@ -169,17 +168,6 @@ def render_template(template: str, values: dict) -> str:
     return result.strip()
 
 
-def apply_context_strategy(ctx: dict) -> dict:
-    """Fit messages within token budget using the active strategy."""
-    settings = ctx.get("scenario", {}).get("settings", {})
-    strategy_name = settings.get("context_strategy", "summary_buffer")
-    max_tokens = settings.get("max_context_tokens", 6144)
-
-    strategy = get_strategy(strategy_name)
-    ctx["messages"] = strategy.fit(ctx["messages"], max_tokens, ctx=ctx)
-    return ctx
-
-
 # -- Built-in post-processing hooks --
 
 def clean_response(ctx: dict) -> dict:
@@ -206,11 +194,15 @@ def inject_tools(ctx: dict) -> dict:
 
 
 def create_default_pipeline() -> Pipeline:
-    """Create pipeline with standard hooks."""
+    """Create pipeline with standard hooks.
+
+    NOTE: context budgeting is no longer part of the pipeline — it's
+    now done explicitly at each call site via budget.fit_prompt, which
+    needs access to the ollama client and resolved model name.
+    """
     p = Pipeline()
     p.add_pre(assemble_prompt)
     p.add_pre(expand_variables)
     p.add_pre(inject_tools)
-    p.add_pre(apply_context_strategy)
     p.add_post(clean_response)
     return p

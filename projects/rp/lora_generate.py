@@ -22,9 +22,11 @@ import json
 import logging
 import random
 import re
+from pathlib import Path
 
 import asyncpg
 
+from .budget import BudgetError, fit_raw_prompt
 from .pipeline import DEFAULT_PROMPT_TEMPLATE, _split_template, render_template
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
@@ -215,6 +217,19 @@ async def generate_scenarios(ollama, model: str, ai_card: dict, user_card: dict,
             "Example: [\"Scenario one.\", \"Scenario two.\", \"Scenario three.\"]"
         )
 
+        try:
+            prompt, _ = await fit_raw_prompt(
+                prompt=prompt,
+                system="Output valid JSON only. No markdown fences.",
+                model=model, ollama=ollama, num_predict=1024,
+            )
+        except BudgetError as e:
+            _log.warning(
+                "Skipping category %s for %s: prompt does not fit (%s)",
+                cat["category"], char_name, e,
+            )
+            continue
+
         raw = await ollama.generate(
             model=model, prompt=prompt,
             system="Output valid JSON only. No markdown fences.",
@@ -266,9 +281,18 @@ async def generate_user_message(ollama, model: str, context: dict) -> str:
         "No prefix like 'User:'. Just the message."
     )
 
+    system = f"You are {context['user_name']}. Write their next message only."
+    try:
+        prompt, _ = await fit_raw_prompt(
+            prompt=prompt, system=system,
+            model=model, ollama=ollama, num_predict=300,
+        )
+    except BudgetError as e:
+        _log.warning("User msg budget error: %s", e)
+        return ""
+
     raw = await ollama.generate(
-        model=model, prompt=prompt,
-        system=f"You are {context['user_name']}. Write their next message only.",
+        model=model, prompt=prompt, system=system,
         options={"temperature": 1.0, "num_predict": 300, "think": False},
     )
     return raw.strip().strip('"')
@@ -282,6 +306,17 @@ async def generate_assistant_message(ollama, model: str, system_prompt: str,
     for msg in messages:
         role = "user" if msg["from"] == "human" else "assistant"
         chat_msgs.append({"role": role, "content": msg["value"]})
+
+    serialized = "\n".join(f"{m['role']}: {m['content']}" for m in chat_msgs[1:])
+    try:
+        _, _ = await fit_raw_prompt(
+            prompt=serialized, system=system_prompt,
+            model=model, ollama=ollama, num_predict=768,
+            ground_truth=False,
+        )
+    except BudgetError as e:
+        _log.warning("Assistant msg budget error: %s", e)
+        return ""
 
     raw = await ollama.chat(
         model=model, messages=chat_msgs,
@@ -415,8 +450,28 @@ async def generate_conversation(ollama, model_70b: str, ai_card: dict, user_card
 class OllamaClient:
     """Minimal async Ollama client for generation."""
 
-    def __init__(self, base_url: str = "http://127.0.0.1:8080"):
+    def __init__(self, base_url: str = "http://127.0.0.1:8080", ollama_url: str | None = None):
         self.base_url = base_url
+        if not ollama_url:
+            try:
+                config_path = Path(__file__).parent.parent / "aiserver" / "config.json"
+                ollama_url = json.loads(config_path.read_text()).get(
+                    "ollama_url", "http://localhost:11434"
+                )
+            except Exception:
+                ollama_url = "http://localhost:11434"
+        from aiserver.ollama import OllamaClient as _BudgetOllamaClient
+        self._budget = _BudgetOllamaClient(ollama_url)
+
+    async def get_num_ctx(self, model: str) -> int:
+        """Delegate to real Ollama for budget protocol."""
+        return await self._budget.get_num_ctx(model)
+
+    async def count_generate_prompt(
+        self, model: str, prompt: str, system: str | None = None
+    ) -> int:
+        """Delegate to real Ollama for budget protocol."""
+        return await self._budget.count_generate_prompt(model, prompt, system)
 
     @staticmethod
     def _parse_ndjson(text: str) -> str:
@@ -497,12 +552,14 @@ async def main():
     parser.add_argument("--scenarios-per-category", type=int, default=2, help="Scenarios per category (default: 2)")
     parser.add_argument("--scenarios-only", action="store_true", help="Only generate and print scenarios")
     parser.add_argument("--aiserver-url", type=str, default="http://127.0.0.1:8080")
+    parser.add_argument("--ollama-url", type=str, default=None,
+                        help="Raw Ollama URL for budget counting (default: from aiserver/config.json)")
     parser.add_argument("--output", "-o", type=str, default="lora_generated.json")
     args = parser.parse_args()
 
     import os
     pool = await asyncpg.create_pool(os.environ["DATABASE_URL"], min_size=1, max_size=2)
-    ollama = OllamaClient(args.aiserver_url)
+    ollama = OllamaClient(args.aiserver_url, ollama_url=args.ollama_url)
 
     ai_card_ids = [int(x.strip()) for x in args.ai_card_ids.split(",")]
     user_card = await _get_card(pool, args.user_card_id)

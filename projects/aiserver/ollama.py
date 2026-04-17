@@ -172,6 +172,39 @@ class OllamaClient:
                 tokens.append(chunk["token"])
         return "".join(tokens)
 
+    async def count_generate_prompt(
+        self,
+        model: str,
+        prompt: str,
+        system: str | None = None,
+    ) -> int:
+        """Tokenize a prompt via /api/generate and return prompt_eval_count.
+
+        Posts with `num_predict: 0` so Ollama tokenizes the prompt but
+        generates no output. Used by budget.fit_raw_prompt for ground-truth
+        counting that matches the generate endpoint's template — /api/chat
+        would apply chat role markers that /api/generate does not.
+        """
+        body: dict = {
+            "model": model,
+            "prompt": prompt,
+            "stream": False,
+            "options": {"num_predict": 0},
+        }
+        if system:
+            body["system"] = system
+        try:
+            async with httpx.AsyncClient(timeout=120.0) as client:
+                resp = await client.post(f"{self.base_url}/api/generate", json=body)
+                if resp.status_code != 200:
+                    raise OllamaError(f"Ollama returned {resp.status_code}: {resp.text}")
+                data = resp.json()
+                return int(data.get("prompt_eval_count", 0) or 0)
+        except httpx.ConnectError:
+            raise OllamaError(f"Cannot connect to Ollama at {self.base_url}")
+        except httpx.HTTPError as e:
+            raise OllamaError(f"HTTP error communicating with Ollama: {e}") from e
+
     async def chat(
         self,
         model: str,
@@ -251,6 +284,50 @@ class OllamaClient:
         except httpx.HTTPError:
             pass
         return []
+
+    async def get_num_ctx(self, model: str) -> int:
+        """Return effective context length for a model via /api/show.
+
+        Prefers the runtime-loaded num_ctx from the parameters field (a
+        whitespace-formatted string). Falls back to any <arch>.context_length
+        entry in model_info (the architectural max from the GGUF file).
+        Raises OllamaError if neither is present or the request fails.
+        """
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.post(
+                    f"{self.base_url}/api/show", json={"model": model}
+                )
+                if resp.status_code != 200:
+                    raise OllamaError(
+                        f"Ollama /api/show returned {resp.status_code}: {resp.text}"
+                    )
+                data = resp.json()
+        except httpx.ConnectError:
+            raise OllamaError(f"Cannot connect to Ollama at {self.base_url}")
+        except httpx.HTTPError as e:
+            raise OllamaError(f"HTTP error from /api/show: {e}") from e
+
+        # Parse parameters for "num_ctx <value>"
+        params_str = data.get("parameters", "") or ""
+        for line in params_str.splitlines():
+            parts = line.split()
+            if len(parts) >= 2 and parts[0] == "num_ctx":
+                try:
+                    return int(parts[1])
+                except ValueError:
+                    pass
+
+        # Fall back to model_info[<arch>.context_length]
+        model_info = data.get("model_info", {}) or {}
+        for key, value in model_info.items():
+            if key.endswith(".context_length") and isinstance(value, int):
+                return value
+
+        raise OllamaError(
+            f"Could not determine context length for model {model!r}: "
+            f"no num_ctx in parameters and no <arch>.context_length in model_info"
+        )
 
     async def embed(self, model: str, text: str) -> list[float]:
         """Get embedding vector for text via Ollama /api/embed."""
