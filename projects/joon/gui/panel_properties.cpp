@@ -20,6 +20,7 @@ void App::draw_properties() {
                 auto param = eval->param<float>(p.name);
                 param = val;
                 eval->evaluate();
+                viewport_dirty = true;
             }
         }
     } else {

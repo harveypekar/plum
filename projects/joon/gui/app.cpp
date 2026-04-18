@@ -41,17 +41,27 @@ void App::shutdown() {
 }
 
 void App::bind_viewport() {
-    if (viewport_desc) {
-        ImGui_ImplVulkan_RemoveTexture(viewport_desc);
-        viewport_desc = VK_NULL_HANDLE;
+    if (!eval || graph.has_errors() || graph.ir().outputs.empty()) {
+        if (viewport_desc) {
+            ImGui_ImplVulkan_RemoveTexture(viewport_desc);
+            viewport_desc = VK_NULL_HANDLE;
+            bound_view = VK_NULL_HANDLE;
+        }
+        return;
     }
-    if (!eval || graph.has_errors() || graph.ir().outputs.empty()) return;
 
     auto result = eval->result("");
     auto* view = static_cast<VkImageView>(result.vk_image_view());
     if (!view || !sampler) return;
 
+    if (view == bound_view) return;
+
+    if (viewport_desc) {
+        vkDeviceWaitIdle(ctx->device().device);
+        ImGui_ImplVulkan_RemoveTexture(viewport_desc);
+    }
     viewport_desc = ImGui_ImplVulkan_AddTexture(sampler, view, VK_IMAGE_LAYOUT_GENERAL);
+    bound_view = view;
 }
 
 void App::reparse() {
