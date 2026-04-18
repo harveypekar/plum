@@ -1,9 +1,26 @@
 #define VMA_IMPLEMENTATION
 #include "vulkan/device.h"
+#include <cstdio>
 #include <stdexcept>
 #include <vector>
 
 namespace joon {
+
+static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
+    VkDebugUtilsMessageSeverityFlagBitsEXT severity,
+    VkDebugUtilsMessageTypeFlagsEXT,
+    const VkDebugUtilsMessengerCallbackDataEXT* data,
+    void* user_data) {
+    auto* dev = static_cast<Device*>(user_data);
+    const char* level = "INFO";
+    if (severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) level = "ERROR";
+    else if (severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) level = "WARN";
+    if (dev->log_fn)
+        dev->log_fn("[VK %s] %s\n", level, data->pMessage);
+    else
+        std::fprintf(stderr, "[VK %s] %s\n", level, data->pMessage);
+    return VK_FALSE;
+}
 
 std::unique_ptr<Device> Device::create(bool enable_validation) {
     auto dev = std::make_unique<Device>();
@@ -30,21 +47,39 @@ std::unique_ptr<Device> Device::create(bool enable_validation) {
 #endif
     };
 
+    std::vector<const char*> layers;
+    if (enable_validation) {
+        layers.push_back("VK_LAYER_KHRONOS_validation");
+        instance_extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+    }
+
     VkInstanceCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
     create_info.pApplicationInfo = &app_info;
     create_info.enabledExtensionCount = static_cast<uint32_t>(instance_extensions.size());
     create_info.ppEnabledExtensionNames = instance_extensions.data();
-
-    std::vector<const char*> layers;
-    if (enable_validation) {
-        layers.push_back("VK_LAYER_KHRONOS_validation");
-    }
     create_info.enabledLayerCount = static_cast<uint32_t>(layers.size());
     create_info.ppEnabledLayerNames = layers.data();
 
     if (vkCreateInstance(&create_info, nullptr, &dev->instance) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create Vulkan instance");
+    }
+
+    if (enable_validation) {
+        VkDebugUtilsMessengerCreateInfoEXT dbg_info{};
+        dbg_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+        dbg_info.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+                                   VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+        dbg_info.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+                               VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
+                               VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+        dbg_info.pfnUserCallback = debugCallback;
+        dbg_info.pUserData = dev.get();
+
+        auto createFn = reinterpret_cast<PFN_vkCreateDebugUtilsMessengerEXT>(
+            vkGetInstanceProcAddr(dev->instance, "vkCreateDebugUtilsMessengerEXT"));
+        if (createFn)
+            createFn(dev->instance, &dbg_info, nullptr, &dev->debug_messenger);
     }
 
     // Physical device — prefer discrete GPU
@@ -146,6 +181,11 @@ Device::~Device() {
     if (allocator) vmaDestroyAllocator(allocator);
     if (command_pool) vkDestroyCommandPool(device, command_pool, nullptr);
     if (device) vkDestroyDevice(device, nullptr);
+    if (debug_messenger) {
+        auto destroyFn = reinterpret_cast<PFN_vkDestroyDebugUtilsMessengerEXT>(
+            vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT"));
+        if (destroyFn) destroyFn(instance, debug_messenger, nullptr);
+    }
     if (instance) vkDestroyInstance(instance, nullptr);
 }
 

@@ -6,6 +6,8 @@
 
 namespace joon {
 
+using LogFn = void(*)(const char* fmt, ...);
+
 struct Device {
     VkInstance instance = VK_NULL_HANDLE;
     VkPhysicalDevice physical_device = VK_NULL_HANDLE;
@@ -16,6 +18,8 @@ struct Device {
     uint32_t graphics_family = UINT32_MAX;
     VkCommandPool command_pool = VK_NULL_HANDLE;
     VmaAllocator allocator = VK_NULL_HANDLE;
+    VkDebugUtilsMessengerEXT debug_messenger = VK_NULL_HANDLE;
+    LogFn log_fn = nullptr;
 
     Device() = default;
     ~Device();
