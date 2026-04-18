@@ -259,15 +259,19 @@ async def get_messages(conv_id: int) -> list[dict]:
 
 
 async def add_message(conv_id: int, role: str, content: str,
-                      raw_response: dict | None = None) -> dict:
+                      raw_response: dict | None = None,
+                      system_prompt: str | None = None,
+                      scene_state: str | None = None,
+                      post_prompt: str | None = None) -> dict:
     pool = await get_pool()
     row = await pool.fetchrow(
-        "INSERT INTO rp_messages (conversation_id, role, content, raw_response, sequence) "
-        "VALUES ($1, $2, $3, $4, "
+        "INSERT INTO rp_messages (conversation_id, role, content, raw_response, "
+        "system_prompt, scene_state, post_prompt, sequence) "
+        "VALUES ($1, $2, $3, $4, $5, $6, $7, "
         "(SELECT COALESCE(MAX(sequence), 0) + 1 FROM rp_messages WHERE conversation_id = $1)) "
         "RETURNING id, conversation_id, role, content, "
-        "raw_response, sequence, created_at::text",
-        conv_id, role, content, raw_response,
+        "raw_response, sequence, system_prompt, scene_state, post_prompt, created_at::text",
+        conv_id, role, content, raw_response, system_prompt, scene_state, post_prompt,
     )
     await pool.execute(
         "UPDATE rp_conversations SET updated_at = NOW() WHERE id = $1", conv_id
