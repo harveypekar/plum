@@ -7,8 +7,6 @@ void App::draw_viewport() {
     if (eval && !graph.has_errors() && !graph.ir().outputs.empty()) {
         auto result = eval->result("output");
         if (result.width() > 0) {
-            // Update ImGui texture descriptor for the output image
-            // viewport_desc is set up by the main loop when it binds VkImageView to ImGui
             ImVec2 avail = ImGui::GetContentRegionAvail();
             if (viewport_desc) {
                 // Maintain aspect ratio

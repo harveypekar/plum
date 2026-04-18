@@ -16,6 +16,7 @@ struct App {
     std::string dsl_source;
     std::string eval_error;
     bool source_dirty = true;
+    bool viewport_dirty = true;
     float codeFontScale = 1.0f;
     uint32_t selected_node_id = UINT32_MAX;
 
@@ -27,6 +28,7 @@ struct App {
     void init();
     void shutdown();
     void reparse();
+    void bind_viewport();
     void update();
 
     void draw_tree();

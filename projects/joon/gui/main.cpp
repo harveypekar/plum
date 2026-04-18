@@ -9,6 +9,7 @@
 #include <imgui_impl_vulkan.h>
 
 #include "vulkan/device.h"
+#include "util/exe_dir.h"
 #include "log.h"
 
 #include <algorithm>
@@ -176,7 +177,8 @@ static void recreate_swapchain(const joon::Device& dev, GuiVulkan& gui, GLFWwind
 }
 
 int main() {
-    joon_log::init("joon-gui.log");
+    auto log_path = joon::exe_dir() + "/joon-gui.log";
+    joon_log::init(log_path.c_str());
 
     if (!glfwInit()) {
         joon_log::write("glfwInit failed\n");
