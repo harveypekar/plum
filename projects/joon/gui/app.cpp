@@ -5,6 +5,7 @@
 
 void App::init() {
     ctx = joon::Context::create();
+    ctx->device().log_fn = joon_log::write;
 
     dsl_source = R"(; Joon - edit this code
 (def base (noise :scale 4.0 :octaves 3))
