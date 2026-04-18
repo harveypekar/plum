@@ -16,9 +16,11 @@ void App::draw_properties() {
             if (it != p.constraints.end()) max_v = it->second;
 
             if (ImGui::SliderFloat(p.name.c_str(), &val, min_v, max_v)) {
+                p.default_value = val;
                 auto param = eval->param<float>(p.name);
                 param = val;
                 eval->evaluate();
+                viewport_dirty = true;
             }
         }
     } else {

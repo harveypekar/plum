@@ -65,7 +65,6 @@ void App::reparse() {
         if (!graph.has_errors()) {
             eval = ctx->create_evaluator(graph);
             eval->evaluate();
-            bind_viewport();
         } else {
             eval.reset();
         }
@@ -80,5 +79,10 @@ void App::reparse() {
 void App::update() {
     if (source_dirty) {
         reparse();
+        viewport_dirty = true;
+    }
+    if (viewport_dirty && eval) {
+        bind_viewport();
+        viewport_dirty = false;
     }
 }
