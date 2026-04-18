@@ -65,6 +65,22 @@ CREATE TABLE IF NOT EXISTS rp_messages (
 
 CREATE INDEX IF NOT EXISTS idx_rp_messages_conv ON rp_messages(conversation_id, sequence);
 
+-- Migration: add pipeline context columns to rp_messages
+DO $$ BEGIN
+    ALTER TABLE rp_messages ADD COLUMN system_prompt TEXT DEFAULT NULL;
+EXCEPTION WHEN duplicate_column THEN NULL;
+END $$;
+
+DO $$ BEGIN
+    ALTER TABLE rp_messages ADD COLUMN scene_state TEXT DEFAULT NULL;
+EXCEPTION WHEN duplicate_column THEN NULL;
+END $$;
+
+DO $$ BEGIN
+    ALTER TABLE rp_messages ADD COLUMN post_prompt TEXT DEFAULT NULL;
+EXCEPTION WHEN duplicate_column THEN NULL;
+END $$;
+
 CREATE TABLE IF NOT EXISTS rp_first_message_cache (
     id              SERIAL PRIMARY KEY,
     combo_hash      TEXT NOT NULL UNIQUE,
