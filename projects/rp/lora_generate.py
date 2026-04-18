@@ -27,29 +27,13 @@ from pathlib import Path
 import asyncpg
 
 from .budget import BudgetError, fit_raw_prompt
+from .lora_curate import STOCK_PHRASES
 from .pipeline import DEFAULT_PROMPT_TEMPLATE, _split_template, render_template
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 _log = logging.getLogger(__name__)
 
 # --- Content filters ---
-
-STOCK_PHRASES = [
-    "ruin you for anyone else", "ruin me for anyone else",
-    "ruined for anyone else", "ruined me for everyone",
-    "electricity coursed", "electricity shot through",
-    "shivers down her spine", "shivers down my spine",
-    "breath caught in", "breath hitched",
-    "heart pounded in", "heart hammered in",
-    "pulse quickened", "pulse raced",
-    "a gasp escaped", "a moan escaped",
-    "core tightened", "coil tightened",
-    "undone by", "came undone",
-    "claimed her lips", "claimed his lips",
-    "molten heat", "pooling heat",
-    "like a prayer", "whispered like a prayer",
-    "swallowed thickly", "adam's apple bobbed",
-]
 
 VIOLENCE_PATTERNS = [
     r"\b(force[ds]? (?:her|him|them)(?:self)? (?:down|onto|against|into))",
