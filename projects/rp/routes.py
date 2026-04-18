@@ -842,7 +842,12 @@ def setup(app: FastAPI, ollama, resolve_model=None):
             try:
                 post_ctx = {"response": final_text, "ai_name": _get_ai_name(ctx)}
                 post_ctx = await _pipeline.run_post(post_ctx)
-                await db.add_message(conv_id, "assistant", post_ctx["response"], raw_response=raw)
+                await db.add_message(
+                    conv_id, "assistant", post_ctx["response"], raw_response=raw,
+                    system_prompt=ctx.get("system_prompt", ""),
+                    scene_state=conv.get("scene_state", ""),
+                    post_prompt=ctx.get("post_prompt", ""),
+                )
                 conv_log.log_response(conv_id, "assistant", post_ctx["response"], raw)
                 # Update scene state and maybe generate summary in background
                 asyncio.create_task(_auto_update_scene_state(conv_id, model,
@@ -947,7 +952,12 @@ def setup(app: FastAPI, ollama, resolve_model=None):
                 response_text = "".join(tokens)
                 post_ctx = {"response": response_text, "ai_name": _get_ai_name(ctx)}
                 post_ctx = await _pipeline.run_post(post_ctx)
-                await db.add_message(conv_id, "assistant", post_ctx["response"], raw_response=raw)
+                await db.add_message(
+                    conv_id, "assistant", post_ctx["response"], raw_response=raw,
+                    system_prompt=ctx.get("system_prompt", ""),
+                    scene_state=conv.get("scene_state", ""),
+                    post_prompt=ctx.get("post_prompt", ""),
+                )
                 conv_log.log_response(conv_id, "assistant", post_ctx["response"], raw)
                 # Update scene state and maybe generate summary in background
                 asyncio.create_task(_auto_update_scene_state(conv_id, model,
@@ -1022,7 +1032,12 @@ def setup(app: FastAPI, ollama, resolve_model=None):
                 response_text = "".join(tokens)
                 post_ctx = {"response": response_text, "ai_name": _get_ai_name(ctx)}
                 post_ctx = await _pipeline.run_post(post_ctx)
-                await db.add_message(conv_id, "assistant", post_ctx["response"], raw_response=raw)
+                await db.add_message(
+                    conv_id, "assistant", post_ctx["response"], raw_response=raw,
+                    system_prompt=ctx.get("system_prompt", ""),
+                    scene_state=conv.get("scene_state", ""),
+                    post_prompt=ctx.get("post_prompt", ""),
+                )
                 conv_log.log_response(conv_id, "assistant", post_ctx["response"], raw)
                 # Update scene state and maybe generate summary in background
                 asyncio.create_task(_auto_update_scene_state(conv_id, model,
@@ -1146,7 +1161,12 @@ def setup(app: FastAPI, ollama, resolve_model=None):
                 response_text = "".join(tokens)
                 post_ctx = {"response": response_text, "ai_name": _get_ai_name(ctx)}
                 post_ctx = await _pipeline.run_post(post_ctx)
-                await db.add_message(conv_id, save_role, post_ctx["response"], raw_response=raw)
+                await db.add_message(
+                    conv_id, save_role, post_ctx["response"], raw_response=raw,
+                    system_prompt=ctx.get("system_prompt", ""),
+                    scene_state=conv.get("scene_state", ""),
+                    post_prompt=ctx.get("post_prompt", ""),
+                )
                 conv_log.log_response(conv_id, save_role, post_ctx["response"], raw)
                 # Update scene state and maybe generate summary in background
                 asyncio.create_task(_auto_update_scene_state(conv_id, model,

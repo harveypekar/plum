@@ -39,12 +39,14 @@ from .evaluators import card as card_eval  # noqa: E402
 from .evaluators import fewshot as fewshot_eval  # noqa: E402
 from .evaluators import response as response_eval  # noqa: E402
 from .evaluators import scenario as scenario_eval  # noqa: E402
+from .evaluators import message as message_eval  # noqa: E402
 from .evaluators import scene_state as scene_state_eval  # noqa: E402
 from .report import aggregate, format_report, format_single, to_json  # noqa: E402
 
 # Import db functions for saving/loading metrics
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from db import save_metrics, get_metrics, get_latest_metrics  # noqa: E402, F401
+from lora_curate import filter_message  # noqa: E402
 
 
 def _add_common_args(sub: argparse.ArgumentParser):
@@ -92,6 +94,15 @@ def build_parser() -> argparse.ArgumentParser:
     _add_common_args(p_scenario)
     p_scenario.add_argument("--scenario-id", type=int, help="Evaluate a single scenario")
     p_scenario.add_argument("--all", action="store_true", help="Evaluate all scenarios")
+
+    p_message = sub.add_parser("message", help="Score individual messages for LoRA curation")
+    _add_common_args(p_message)
+    p_message.add_argument("--conv-id", type=int, help="Score messages in one conversation")
+    p_message.add_argument("--all", action="store_true", help="Score all conversations")
+    p_message.add_argument("--skip-scored", action="store_true",
+                           help="Skip messages that already have scores")
+    p_message.add_argument("--min-messages", type=int, default=10,
+                           help="Min messages per conv for --all (default: 10)")
 
     p_show = sub.add_parser("show", help="Show stored metrics from database")
     p_show.add_argument("--db-url", default=None)
@@ -515,6 +526,133 @@ async def run_scenario(args, pool: asyncpg.Pool, aiserver_url: str):
         await _save_results(results, "scenario", rubric.name, pool)
 
 
+async def run_message(args, pool: asyncpg.Pool, aiserver_url: str):
+    rubric = load_rubric("response", Path(args.rubric) if args.rubric else None)
+
+    if args.conv_id:
+        conv_ids = [args.conv_id]
+    elif args.all:
+        rows = await pool.fetch(
+            "SELECT c.id FROM rp_conversations c "
+            "JOIN rp_messages m ON m.conversation_id = c.id "
+            "GROUP BY c.id HAVING count(m.id) >= $1 "
+            "ORDER BY c.id",
+            args.min_messages,
+        )
+        conv_ids = [r["id"] for r in rows]
+    else:
+        print("Error: --conv-id or --all required", file=sys.stderr)
+        sys.exit(1)
+
+    if not conv_ids:
+        print("No conversations found.")
+        return
+
+    scored_ids: set[str] = set()
+    if args.skip_scored:
+        scored_rows = await pool.fetch(
+            "SELECT target_id FROM rp_eval_metrics "
+            "WHERE target_type = 'message'"
+        )
+        scored_ids = {r["target_id"] for r in scored_rows}
+
+    total_scored = 0
+    total_rejected = 0
+    total_skipped = 0
+
+    print(f"Judge: {args.judge_model}  Conversations: {len(conv_ids)}")
+
+    for conv_id in conv_ids:
+        all_msgs = await pool.fetch(
+            "SELECT id, conversation_id, role, content, system_prompt, "
+            "scene_state, post_prompt, sequence "
+            "FROM rp_messages WHERE conversation_id = $1 ORDER BY sequence",
+            conv_id,
+        )
+        all_msgs = [dict(m) for m in all_msgs]
+        scoreable = message_eval.get_scoreable_messages(all_msgs)
+
+        if not scoreable:
+            continue
+
+        conv_label = f"conv {conv_id}"
+        print(f"\n{conv_label}: {len(scoreable)} scoreable messages")
+
+        if args.dry_run:
+            for msg in scoreable:
+                preview = msg["content"][:60].replace("\n", " ")
+                scored_marker = " [scored]" if f"msg:{msg['id']}" in scored_ids else ""
+                print(f"  msg {msg['id']} seq {msg['sequence']}: {preview}...{scored_marker}")
+            continue
+
+        if total_scored == 0 and total_rejected == 0:
+            await _warmup_model(aiserver_url, args.judge_model)
+
+        results: list[EvalResult] = []
+        eval_times: list[float] = []
+
+        for i, msg in enumerate(scoreable):
+            target_id = f"msg:{msg['id']}"
+
+            if target_id in scored_ids:
+                total_skipped += 1
+                continue
+
+            history = [m for m in all_msgs if m["sequence"] < msg["sequence"]]
+
+            prev_assistant = [
+                m["content"] for m in history
+                if m["role"] == "assistant"
+            ][-3:]
+            user_msg = ""
+            for h in reversed(history):
+                if h["role"] == "user":
+                    user_msg = h["content"]
+                    break
+
+            gate = filter_message(msg["content"], user_msg, prev_assistant)
+
+            if not gate.passed:
+                total_rejected += 1
+                reject_scores = [
+                    {"dimension": "hard_gate", "score": 0, "explanation": gate.reason}
+                ]
+                await save_metrics(
+                    domain="curation",
+                    target_type="message",
+                    target_id=target_id,
+                    target_label=f"msg {msg['id']} (conv {conv_id})",
+                    judge_model="heuristic",
+                    rubric_name="hard_gate",
+                    scores=reject_scores,
+                    weighted_average=0.0,
+                    raw_judge_output=f"reason={gate.reason} stock={gate.stock_phrase_count} "
+                                     f"overlap={gate.trigram_overlap:.2f} length={gate.length_ratio:.1f}",
+                    pool=pool,
+                )
+                preview = msg["content"][:50].replace("\n", " ")
+                print(f"  [REJECT] msg {msg['id']}: {gate.reason} — {preview}...")
+                continue
+
+            preview = msg["content"][:50].replace("\n", " ")
+            print(f"  [{i+1}/{len(scoreable)}] msg {msg['id']} {preview}...", end="", flush=True)
+            try:
+                t0 = time.time()
+                result = await message_eval.score_message(
+                    aiserver_url, args.judge_model, msg, history, rubric,
+                )
+                elapsed = time.time() - t0
+                eval_times.append(elapsed)
+                results.append(result)
+                total_scored += 1
+                _print_progress(result, i, len(scoreable), elapsed, eval_times)
+                await _save_results([result], "message", rubric.name, pool)
+            except Exception as e:
+                print(f" ERROR: {type(e).__name__}: {e}" if str(e) else f" ERROR: {type(e).__name__}")
+
+    print(f"\nDone: {total_scored} scored, {total_rejected} rejected, {total_skipped} skipped")
+
+
 async def run_show(args, pool: asyncpg.Pool):
     """Show stored metrics from the database."""
     rows = await get_metrics(
@@ -755,6 +893,8 @@ async def main():
             await run_scenario(args, pool, aiserver_url)
         elif args.command == "report":
             await run_report(args, pool, aiserver_url)
+        elif args.command == "message":
+            await run_message(args, pool, aiserver_url)
         else:
             print(f"Unknown command: {args.command}", file=sys.stderr)
             sys.exit(1)
