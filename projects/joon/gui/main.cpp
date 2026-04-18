@@ -12,6 +12,8 @@
 #include "util/exe_dir.h"
 #include "log.h"
 
+#include <imgui_internal.h>
+
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>
@@ -430,7 +432,31 @@ int main() {
             ImGui::EndMainMenuBar();
         }
 
-        ImGui::DockSpaceOverViewport();
+        ImGuiID dockspace_id = ImGui::DockSpaceOverViewport();
+
+        static bool first_frame = true;
+        if (first_frame) {
+            first_frame = false;
+
+            ImGui::DockBuilderRemoveNode(dockspace_id);
+            ImGui::DockBuilderAddNode(dockspace_id, ImGuiDockNodeFlags_DockSpace);
+            ImGui::DockBuilderSetNodeSize(dockspace_id, ImGui::GetMainViewport()->Size);
+
+            ImGuiID dock_main = dockspace_id;
+            ImGuiID dock_bottom = ImGui::DockBuilderSplitNode(dock_main, ImGuiDir_Down, 0.20f, nullptr, &dock_main);
+            ImGuiID dock_left = ImGui::DockBuilderSplitNode(dock_main, ImGuiDir_Left, 0.12f, nullptr, &dock_main);
+            ImGuiID dock_right = ImGui::DockBuilderSplitNode(dock_main, ImGuiDir_Right, 0.55f, nullptr, &dock_main);
+            ImGuiID dock_right_bottom = ImGui::DockBuilderSplitNode(dock_right, ImGuiDir_Down, 0.36f, nullptr, &dock_right);
+
+            ImGui::DockBuilderDockWindow("Properties", dock_left);
+            ImGui::DockBuilderDockWindow("Graph Tree", dock_left);
+            ImGui::DockBuilderDockWindow("Code Editor", dock_main);
+            ImGui::DockBuilderDockWindow("Viewport", dock_right);
+            ImGui::DockBuilderDockWindow("Node Preview", dock_right_bottom);
+            ImGui::DockBuilderDockWindow("Output Log", dock_bottom);
+
+            ImGui::DockBuilderFinish(dockspace_id);
+        }
 
         app.update();
         app.draw_tree();
