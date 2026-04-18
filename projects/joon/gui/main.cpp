@@ -420,6 +420,9 @@ int main() {
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
+        static bool first_launch = true;
+        static bool reset_layout = false;
+
         // Menu bar
         if (ImGui::BeginMainMenuBar()) {
             if (ImGui::BeginMenu("Layout")) {
@@ -427,6 +430,8 @@ int main() {
                     ImGui::SaveIniSettingsToDisk("joon_layout.ini");
                 if (ImGui::MenuItem("Load Layout"))
                     ImGui::LoadIniSettingsFromDisk("joon_layout.ini");
+                if (ImGui::MenuItem("Reset Layout"))
+                    reset_layout = true;
                 ImGui::EndMenu();
             }
             ImGui::EndMainMenuBar();
@@ -434,10 +439,17 @@ int main() {
 
         ImGuiID dockspace_id = ImGui::DockSpaceOverViewport();
 
-        static bool first_frame = true;
-        if (first_frame) {
-            first_frame = false;
-
+        bool needs_layout = false;
+        if (first_launch) {
+            first_launch = false;
+            auto* node = ImGui::DockBuilderGetNode(dockspace_id);
+            needs_layout = !node || !node->ChildNodes[0];
+        }
+        if (reset_layout) {
+            reset_layout = false;
+            needs_layout = true;
+        }
+        if (needs_layout) {
             ImGui::DockBuilderRemoveNode(dockspace_id);
             ImGui::DockBuilderAddNode(dockspace_id, ImGuiDockNodeFlags_DockSpace);
             ImGui::DockBuilderSetNodeSize(dockspace_id, ImGui::GetMainViewport()->Size);
