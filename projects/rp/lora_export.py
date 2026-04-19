@@ -98,7 +98,7 @@ async def _get_conv_data(pool, conv_id: int) -> dict | None:
             scenario = dict(row)
 
     messages = await pool.fetch(
-        "SELECT role, content FROM rp_messages "
+        "SELECT id, role, content FROM rp_messages "
         "WHERE conversation_id = $1 ORDER BY sequence", conv_id)
 
     return {
@@ -130,18 +130,27 @@ def _conv_to_sharegpt(conv_data: dict) -> dict:
     }
 
 
-async def _get_eval_scores(pool, conv_id: int) -> dict:
-    """Get average eval score per message for a conversation."""
-    rows = await pool.fetch(
-        "SELECT target_id, weighted_average FROM rp_eval_results "
-        "WHERE target_type = 'response' AND target_id LIKE $1",
-        f"conv:{conv_id}:%")
-    scores = {}
-    for row in rows:
-        parts = row["target_id"].split(":")
-        if len(parts) >= 3:
-            scores[parts[2]] = row["weighted_average"]
-    return scores
+def truncate_by_score(
+    messages: list[dict],
+    scores: dict[int, float],
+    min_score: float,
+    include_unscored: bool = False,
+) -> list[dict]:
+    """Truncate a message list at the first assistant message below threshold."""
+    result = []
+    for msg in messages:
+        if msg["role"] == "assistant":
+            msg_score = scores.get(msg["id"])
+            if msg_score is None and not include_unscored:
+                if result and result[-1]["role"] == "user":
+                    result.pop()
+                break
+            elif msg_score is not None and msg_score < min_score:
+                if result and result[-1]["role"] == "user":
+                    result.pop()
+                break
+        result.append(msg)
+    return result
 
 
 async def main():
@@ -149,7 +158,10 @@ async def main():
     parser.add_argument("--user-card-id", type=int, help="Export all convs for this user card")
     parser.add_argument("--conv-ids", type=str, help="Comma-separated conversation IDs")
     parser.add_argument("--min-messages", type=int, default=10, help="Min messages per conv (default: 10)")
-    parser.add_argument("--min-score", type=float, default=0, help="Min eval score to include (0 = no filter)")
+    parser.add_argument("--min-msg-score", type=float, default=0,
+                        help="Min per-message eval score to include (0 = no filter)")
+    parser.add_argument("--include-unscored", action="store_true",
+                        help="Include messages without scores (default: exclude)")
     parser.add_argument("--output", "-o", type=str, default="-", help="Output file (default: stdout)")
     args = parser.parse_args()
 
@@ -179,12 +191,37 @@ async def main():
             _log.warning("Skipping conv %d: missing data", conv_id)
             continue
 
+        original_turns = len([m for m in conv_data["messages"] if m["role"] == "assistant"])
+
+        if args.min_msg_score > 0:
+            msg_ids = [m["id"] for m in conv_data["messages"] if m["role"] == "assistant"]
+            if msg_ids:
+                score_rows = await pool.fetch(
+                    "SELECT target_id, weighted_average FROM rp_eval_metrics "
+                    "WHERE target_type = 'message' AND target_id = ANY($1::text[])",
+                    [f"msg:{mid}" for mid in msg_ids],
+                )
+                scores = {}
+                for row in score_rows:
+                    mid = int(row["target_id"].split(":")[1])
+                    scores[mid] = float(row["weighted_average"])
+
+                conv_data["messages"] = truncate_by_score(
+                    conv_data["messages"], scores, args.min_msg_score,
+                    include_unscored=args.include_unscored,
+                )
+
+        if not conv_data["messages"]:
+            _log.warning("Skipping conv %d: no messages after filtering", conv_id)
+            continue
+
         entry = _conv_to_sharegpt(conv_data)
-        turns = len([m for m in entry["conversations"] if m["from"] == "gpt"])
-        entry["metadata"]["turns"] = turns
+        exported_turns = len([m for m in entry["conversations"] if m["from"] == "gpt"])
+        entry["metadata"]["original_turns"] = original_turns
+        entry["metadata"]["exported_turns"] = exported_turns
         results.append(entry)
-        _log.info("  conv %d: %s — %d turns", conv_id,
-                  entry["metadata"]["character"], turns)
+        _log.info("  conv %d: %s — %d/%d turns", conv_id,
+                  entry["metadata"]["character"], exported_turns, original_turns)
 
     await pool.close()
 
@@ -197,7 +234,7 @@ async def main():
             f.write(output)
         _log.info("Wrote %d conversations (%d total turns) to %s",
                   len(results),
-                  sum(r["metadata"]["turns"] for r in results),
+                  sum(r["metadata"]["exported_turns"] for r in results),
                   args.output)
 
 

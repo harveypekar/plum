@@ -27,29 +27,13 @@ from pathlib import Path
 import asyncpg
 
 from .budget import BudgetError, fit_raw_prompt
+from .lora_curate import STOCK_PHRASES
 from .pipeline import DEFAULT_PROMPT_TEMPLATE, _split_template, render_template
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 _log = logging.getLogger(__name__)
 
 # --- Content filters ---
-
-STOCK_PHRASES = [
-    "ruin you for anyone else", "ruin me for anyone else",
-    "ruined for anyone else", "ruined me for everyone",
-    "electricity coursed", "electricity shot through",
-    "shivers down her spine", "shivers down my spine",
-    "breath caught in", "breath hitched",
-    "heart pounded in", "heart hammered in",
-    "pulse quickened", "pulse raced",
-    "a gasp escaped", "a moan escaped",
-    "core tightened", "coil tightened",
-    "undone by", "came undone",
-    "claimed her lips", "claimed his lips",
-    "molten heat", "pooling heat",
-    "like a prayer", "whispered like a prayer",
-    "swallowed thickly", "adam's apple bobbed",
-]
 
 VIOLENCE_PATTERNS = [
     r"\b(force[ds]? (?:her|him|them)(?:self)? (?:down|onto|against|into))",
@@ -554,7 +538,8 @@ async def main():
     parser.add_argument("--aiserver-url", type=str, default="http://127.0.0.1:8080")
     parser.add_argument("--ollama-url", type=str, default=None,
                         help="Raw Ollama URL for budget counting (default: from aiserver/config.json)")
-    parser.add_argument("--output", "-o", type=str, default="lora_generated.json")
+    parser.add_argument("--also-json", type=str, default=None,
+                        help="Also write results to JSON file (optional)")
     args = parser.parse_args()
 
     import os
@@ -600,6 +585,27 @@ async def main():
                 turns = result["metadata"]["turns"]
                 stock = result["metadata"]["stock_phrases_found"]
                 _log.info("  -> %d turns, %d stock phrases", turns, stock)
+
+                from . import db as rp_db
+                rp_db._pool = pool
+                db_conv = await rp_db.create_conversation(
+                    user_card_id=args.user_card_id,
+                    ai_card_id=ai_card_id,
+                    scenario_id=None,
+                    model=args.model,
+                )
+                system_prompt = result["conversations"][0]["value"]
+                for msg in result["conversations"][1:]:
+                    role = "user" if msg["from"] == "human" else "assistant"
+                    kwargs = {}
+                    if role == "assistant":
+                        kwargs["system_prompt"] = system_prompt
+                        kwargs["scene_state"] = ""
+                        kwargs["post_prompt"] = ""
+                    await rp_db.add_message(
+                        db_conv["id"], role, msg["value"], **kwargs,
+                    )
+                _log.info("  -> saved to DB as conv %d", db_conv["id"])
             else:
                 _log.warning("  -> discarded")
 
@@ -608,13 +614,14 @@ async def main():
     if args.scenarios_only:
         return
 
-    # Write output
-    with open(args.output, "w") as f:
-        json.dump(all_results, f, ensure_ascii=False, indent=2)
+    if args.also_json and all_results:
+        with open(args.also_json, "w") as f:
+            json.dump(all_results, f, ensure_ascii=False, indent=2)
+        _log.info("Also wrote JSON to %s", args.also_json)
 
     total_turns = sum(r["metadata"]["turns"] for r in all_results)
-    _log.info("Wrote %d conversations (%d turns) to %s",
-             len(all_results), total_turns, args.output)
+    _log.info("Generated %d conversations (%d turns), all saved to DB",
+             len(all_results), total_turns)
 
 
 if __name__ == "__main__":
