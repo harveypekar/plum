@@ -194,7 +194,7 @@ class OllamaClient:
         if system:
             body["system"] = system
         try:
-            async with httpx.AsyncClient(timeout=120.0) as client:
+            async with httpx.AsyncClient(timeout=300.0) as client:
                 resp = await client.post(f"{self.base_url}/api/generate", json=body)
                 if resp.status_code != 200:
                     raise OllamaError(f"Ollama returned {resp.status_code}: {resp.text}")
