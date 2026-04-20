@@ -230,6 +230,7 @@ async def generate_scenarios(ollama, model: str, ai_card: dict, user_card: dict,
             if isinstance(scenarios, list):
                 for s in scenarios:
                     all_scenarios.append({"category": cat["category"], "text": s})
+                    _log.info("  [%s] %s", cat["category"], s[:120])
         except (json.JSONDecodeError, IndexError):
             _log.warning("Failed to parse scenarios for %s/%s", char_name, cat["category"])
             continue
@@ -368,30 +369,29 @@ async def generate_conversation(ollama, model_70b: str, ai_card: dict, user_card
     }
 
     for turn in range(num_turns):
-        # Generate user message
+        _log.info("  turn %d/%d ...", turn + 1, num_turns)
+
         user_msg = await generate_user_message(ollama, model_70b, context)
         if not user_msg:
             _log.warning("Empty user message at turn %d, stopping", turn)
             break
 
-        # Safety check on user message
         safety = check_safety(user_msg)
         if safety:
             _log.warning("Safety flag in generated user msg at turn %d, stopping: %s",
                         turn, safety[0])
             break
 
+        _log.info("    %s: %s", user_name, user_msg[:150])
         messages.append({"from": "human", "value": user_msg})
 
-        # Generate assistant response
         assistant_msg = await generate_assistant_message(
             ollama, model_70b, system_prompt, messages)
         if not assistant_msg:
             _log.warning("Empty assistant message at turn %d, stopping", turn)
-            messages.pop()  # remove orphaned user message
+            messages.pop()
             break
 
-        # Check assistant response quality
         safety = check_safety(assistant_msg)
         if safety:
             safety_flag_count += 1
@@ -399,17 +399,18 @@ async def generate_conversation(ollama, model_70b: str, ai_card: dict, user_card
             if safety_flag_count >= 2:
                 _log.warning("Too many safety flags, discarding conversation")
                 return None
-            messages.pop()  # remove the user message that led here
+            messages.pop()
             continue
 
         stock = check_stock_phrases(assistant_msg)
         if stock:
             stock_phrase_count += 1
-            _log.info("  turn %d: stock phrase detected: %s", turn, stock[0])
+            _log.info("    [stock phrase: %s]", stock[0])
             if stock_phrase_count >= 3:
                 _log.warning("Too many stock phrases, stopping early")
                 break
 
+        _log.info("    %s: %s", char_name, assistant_msg[:150])
         messages.append({"from": "gpt", "value": assistant_msg})
 
     if len([m for m in messages if m["from"] == "gpt"]) < 3:
@@ -584,7 +585,10 @@ async def main():
                 all_results.append(result)
                 turns = result["metadata"]["turns"]
                 stock = result["metadata"]["stock_phrases_found"]
-                _log.info("  -> %d turns, %d stock phrases", turns, stock)
+                total_chars = sum(len(m["value"]) for m in result["conversations"][1:])
+                total_words = sum(len(m["value"].split()) for m in result["conversations"][1:])
+                _log.info("  => %d turns, %d words (%d chars), %d stock phrases",
+                         turns, total_words, total_chars, stock)
 
                 from . import db as rp_db
                 rp_db._pool = pool
@@ -620,8 +624,19 @@ async def main():
         _log.info("Also wrote JSON to %s", args.also_json)
 
     total_turns = sum(r["metadata"]["turns"] for r in all_results)
-    _log.info("Generated %d conversations (%d turns), all saved to DB",
-             len(all_results), total_turns)
+    total_words = sum(
+        sum(len(m["value"].split()) for m in r["conversations"][1:])
+        for r in all_results
+    )
+    total_stock = sum(r["metadata"]["stock_phrases_found"] for r in all_results)
+    chars_by_card = {}
+    for r in all_results:
+        name = r["metadata"]["character"]
+        chars_by_card[name] = chars_by_card.get(name, 0) + 1
+    breakdown = ", ".join(f"{n}={c}" for n, c in sorted(chars_by_card.items()))
+    _log.info("=== Done: %d conversations (%d turns, %d words, %d stock phrases) ===",
+             len(all_results), total_turns, total_words, total_stock)
+    _log.info("    Per card: %s", breakdown)
 
 
 if __name__ == "__main__":
