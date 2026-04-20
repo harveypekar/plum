@@ -110,9 +110,8 @@ std::unique_ptr<Device> Device::create(bool enable_validation) {
     for (uint32_t i = 0; i < family_count; i++) {
         if (families[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) {
             dev->graphics_family = i;
-        }
-        if (families[i].queueFlags & VK_QUEUE_COMPUTE_BIT) {
             dev->compute_family = i;
+            break;
         }
     }
 
