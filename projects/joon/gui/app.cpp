@@ -46,7 +46,6 @@ void App::bind_viewport() {
         if (viewport_desc) {
             ImGui_ImplVulkan_RemoveTexture(viewport_desc);
             viewport_desc = VK_NULL_HANDLE;
-            bound_view = VK_NULL_HANDLE;
         }
         return;
     }
@@ -55,14 +54,11 @@ void App::bind_viewport() {
     auto* view = static_cast<VkImageView>(result.vk_image_view());
     if (!view || !sampler) return;
 
-    if (view == bound_view) return;
-
     if (viewport_desc) {
         vkDeviceWaitIdle(ctx->device().device);
         ImGui_ImplVulkan_RemoveTexture(viewport_desc);
     }
     viewport_desc = ImGui_ImplVulkan_AddTexture(sampler, view, VK_IMAGE_LAYOUT_GENERAL);
-    bound_view = view;
 }
 
 void App::reparse() {
