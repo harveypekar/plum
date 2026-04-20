@@ -78,9 +78,9 @@ void gpu_dispatch(EvalContext& ctx,
     post_barrier.image = images.back()->image;
     post_barrier.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
     post_barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-    post_barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    post_barrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
     vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                         VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                         VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
                          0, 0, nullptr, 0, nullptr, 1, &post_barrier);
 
     ctx.device.end_single_command(cmd);
