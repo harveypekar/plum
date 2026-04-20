@@ -22,7 +22,6 @@ struct App {
 
     VkDescriptorSet viewport_desc = VK_NULL_HANDLE;
     VkDescriptorSet preview_desc = VK_NULL_HANDLE;
-    VkImageView bound_view = VK_NULL_HANDLE;
     VkSampler sampler = VK_NULL_HANDLE;
     VkDescriptorPool imgui_desc_pool = VK_NULL_HANDLE;
 
