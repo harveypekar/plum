@@ -19,6 +19,7 @@ load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
 from config import Config  # noqa: E402
 from models import (  # noqa: E402
+    ChatRequest,
     DefaultsResponse,
     GenerateRequest,
     HealthResponse,
@@ -96,6 +97,46 @@ async def generate(req: GenerateRequest):
             entry = {
                 "model": model,
                 "prompt": req.prompt[:100],
+                "total_tokens": total_tokens,
+                "latency": round(elapsed, 2),
+                "timestamp": time.time(),
+            }
+            request_log.append(entry)
+            await broadcast_event({"type": "request_complete", **entry})
+
+    return StreamingResponse(stream(), media_type="application/x-ndjson")
+
+
+@app.post("/chat")
+async def chat(req: ChatRequest):
+    model = config.resolve_model(req.model)
+    merged = config.merge_options(req.options)
+    start = time.time()
+
+    async def stream():
+        global active_streams
+        active_streams += 1
+        total_tokens = 0
+        try:
+            async for chunk in ollama.chat_stream(
+                model=model,
+                messages=req.messages,
+                options=merged.copy(),
+                stop=req.stop,
+            ):
+                yield json.dumps(chunk) + "\n"
+                if chunk.get("done"):
+                    total_tokens = chunk.get("total_tokens", 0)
+        except OllamaError as e:
+            yield json.dumps({"error": str(e), "done": True}) + "\n"
+        finally:
+            active_streams -= 1
+            elapsed = time.time() - start
+            preview = (req.messages[-1].get("content", "")[:100]
+                       if req.messages else "")
+            entry = {
+                "model": model,
+                "prompt": preview,
                 "total_tokens": total_tokens,
                 "latency": round(elapsed, 2),
                 "timestamp": time.time(),
