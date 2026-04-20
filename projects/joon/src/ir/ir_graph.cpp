@@ -116,10 +116,15 @@ uint32_t IRGraph::resolve_expr(const AstNode& expr) {
             } else if (auto* kstr = std::get_if<StringNode>(&kw.value->data)) {
                 nodes[id].string_arg = kstr->value;
             } else if (auto* ksym = std::get_if<SymbolNode>(&kw.value->data)) {
-                // Keyword value is a symbol reference (e.g., :mode multiply)
-                // Store as string for now — node implementations interpret it
-                nodes[id].kwargs.push_back({ kw.name, 0.0f });
-                nodes[id].string_arg = ksym->name; // overloaded, but works for single-kwarg case
+                auto it = m_nameToNode.find(ksym->name);
+                if (it != m_nameToNode.end()) {
+                    auto& src = nodes[it->second];
+                    ResolvedKwarg rk{ kw.name, src.constant_value, it->second };
+                    nodes[id].kwargs.push_back(std::move(rk));
+                } else {
+                    nodes[id].kwargs.push_back({ kw.name, 0.0f });
+                    nodes[id].string_arg = ksym->name;
+                }
             }
         }
 

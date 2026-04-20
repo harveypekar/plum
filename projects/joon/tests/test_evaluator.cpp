@@ -94,3 +94,31 @@ TEST_CASE("Multiple param re-evaluations produce correct values", "[evaluator][g
         CHECK(std::abs(avg - val) < 0.02f);
     }
 }
+
+TEST_CASE("Param kwarg updates affect node output", "[evaluator][gpu]") {
+    auto ctx = Context::create();
+    auto graph = ctx->parse_string(
+        "(def base (noise :scale 4.0 :octaves 3))"
+        "(param contrast float 1.0 :min 0.0 :max 3.0)"
+        "(def result (levels base :contrast contrast))"
+        "(output result)");
+    REQUIRE_FALSE(graph.has_errors());
+
+    auto eval = ctx->create_evaluator(graph);
+    eval->evaluate();
+    auto r1 = eval->result("");
+    auto px1 = r1.read_pixels();
+
+    auto p = eval->param<float>("contrast");
+    p = 3.0f;
+    eval->evaluate();
+    auto r2 = eval->result("");
+    auto px2 = r2.read_pixels();
+
+    float diff = 0;
+    for (size_t i = 0; i < px1.size() && i < px2.size(); i += 4)
+        diff += std::abs(px2[i] - px1[i]);
+    diff /= (px1.size() / 4);
+
+    REQUIRE(diff > 0.01f);
+}
