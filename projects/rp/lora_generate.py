@@ -460,7 +460,7 @@ class OllamaClient:
                 )
             except Exception:
                 ollama_url = "http://localhost:11434"
-        from aiserver.ollama import OllamaClient as _BudgetOllamaClient
+        from projects.aiserver.ollama import OllamaClient as _BudgetOllamaClient
         self._budget = _BudgetOllamaClient(ollama_url)
 
     async def get_num_ctx(self, model: str) -> int:
