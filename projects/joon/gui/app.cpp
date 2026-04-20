@@ -43,6 +43,8 @@ void App::shutdown() {
 
 void App::bind_viewport() {
     if (!eval || graph.has_errors() || graph.ir().outputs.empty()) {
+        joon_log::write("[BIND] skip: eval=%p errors=%d outputs=%zu\n",
+                        eval.get(), graph.has_errors(), graph.ir().outputs.size());
         if (viewport_desc) {
             ImGui_ImplVulkan_RemoveTexture(viewport_desc);
             viewport_desc = VK_NULL_HANDLE;
@@ -52,6 +54,8 @@ void App::bind_viewport() {
 
     auto result = eval->result("");
     auto* view = static_cast<VkImageView>(result.vk_image_view());
+    joon_log::write("[BIND] view=%p sampler=%p w=%u h=%u\n",
+                    view, sampler, result.width(), result.height());
     if (!view || !sampler) return;
 
     if (viewport_desc) {
@@ -59,6 +63,7 @@ void App::bind_viewport() {
         ImGui_ImplVulkan_RemoveTexture(viewport_desc);
     }
     viewport_desc = ImGui_ImplVulkan_AddTexture(sampler, view, VK_IMAGE_LAYOUT_GENERAL);
+    joon_log::write("[BIND] new descriptor=%p\n", viewport_desc);
 }
 
 void App::reparse() {

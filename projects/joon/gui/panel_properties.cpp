@@ -1,4 +1,5 @@
 #include "app.h"
+#include "log.h"
 #include <imgui.h>
 
 void App::draw_properties() {
@@ -21,6 +22,7 @@ void App::draw_properties() {
                 param = val;
                 eval->evaluate();
                 viewport_dirty = true;
+                joon_log::write("[SLIDER] %s = %.3f\n", p.name.c_str(), val);
             }
         }
     } else {

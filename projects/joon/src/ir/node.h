@@ -19,6 +19,7 @@ struct Edge {
 struct ResolvedKwarg {
     std::string name;
     Value value;
+    uint32_t source_node = UINT32_MAX;
 };
 
 struct Node {
