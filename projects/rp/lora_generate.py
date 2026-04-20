@@ -495,7 +495,8 @@ class OllamaClient:
         if options:
             payload["options"] = options
 
-        async with aiohttp.ClientSession() as session:
+        timeout = aiohttp.ClientTimeout(total=600)
+        async with aiohttp.ClientSession(timeout=timeout) as session:
             async with session.post(f"{self.base_url}/generate", json=payload) as resp:
                 if resp.status != 200:
                     text = await resp.text()
@@ -509,7 +510,8 @@ class OllamaClient:
         if options:
             payload["options"] = options
 
-        async with aiohttp.ClientSession() as session:
+        timeout = aiohttp.ClientTimeout(total=600)
+        async with aiohttp.ClientSession(timeout=timeout) as session:
             async with session.post(f"{self.base_url}/chat", json=payload) as resp:
                 if resp.status != 200:
                     text = await resp.text()
