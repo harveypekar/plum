@@ -458,65 +458,51 @@ class OllamaClient:
         """Delegate to real Ollama for budget protocol."""
         return await self._budget.count_generate_prompt(model, prompt, system)
 
-    @staticmethod
-    def _parse_ndjson(text: str) -> str:
-        """Parse aiserver NDJSON stream into text, skipping think tokens."""
-        parts = []
-        for line in text.strip().split("\n"):
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                chunk = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            # Skip thinking tokens and done markers
-            if chunk.get("thinking"):
-                continue
-            if chunk.get("done"):
-                continue
-            if "error" in chunk:
-                raise RuntimeError(f"Ollama error: {chunk['error']}")
-            # aiserver format: {"token": "..."} or Ollama format: {"response": "..."}
-            if "token" in chunk:
-                parts.append(chunk["token"])
-            elif "response" in chunk:
-                parts.append(chunk["response"])
-            elif "message" in chunk and "content" in chunk["message"]:
-                parts.append(chunk["message"]["content"])
+    async def _stream_ndjson(self, endpoint: str, payload: dict) -> str:
+        """Stream NDJSON from aiserver, accumulating token text."""
+        import aiohttp
+        timeout = aiohttp.ClientTimeout(total=None, sock_read=120)
+        parts: list[str] = []
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            async with session.post(f"{self.base_url}/{endpoint}", json=payload) as resp:
+                if resp.status != 200:
+                    text = await resp.text()
+                    raise RuntimeError(f"{endpoint} failed ({resp.status}): {text}")
+                async for raw_line in resp.content:
+                    line = raw_line.decode().strip()
+                    if not line:
+                        continue
+                    try:
+                        chunk = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    if chunk.get("thinking") or chunk.get("done"):
+                        continue
+                    if "error" in chunk:
+                        raise RuntimeError(f"Ollama error: {chunk['error']}")
+                    if "token" in chunk:
+                        parts.append(chunk["token"])
+                    elif "response" in chunk:
+                        parts.append(chunk["response"])
+                    elif "message" in chunk and "content" in chunk["message"]:
+                        parts.append(chunk["message"]["content"])
         return "".join(parts)
 
     async def generate(self, model: str, prompt: str, system: str = "",
                        options: dict | None = None) -> str:
-        import aiohttp
-        payload = {"model": model, "prompt": prompt, "stream": False}
+        payload: dict = {"model": model, "prompt": prompt, "stream": True}
         if system:
             payload["system"] = system
         if options:
             payload["options"] = options
-
-        timeout = aiohttp.ClientTimeout(total=600)
-        async with aiohttp.ClientSession(timeout=timeout) as session:
-            async with session.post(f"{self.base_url}/generate", json=payload) as resp:
-                if resp.status != 200:
-                    text = await resp.text()
-                    raise RuntimeError(f"Generate failed ({resp.status}): {text}")
-                return self._parse_ndjson(await resp.text())
+        return await self._stream_ndjson("generate", payload)
 
     async def chat(self, model: str, messages: list[dict],
                    options: dict | None = None) -> str:
-        import aiohttp
-        payload = {"model": model, "messages": messages, "stream": False}
+        payload: dict = {"model": model, "messages": messages, "stream": True}
         if options:
             payload["options"] = options
-
-        timeout = aiohttp.ClientTimeout(total=600)
-        async with aiohttp.ClientSession(timeout=timeout) as session:
-            async with session.post(f"{self.base_url}/chat", json=payload) as resp:
-                if resp.status != 200:
-                    text = await resp.text()
-                    raise RuntimeError(f"Chat failed ({resp.status}): {text}")
-                return self._parse_ndjson(await resp.text())
+        return await self._stream_ndjson("chat", payload)
 
 
 async def _get_card(pool, card_id: int) -> dict:
