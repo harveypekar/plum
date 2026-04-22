@@ -11,6 +11,10 @@ Generate a comprehensive quality report for a roleplay conversation.
 
 Takes a conversation ID as the argument (e.g., `/rp-report 89`).
 
+## Output
+
+Always write the full report to `projects/rp/reports/conv-<ID>.md`. Create the `reports/` directory if it doesn't exist. Do not print the report to the conversation — write it all to the file, then tell the user the file path.
+
 ## Instructions
 
 ### 1. Fetch conversation data
