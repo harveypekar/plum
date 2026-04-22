@@ -40,6 +40,13 @@ Monorepo: sysadmin scripts (Windows/WSL2 + Linux VPS), side projects. Bash and P
 - Design specs and implementation plans live on the **feature branch**, never duplicated on main
 - Pre-commit hook runs project tests for any modified project — fix failures before committing
 
+## Debugging Rules (Non-Negotiable)
+
+- **Read logs before asking the user.** If a log file exists (log.txt, /tmp/*.log, console output redirected to file), read it yourself. Never ask the user to "check the output" when you can read the file.
+- **Verify before claiming success.** After applying a fix, run the test plan or read program output to confirm it actually works. "It should work now" without verification is not acceptable.
+- **Two-strike rule for fixes.** If the same symptom persists after 2 fix attempts, STOP patching. Instead: (1) trace the full execution path by reading the code, (2) write down what you expected vs what you observed vs what you tried, (3) only then propose a fix with a root-cause explanation.
+- **Never swallow empty responses.** When calling external services (Ollama, DB, HTTP APIs), always check for empty/null/missing responses and raise an error with context. "No error" is not "success" — verify positive output exists.
+
 ## Research
 
 - Add a reference to all statements, with links at the bottom. Also add a date
