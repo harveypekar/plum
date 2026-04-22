@@ -55,6 +55,13 @@ std::vector<uint8_t> PipelineCache::compile_hlsl(const std::string& hlsl_path,
         + " -Fo \"" + spv_path + "\""
         + " 2>&1";
 
+#ifdef _WIN32
+    // cmd.exe /c strips the outer quotes around an argv[0] when the entire
+    // command starts and ends with a quote, mangling our path. Wrap the whole
+    // command in an extra pair so the inner quoting survives.
+    cmd = "\"" + cmd + "\"";
+#endif
+
     int result = std::system(cmd.c_str());
     if (result != 0)
         throw std::runtime_error("DXC compilation failed for: " + hlsl_path);
