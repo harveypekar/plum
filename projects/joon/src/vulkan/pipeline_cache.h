@@ -28,7 +28,10 @@ private:
     std::string m_shaderDir;
     std::unordered_map<std::string, ComputePipeline> m_pipelines;
 
-    std::vector<uint8_t> read_spirv(const std::string& name);
+    std::vector<uint8_t> load_or_compile(const std::string& name);
+    bool needs_recompile(const std::string& hlsl_path, const std::string& spv_path);
+    std::vector<uint8_t> compile_hlsl(const std::string& hlsl_path, const std::string& spv_path);
+    std::vector<uint8_t> read_file(const std::string& path);
 };
 
 } // namespace joon

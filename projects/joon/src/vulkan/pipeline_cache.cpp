@@ -1,8 +1,11 @@
 #include "vulkan/pipeline_cache.h"
+#include <cstdlib>
+#include <filesystem>
 #include <fstream>
 #include <stdexcept>
 
 namespace joon {
+namespace fs = std::filesystem;
 
 PipelineCache::PipelineCache(Device& device, const std::string& shader_dir)
     : m_device(device), m_shaderDir(shader_dir) {}
@@ -16,15 +19,63 @@ PipelineCache::~PipelineCache() {
     }
 }
 
-std::vector<uint8_t> PipelineCache::read_spirv(const std::string& name) {
-    std::string path = m_shaderDir + "/" + name + ".spv";
+std::vector<uint8_t> PipelineCache::read_file(const std::string& path) {
     std::ifstream file(path, std::ios::binary | std::ios::ate);
-    if (!file.is_open()) throw std::runtime_error("Cannot open shader: " + path);
+    if (!file.is_open()) throw std::runtime_error("Cannot open file: " + path);
     size_t size = file.tellg();
     std::vector<uint8_t> data(size);
     file.seekg(0);
     file.read(reinterpret_cast<char*>(data.data()), size);
     return data;
+}
+
+bool PipelineCache::needs_recompile(const std::string& hlsl_path,
+                                     const std::string& spv_path) {
+    if (!fs::exists(spv_path)) return true;
+    auto hlsl_time = fs::last_write_time(hlsl_path);
+    auto spv_time = fs::last_write_time(spv_path);
+    return hlsl_time > spv_time;
+}
+
+std::vector<uint8_t> PipelineCache::compile_hlsl(const std::string& hlsl_path,
+                                                   const std::string& spv_path) {
+    std::string dxc;
+    const char* vulkan_sdk = std::getenv("VULKAN_SDK");
+    if (vulkan_sdk) {
+        dxc = std::string(vulkan_sdk) + "/Bin/dxc.exe";
+        if (!fs::exists(dxc))
+            dxc = std::string(vulkan_sdk) + "/bin/dxc";
+    }
+    if (dxc.empty() || !fs::exists(dxc))
+        throw std::runtime_error("DXC not found. Set VULKAN_SDK environment variable.");
+
+    std::string cmd = "\"" + dxc + "\""
+        + " -T cs_6_0 -E main -spirv -fspv-target-env=vulkan1.1"
+        + " \"" + hlsl_path + "\""
+        + " -Fo \"" + spv_path + "\""
+        + " 2>&1";
+
+    int result = std::system(cmd.c_str());
+    if (result != 0)
+        throw std::runtime_error("DXC compilation failed for: " + hlsl_path);
+
+    return read_file(spv_path);
+}
+
+std::vector<uint8_t> PipelineCache::load_or_compile(const std::string& name) {
+    std::string hlsl_path = m_shaderDir + "/" + name + ".hlsl";
+    std::string spv_path = m_shaderDir + "/" + name + ".spv";
+
+    if (fs::exists(hlsl_path)) {
+        if (needs_recompile(hlsl_path, spv_path))
+            return compile_hlsl(hlsl_path, spv_path);
+        return read_file(spv_path);
+    }
+
+    if (fs::exists(spv_path))
+        return read_file(spv_path);
+
+    throw std::runtime_error("No shader source found: " + name);
 }
 
 const ComputePipeline& PipelineCache::get(const std::string& name,
@@ -36,7 +87,7 @@ const ComputePipeline& PipelineCache::get(const std::string& name,
 
     ComputePipeline p{};
 
-    auto spirv = read_spirv(name);
+    auto spirv = load_or_compile(name);
     if (spirv.size() % 4 != 0)
         throw std::runtime_error("SPIR-V size not a multiple of 4: " + name);
 
