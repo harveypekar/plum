@@ -252,7 +252,7 @@ async def get_messages(conv_id: int) -> list[dict]:
     pool = await get_pool()
     rows = await pool.fetch(
         "SELECT id, conversation_id, role, content, raw_response, sequence, "
-        "system_prompt, scene_state, post_prompt, budget_json, "
+        "system_prompt, scene_state, post_prompt, budget_json, prompt_json, "
         "created_at::text FROM rp_messages WHERE conversation_id = $1 ORDER BY sequence",
         conv_id,
     )
@@ -264,16 +264,17 @@ async def add_message(conv_id: int, role: str, content: str,
                       system_prompt: str | None = None,
                       scene_state: str | None = None,
                       post_prompt: str | None = None,
-                      budget_json: dict | None = None) -> dict:
+                      budget_json: dict | None = None,
+                      prompt_json: list | None = None) -> dict:
     pool = await get_pool()
     row = await pool.fetchrow(
         "INSERT INTO rp_messages (conversation_id, role, content, raw_response, "
-        "system_prompt, scene_state, post_prompt, budget_json, sequence) "
-        "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, "
+        "system_prompt, scene_state, post_prompt, budget_json, prompt_json, sequence) "
+        "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, "
         "(SELECT COALESCE(MAX(sequence), 0) + 1 FROM rp_messages WHERE conversation_id = $1)) "
         "RETURNING id, conversation_id, role, content, "
-        "raw_response, sequence, system_prompt, scene_state, post_prompt, budget_json, created_at::text",
-        conv_id, role, content, raw_response, system_prompt, scene_state, post_prompt, budget_json,
+        "raw_response, sequence, system_prompt, scene_state, post_prompt, budget_json, prompt_json, created_at::text",
+        conv_id, role, content, raw_response, system_prompt, scene_state, post_prompt, budget_json, prompt_json,
     )
     await pool.execute(
         "UPDATE rp_conversations SET updated_at = NOW() WHERE id = $1", conv_id

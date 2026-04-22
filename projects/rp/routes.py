@@ -856,6 +856,7 @@ def setup(app: FastAPI, ollama, resolve_model=None):
                     scene_state=conv.get("scene_state", ""),
                     post_prompt=ctx.get("post_prompt", ""),
                     budget_json=_budget_to_json(ctx),
+                    prompt_json=chat_messages,
                 )
                 conv_log.log_response(conv_id, "assistant", post_ctx["response"], raw)
                 # Update scene state and maybe generate summary in background
@@ -967,6 +968,7 @@ def setup(app: FastAPI, ollama, resolve_model=None):
                     scene_state=conv.get("scene_state", ""),
                     post_prompt=ctx.get("post_prompt", ""),
                     budget_json=_budget_to_json(ctx),
+                    prompt_json=chat_messages,
                 )
                 conv_log.log_response(conv_id, "assistant", post_ctx["response"], raw)
                 # Update scene state and maybe generate summary in background
@@ -1048,6 +1050,7 @@ def setup(app: FastAPI, ollama, resolve_model=None):
                     scene_state=conv.get("scene_state", ""),
                     post_prompt=ctx.get("post_prompt", ""),
                     budget_json=_budget_to_json(ctx),
+                    prompt_json=chat_messages,
                 )
                 conv_log.log_response(conv_id, "assistant", post_ctx["response"], raw)
                 # Update scene state and maybe generate summary in background
@@ -1178,6 +1181,7 @@ def setup(app: FastAPI, ollama, resolve_model=None):
                     scene_state=conv.get("scene_state", ""),
                     post_prompt=ctx.get("post_prompt", ""),
                     budget_json=_budget_to_json(ctx),
+                    prompt_json=chat_messages,
                 )
                 conv_log.log_response(conv_id, save_role, post_ctx["response"], raw)
                 # Update scene state and maybe generate summary in background

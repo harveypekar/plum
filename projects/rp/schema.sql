@@ -87,6 +87,12 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_column THEN NULL;
 END $$;
 
+-- Migration: add full assembled prompt to rp_messages
+DO $$ BEGIN
+    ALTER TABLE rp_messages ADD COLUMN prompt_json JSONB DEFAULT NULL;
+EXCEPTION WHEN duplicate_column THEN NULL;
+END $$;
+
 CREATE TABLE IF NOT EXISTS rp_first_message_cache (
     id              SERIAL PRIMARY KEY,
     combo_hash      TEXT NOT NULL UNIQUE,
