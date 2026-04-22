@@ -30,6 +30,11 @@ void Interpreter::evaluate(IRGraph& graph) {
             continue;
         }
 
+        for (auto& kw : node.kwargs) {
+            if (kw.source_node != UINT32_MAX && kw.source_node < graph.nodes.size())
+                kw.value = graph.nodes[kw.source_node].constant_value;
+        }
+
         auto* executor = m_registry.find(node.op);
         if (executor) {
             (*executor)(node, m_ctx);
