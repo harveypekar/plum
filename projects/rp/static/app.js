@@ -722,6 +722,98 @@
 
   $("continueBtn").addEventListener("click", continueConversation);
   $("regenerateBtn").addEventListener("click", regenerateResponse);
+
+  // -- Compare (A/B eval) --
+  $("compareBtn").addEventListener("click", compareMessage);
+  $("compareClose").addEventListener("click", () => {
+    $("compareModal").style.display = "none";
+  });
+
+  async function compareMessage() {
+    const input = $("chatInput");
+    const content = input.value.trim();
+    if (!content || !currentConvId || isStreaming) return;
+
+    const configs = [
+      { label: "T=0.6", temperature: 0.6 },
+      { label: "T=0.8 (default)", temperature: 0.8 },
+      { label: "T=1.0", temperature: 1.0 },
+    ];
+
+    input.value = "";
+    autoResizeInput();
+
+    const container = $("chatMessages");
+    appendMessageBubble(container, { id: null, role: "user", content },
+      currentConvDetail.user_card, currentConvDetail.ai_card);
+    container.scrollTop = container.scrollHeight;
+
+    const modal = $("compareModal");
+    const candidatesDiv = $("compareCandidates");
+    candidatesDiv.textContent = "";
+    candidatesDiv.appendChild(el("div", {
+      textContent: "Generating candidates...",
+      style: { color: "#8b949e", textAlign: "center", padding: "40px" },
+    }));
+    modal.style.display = "";
+
+    try {
+      const result = await api("POST", "/rp/conversations/" + currentConvId + "/compare", {
+        content, configs,
+      });
+
+      candidatesDiv.textContent = "";
+      for (const c of result.candidates) {
+        const card = el("div", {
+          style: {
+            border: "1px solid #30363d", borderRadius: "8px", padding: "16px",
+            marginBottom: "12px", background: "#0d1117",
+          },
+        });
+        const header = el("div", {
+          style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" },
+        });
+        header.appendChild(el("strong", {
+          textContent: c.label,
+          style: { color: "#58a6ff" },
+        }));
+        header.appendChild(el("span", {
+          textContent: c.model + " | " + JSON.stringify(c.config),
+          style: { color: "#8b949e", fontSize: "0.8em" },
+        }));
+        card.appendChild(header);
+
+        card.appendChild(el("div", {
+          textContent: c.content,
+          style: { color: "#c9d1d9", whiteSpace: "pre-wrap", fontSize: "0.9em", lineHeight: "1.5", marginBottom: "12px" },
+        }));
+
+        const pickBtn = el("button", {
+          textContent: "Pick this one",
+          style: { background: "#238636" },
+        });
+        pickBtn.addEventListener("click", async () => {
+          try {
+            await api("POST", "/rp/eval-sets/" + result.eval_set_id + "/select", {
+              candidate_id: c.id,
+            });
+            modal.style.display = "none";
+            openConversation(currentConvId);
+          } catch (e) {
+            alert("Failed to select: " + e.message);
+          }
+        });
+        card.appendChild(pickBtn);
+        candidatesDiv.appendChild(card);
+      }
+    } catch (e) {
+      candidatesDiv.textContent = "";
+      candidatesDiv.appendChild(el("div", {
+        textContent: "Error: " + e.message,
+        style: { color: "#f85149", padding: "20px" },
+      }));
+    }
+  }
   $("restartBtn").addEventListener("click", () => {
     if (!currentConvId || isStreaming) return;
     confirmAction($("restartBtn"), async () => {

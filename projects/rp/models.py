@@ -78,3 +78,20 @@ class EditMessageRequest(BaseModel):
 
 class SceneStateRequest(BaseModel):
     scene_state: str
+
+
+class CompareConfig(BaseModel):
+    label: str = ""
+    model: str | None = None
+    temperature: float | None = None
+    num_predict: int | None = None
+    response_reserve: int | None = None
+
+
+class CompareRequest(BaseModel):
+    content: str
+    configs: list[CompareConfig]
+
+
+class SelectCandidateRequest(BaseModel):
+    candidate_id: int

@@ -1,4 +1,5 @@
 import asyncio
+import copy
 import json
 import logging
 from fastapi import FastAPI, UploadFile, File, HTTPException, Request
@@ -12,6 +13,7 @@ from .models import (
     CardCreate, CardResponse, ScenarioCreate, ScenarioResponse,
     ConversationCreate, ConversationResponse, ConversationDetailResponse,
     MessageResponse, SendMessageRequest, EditMessageRequest, SceneStateRequest,
+    CompareRequest, SelectCandidateRequest,
 )
 from .pipeline import create_default_pipeline
 from dataclasses import asdict
@@ -1193,6 +1195,167 @@ def setup(app: FastAPI, ollama, resolve_model=None):
                 yield json.dumps({"error": f"Failed to save response: {e}", "done": True}) + "\n"
 
         return StreamingResponse(stream(), media_type="application/x-ndjson")
+
+    # -- Compare (A/B eval) --
+
+    @app.post("/rp/conversations/{conv_id}/compare")
+    async def compare_message(conv_id: int, req: CompareRequest):
+        conv = await db.get_conversation(conv_id)
+        if not conv:
+            raise HTTPException(404, "Conversation not found")
+
+        await db.add_message(conv_id, "user", req.content)
+        conv_log.log_response(conv_id, "user", req.content)
+
+        messages = await db.get_messages(conv_id)
+        next_seq = max((m["sequence"] for m in messages), default=0) + 1
+
+        eval_set = await db.create_eval_set(conv_id, next_seq)
+
+        base_ctx = await _build_pipeline_ctx(conv, messages)
+        base_model = _resolve_model(conv["model"])
+        scenario = base_ctx.get("scenario") or {}
+        settings = scenario.get("settings", {})
+        base_ollama_options = _build_ollama_options(settings)
+
+        research = await research_dispatch(_ollama, req.content)
+        if research:
+            base_ctx["post_prompt"] = (
+                base_ctx.get("post_prompt", "")
+                + "\n\n[Research notes — weave these facts naturally if relevant, "
+                + "don't quote them verbatim or mention looking anything up]\n"
+                + research
+            )
+
+        fewshot_msgs = await get_fewshot_messages(
+            _ollama, base_ctx["messages"], card_id=conv["ai_card_id"],
+        )
+        if fewshot_msgs and base_ctx["messages"]:
+            base_ctx["messages"] = [base_ctx["messages"][0]] + fewshot_msgs + base_ctx["messages"][1:]
+
+        async def generate_candidate(cfg, candidate_row):
+            ctx = copy.deepcopy(base_ctx)
+            model = _resolve_model(cfg.model) if cfg.model else base_model
+            ollama_options = dict(base_ollama_options)
+            if cfg.temperature is not None:
+                ollama_options["temperature"] = cfg.temperature
+            if cfg.num_predict is not None:
+                ollama_options["num_predict"] = cfg.num_predict
+
+            try:
+                await _budget_ctx(ctx, model, ollama_options)
+            except BudgetError as e:
+                await db.update_eval_candidate(
+                    candidate_row["id"],
+                    content=f"[budget error: {e}]",
+                )
+                return
+
+            ollama_options = {**ollama_options, "num_ctx": ctx["_num_ctx"]}
+            chat_messages = _build_chat_messages(ctx)
+            user_name = _get_user_name(ctx)
+
+            tokens = []
+            raw = {}
+            try:
+                async for chunk in _ollama.chat_stream(
+                    model=model, messages=chat_messages,
+                    options=ollama_options, stop=[f"{user_name}:"],
+                ):
+                    if chunk.get("done"):
+                        raw = chunk
+                    elif not chunk.get("thinking"):
+                        tokens.append(chunk["token"])
+            except Exception as e:
+                await db.update_eval_candidate(
+                    candidate_row["id"],
+                    content=f"[generation error: {e}]",
+                )
+                return
+
+            response_text = "".join(tokens)
+            post_ctx = {"response": response_text, "ai_name": _get_ai_name(ctx)}
+            post_ctx = await _pipeline.run_post(post_ctx)
+            await db.update_eval_candidate(
+                candidate_row["id"],
+                content=post_ctx["response"],
+                raw_response=raw,
+                prompt_json=chat_messages,
+                budget_json=_budget_to_json(ctx),
+            )
+
+        # Create candidate rows first, then generate in parallel
+        tasks = []
+        for cfg in req.configs:
+            label = cfg.label or cfg.model or "default"
+            model_name = cfg.model or conv["model"]
+            config_dict = cfg.model_dump(exclude_none=True)
+            candidate_row = await db.add_eval_candidate(
+                eval_set["id"], label, model_name, config_dict,
+            )
+            tasks.append(generate_candidate(cfg, candidate_row))
+
+        await asyncio.gather(*tasks)
+
+        candidates = await db.get_eval_candidates(eval_set["id"])
+        return {
+            "eval_set_id": eval_set["id"],
+            "conversation_id": conv_id,
+            "sequence": next_seq,
+            "candidates": candidates,
+        }
+
+    @app.post("/rp/eval-sets/{eval_set_id}/select")
+    async def select_candidate(eval_set_id: int, req: SelectCandidateRequest):
+        eval_set = await db.get_eval_set(eval_set_id)
+        if not eval_set:
+            raise HTTPException(404, "Eval set not found")
+
+        candidates = await db.get_eval_candidates(eval_set_id)
+        winner = next((c for c in candidates if c["id"] == req.candidate_id), None)
+        if not winner:
+            raise HTTPException(404, "Candidate not found in this eval set")
+
+        conv_id = eval_set["conversation_id"]
+        conv = await db.get_conversation(conv_id)
+
+        await db.add_message(
+            conv_id, "assistant", winner["content"],
+            raw_response=winner.get("raw_response"),
+            system_prompt=None,
+            scene_state=conv.get("scene_state", ""),
+            post_prompt=None,
+            budget_json=winner.get("budget_json"),
+            prompt_json=winner.get("prompt_json"),
+        )
+        await db.select_eval_candidate(eval_set_id, req.candidate_id)
+
+        asyncio.create_task(_auto_update_scene_state(
+            conv_id, conv["model"],
+            _get_ai_name({"ai_card": await db.get_card(conv["ai_card_id"])}),
+            _get_user_name({"user_card": await db.get_card(conv["user_card_id"])}),
+            _get_ai_personality({"ai_card": await db.get_card(conv["ai_card_id"])}),
+        ))
+
+        return {
+            "ok": True,
+            "eval_set_id": eval_set_id,
+            "selected_candidate_id": req.candidate_id,
+            "content": winner["content"],
+        }
+
+    @app.get("/rp/eval-sets/{eval_set_id}")
+    async def get_eval_set_detail(eval_set_id: int):
+        eval_set = await db.get_eval_set(eval_set_id)
+        if not eval_set:
+            raise HTTPException(404, "Eval set not found")
+        candidates = await db.get_eval_candidates(eval_set_id)
+        return {"eval_set": eval_set, "candidates": candidates}
+
+    @app.get("/rp/conversations/{conv_id}/eval-sets")
+    async def list_eval_sets(conv_id: int):
+        sets = await db.get_eval_sets_for_conversation(conv_id)
+        return sets
 
     # -- Static files --
     static_dir = Path(__file__).parent / "static"
