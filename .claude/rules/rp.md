@@ -38,6 +38,13 @@ pytest projects/rp/tests/
 - `schema.sql` — 5 tables: cards, scenarios, conversations, messages, first_message_cache
 - `DESIGN.md` — Architecture & API reference (read before major changes)
 
+## Debugging
+
+- **Runs as an aiserver plugin** — see aiserver rules for server startup and healthcheck
+- **DB schema:** auto-created by `init_schema()` on startup. If tables are missing, restart the server
+- **Empty generation:** if `/rp/conversations/{id}/messages` returns no AI response, check in order: (1) aiserver healthcheck, (2) Ollama model loaded, (3) prompt fits context window (check `budget_json` in the message row)
+- **Prompt budget:** each message stores `budget_json` — read it from DB to diagnose context overflow: `psql "$DATABASE_URL" -c "SELECT budget_json FROM rp_messages WHERE conversation_id=X ORDER BY id DESC LIMIT 1"`
+
 ## Conventions
 
 - Async/await throughout — all DB and HTTP calls are async

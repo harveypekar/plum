@@ -38,6 +38,14 @@ pytest tests/             # Unit tests (mocked)
 - `GET /stats` — Request stats (hourly, throughput, active streams)
 - `WS /ws/dashboard` — Real-time stats events
 
+## Debugging
+
+- **Log file:** redirect output with `python main.py 2>&1 | tee /tmp/aiserver.log` — read `/tmp/aiserver.log` instead of asking the user to paste errors
+- **Healthcheck:** `bash status.sh` or `curl http://127.0.0.1:8080/health` — always run this before assuming the server is working
+- **Ollama connectivity:** Ollama runs on Windows, accessed via WSL gateway. If `/health` returns but generation fails silently, check Ollama is reachable: `curl http://$(cat /etc/resolv.conf | grep nameserver | awk '{print $2}'):11434/api/tags`
+- **DB connectivity:** verify with `psql "$DATABASE_URL" -c "SELECT 1"` before debugging auth/connection errors in application code
+- **Silent failure pattern:** if a request returns empty with no error, the most common causes are: (1) Ollama unreachable, (2) prompt exceeds model context, (3) empty response swallowed by streaming code. Check in that order.
+
 ## Conventions
 
 - Model aliasing: short names (e.g. "q8") resolved via config to full Ollama model names
