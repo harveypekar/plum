@@ -188,7 +188,7 @@ async def list_conversations() -> list[dict]:
     pool = await get_pool()
     rows = await pool.fetch(
         "SELECT c.id, c.user_card_id, c.ai_card_id, c.scenario_id, c.model, "
-        "c.created_at::text, c.updated_at::text, "
+        "c.category, c.created_at::text, c.updated_at::text, "
         "uc.name as user_name, ac.name as ai_name "
         "FROM rp_conversations c "
         "JOIN rp_character_cards uc ON c.user_card_id = uc.id "
@@ -199,13 +199,14 @@ async def list_conversations() -> list[dict]:
 
 
 async def create_conversation(user_card_id: int, ai_card_id: int,
-                               scenario_id: int | None, model: str) -> dict:
+                               scenario_id: int | None, model: str,
+                               category: str = "user") -> dict:
     pool = await get_pool()
     row = await pool.fetchrow(
-        "INSERT INTO rp_conversations (user_card_id, ai_card_id, scenario_id, model) "
-        "VALUES ($1, $2, $3, $4) RETURNING id, user_card_id, ai_card_id, scenario_id, "
-        "model, scene_state, scene_state_msg_id, created_at::text, updated_at::text",
-        user_card_id, ai_card_id, scenario_id, model,
+        "INSERT INTO rp_conversations (user_card_id, ai_card_id, scenario_id, model, category) "
+        "VALUES ($1, $2, $3, $4, $5) RETURNING id, user_card_id, ai_card_id, scenario_id, "
+        "model, category, scene_state, scene_state_msg_id, created_at::text, updated_at::text",
+        user_card_id, ai_card_id, scenario_id, model, category,
     )
     return dict(row)
 
@@ -213,7 +214,7 @@ async def create_conversation(user_card_id: int, ai_card_id: int,
 async def get_conversation(conv_id: int) -> dict | None:
     pool = await get_pool()
     row = await pool.fetchrow(
-        "SELECT id, user_card_id, ai_card_id, scenario_id, model, scene_state, scene_state_msg_id, "
+        "SELECT id, user_card_id, ai_card_id, scenario_id, model, category, scene_state, scene_state_msg_id, "
         "created_at::text, updated_at::text FROM rp_conversations WHERE id = $1",
         conv_id,
     )

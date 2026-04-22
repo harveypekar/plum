@@ -46,6 +46,7 @@ class ConversationResponse(BaseModel):
     scenario_id: int | None
     model: str
     scene_state: str = ""
+    category: str = "user"
     created_at: str
     updated_at: str
 

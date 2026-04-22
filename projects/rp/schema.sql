@@ -53,6 +53,12 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_column THEN NULL;
 END $$;
 
+-- Migration: add category (user vs lora-generated)
+DO $$ BEGIN
+    ALTER TABLE rp_conversations ADD COLUMN category TEXT NOT NULL DEFAULT 'user';
+EXCEPTION WHEN duplicate_column THEN NULL;
+END $$;
+
 CREATE TABLE IF NOT EXISTS rp_messages (
     id              SERIAL PRIMARY KEY,
     conversation_id INTEGER NOT NULL REFERENCES rp_conversations(id) ON DELETE CASCADE,

@@ -585,6 +585,7 @@ async def main():
                     ai_card_id=ai_card_id,
                     scenario_id=None,
                     model=args.model,
+                    category="lora",
                 )
                 system_prompt = result["conversations"][0]["value"]
                 for msg in result["conversations"][1:]:
