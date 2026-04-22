@@ -14,7 +14,8 @@ from .models import (
     MessageResponse, SendMessageRequest, EditMessageRequest, SceneStateRequest,
 )
 from .pipeline import create_default_pipeline
-from .budget import fit_prompt, BudgetError
+from dataclasses import asdict
+from .budget import fit_prompt, BudgetError, BudgetReport
 from .context import get_strategy
 from .mcp_client import get_router as get_mcp_router
 from .research import research_dispatch
@@ -32,6 +33,13 @@ _log = logging.getLogger(__name__)
 _ollama = None
 _pipeline = None
 _resolve_model = None
+
+
+def _budget_to_json(ctx: dict) -> dict | None:
+    report = ctx.get("_budget_report")
+    if not isinstance(report, BudgetReport):
+        return None
+    return asdict(report)
 
 
 async def init_mcp():
@@ -847,6 +855,7 @@ def setup(app: FastAPI, ollama, resolve_model=None):
                     system_prompt=ctx.get("system_prompt", ""),
                     scene_state=conv.get("scene_state", ""),
                     post_prompt=ctx.get("post_prompt", ""),
+                    budget_json=_budget_to_json(ctx),
                 )
                 conv_log.log_response(conv_id, "assistant", post_ctx["response"], raw)
                 # Update scene state and maybe generate summary in background
@@ -957,6 +966,7 @@ def setup(app: FastAPI, ollama, resolve_model=None):
                     system_prompt=ctx.get("system_prompt", ""),
                     scene_state=conv.get("scene_state", ""),
                     post_prompt=ctx.get("post_prompt", ""),
+                    budget_json=_budget_to_json(ctx),
                 )
                 conv_log.log_response(conv_id, "assistant", post_ctx["response"], raw)
                 # Update scene state and maybe generate summary in background
@@ -1037,6 +1047,7 @@ def setup(app: FastAPI, ollama, resolve_model=None):
                     system_prompt=ctx.get("system_prompt", ""),
                     scene_state=conv.get("scene_state", ""),
                     post_prompt=ctx.get("post_prompt", ""),
+                    budget_json=_budget_to_json(ctx),
                 )
                 conv_log.log_response(conv_id, "assistant", post_ctx["response"], raw)
                 # Update scene state and maybe generate summary in background
@@ -1166,6 +1177,7 @@ def setup(app: FastAPI, ollama, resolve_model=None):
                     system_prompt=ctx.get("system_prompt", ""),
                     scene_state=conv.get("scene_state", ""),
                     post_prompt=ctx.get("post_prompt", ""),
+                    budget_json=_budget_to_json(ctx),
                 )
                 conv_log.log_response(conv_id, save_role, post_ctx["response"], raw)
                 # Update scene state and maybe generate summary in background
