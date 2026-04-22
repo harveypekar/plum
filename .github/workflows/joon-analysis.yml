@@ -36,7 +36,7 @@ jobs:
 
       - name: Upload clang-tidy results
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: clang-tidy-report
           path: projects/joon/clang-tidy-report.log
@@ -65,7 +65,7 @@ jobs:
 
       - name: Upload MSVC analysis results
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: msvc-analysis-report
           path: projects/joon/analysis-report.txt
@@ -80,7 +80,14 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential premake5 clang llvm
+          sudo apt-get install -y build-essential clang llvm libvulkan-dev
+
+      - name: Install premake5
+        run: |
+          curl -L -o premake.tar.gz https://github.com/premake/premake-core/releases/download/v5.0.0-beta2/premake-5.0.0-beta2-linux.tar.gz
+          tar -xzf premake.tar.gz
+          sudo mv premake5 /usr/local/bin/premake5
+          sudo chmod +x /usr/local/bin/premake5
 
       - name: Generate ANALYZE config
         working-directory: projects/joon
