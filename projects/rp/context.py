@@ -99,6 +99,6 @@ STRATEGIES = {
 }
 
 
-def get_strategy(name: str = "sliding_window") -> ContextStrategy:
-    cls = STRATEGIES.get(name, SlidingWindow)
+def get_strategy(name: str = "summary_buffer") -> ContextStrategy:
+    cls = STRATEGIES.get(name, SummaryBuffer)
     return cls()

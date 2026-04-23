@@ -10,6 +10,7 @@ from . import db
 
 _log = logging.getLogger("rp.summarize")
 
+SUMMARY_MODEL = "q25"
 SUMMARY_THRESHOLD = 10  # unsummarized messages before triggering
 
 
@@ -65,8 +66,12 @@ async def maybe_generate_summary(
     char_name: str = "Character",
     user_name: str = "User",
     ai_personality: str = "",
+    resolve_model=None,
 ) -> dict | None:
     """Generate a summary if enough unsummarized messages have accumulated.
+
+    Uses SUMMARY_MODEL (a lighter model) for generation, falling back to
+    the conversation model if resolve_model is not provided.
 
     Returns the saved summary row, or None if no summary was needed.
     """
@@ -82,7 +87,6 @@ async def maybe_generate_summary(
         prev_summary = existing["summary"]
         prev_through_seq = existing["through_sequence"]
 
-    # Filter to messages after the last summary
     new_msgs = [m for m in messages if m["sequence"] > prev_through_seq]
     if len(new_msgs) < SUMMARY_THRESHOLD:
         return None
@@ -95,8 +99,9 @@ async def maybe_generate_summary(
         ai_personality=ai_personality,
     )
 
+    summary_model = resolve_model(SUMMARY_MODEL) if resolve_model else model
     raw = await ollama.generate(
-        model=model, prompt=prompt,
+        model=summary_model, prompt=prompt,
         system="Output only the summary. No thinking, no preamble.",
         options={"temperature": 0.3, "num_predict": 600, "think": False},
     )
@@ -116,6 +121,6 @@ async def maybe_generate_summary(
         msg_count=len(new_msgs),
         token_estimate=token_estimate,
     )
-    _log.info("Generated summary for conv %d (through seq %d, %d msgs, ~%d tokens)",
-              conv_id, last_msg["sequence"], len(new_msgs), token_estimate)
+    _log.info("Generated summary for conv %d (through seq %d, %d msgs, ~%d tokens, model=%s)",
+              conv_id, last_msg["sequence"], len(new_msgs), token_estimate, summary_model)
     return saved

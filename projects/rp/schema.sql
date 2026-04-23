@@ -93,6 +93,12 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_column THEN NULL;
 END $$;
 
+-- Migration: add full assembled prompt to rp_messages
+DO $$ BEGIN
+    ALTER TABLE rp_messages ADD COLUMN prompt_json JSONB DEFAULT NULL;
+EXCEPTION WHEN duplicate_column THEN NULL;
+END $$;
+
 CREATE TABLE IF NOT EXISTS rp_first_message_cache (
     id              SERIAL PRIMARY KEY,
     combo_hash      TEXT NOT NULL UNIQUE,
@@ -147,6 +153,33 @@ CREATE TABLE IF NOT EXISTS rp_conversation_summaries (
 
 CREATE INDEX IF NOT EXISTS idx_rp_summaries_conv
     ON rp_conversation_summaries(conversation_id, through_sequence DESC);
+
+-- Eval compare: A/B test multiple generation configs for the same prompt
+CREATE TABLE IF NOT EXISTS rp_eval_sets (
+    id              SERIAL PRIMARY KEY,
+    conversation_id INTEGER NOT NULL REFERENCES rp_conversations(id) ON DELETE CASCADE,
+    sequence        INTEGER NOT NULL,
+    selected_id     INTEGER DEFAULT NULL,
+    created_at      TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS rp_eval_candidates (
+    id              SERIAL PRIMARY KEY,
+    eval_set_id     INTEGER NOT NULL REFERENCES rp_eval_sets(id) ON DELETE CASCADE,
+    label           TEXT NOT NULL DEFAULT '',
+    model           TEXT NOT NULL,
+    config          JSONB NOT NULL DEFAULT '{}',
+    prompt_json     JSONB,
+    budget_json     JSONB,
+    content         TEXT NOT NULL DEFAULT '',
+    raw_response    JSONB,
+    created_at      TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_rp_eval_sets_conv
+    ON rp_eval_sets(conversation_id, sequence);
+CREATE INDEX IF NOT EXISTS idx_rp_eval_candidates_set
+    ON rp_eval_candidates(eval_set_id);
 
 -- Migration: track which message the summary was last generated from
 DO $$ BEGIN

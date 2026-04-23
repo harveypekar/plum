@@ -253,7 +253,7 @@ async def get_messages(conv_id: int) -> list[dict]:
     pool = await get_pool()
     rows = await pool.fetch(
         "SELECT id, conversation_id, role, content, raw_response, sequence, "
-        "system_prompt, scene_state, post_prompt, budget_json, "
+        "system_prompt, scene_state, post_prompt, budget_json, prompt_json, "
         "created_at::text FROM rp_messages WHERE conversation_id = $1 ORDER BY sequence",
         conv_id,
     )
@@ -265,16 +265,17 @@ async def add_message(conv_id: int, role: str, content: str,
                       system_prompt: str | None = None,
                       scene_state: str | None = None,
                       post_prompt: str | None = None,
-                      budget_json: dict | None = None) -> dict:
+                      budget_json: dict | None = None,
+                      prompt_json: list | None = None) -> dict:
     pool = await get_pool()
     row = await pool.fetchrow(
         "INSERT INTO rp_messages (conversation_id, role, content, raw_response, "
-        "system_prompt, scene_state, post_prompt, budget_json, sequence) "
-        "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, "
+        "system_prompt, scene_state, post_prompt, budget_json, prompt_json, sequence) "
+        "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, "
         "(SELECT COALESCE(MAX(sequence), 0) + 1 FROM rp_messages WHERE conversation_id = $1)) "
         "RETURNING id, conversation_id, role, content, "
-        "raw_response, sequence, system_prompt, scene_state, post_prompt, budget_json, created_at::text",
-        conv_id, role, content, raw_response, system_prompt, scene_state, post_prompt, budget_json,
+        "raw_response, sequence, system_prompt, scene_state, post_prompt, budget_json, prompt_json, created_at::text",
+        conv_id, role, content, raw_response, system_prompt, scene_state, post_prompt, budget_json, prompt_json,
     )
     await pool.execute(
         "UPDATE rp_conversations SET updated_at = NOW() WHERE id = $1", conv_id
@@ -296,6 +297,79 @@ async def delete_message(msg_id: int) -> bool:
     pool = await get_pool()
     result = await pool.execute("DELETE FROM rp_messages WHERE id = $1", msg_id)
     return result == "DELETE 1"
+
+
+# -- Eval Compare --
+
+async def create_eval_set(conv_id: int, sequence: int) -> dict:
+    pool = await get_pool()
+    row = await pool.fetchrow(
+        "INSERT INTO rp_eval_sets (conversation_id, sequence) "
+        "VALUES ($1, $2) RETURNING *",
+        conv_id, sequence,
+    )
+    return dict(row)
+
+
+async def add_eval_candidate(eval_set_id: int, label: str, model: str,
+                             config: dict, prompt_json: list | None = None,
+                             budget_json: dict | None = None,
+                             content: str = "",
+                             raw_response: dict | None = None) -> dict:
+    pool = await get_pool()
+    row = await pool.fetchrow(
+        "INSERT INTO rp_eval_candidates "
+        "(eval_set_id, label, model, config, prompt_json, budget_json, content, raw_response) "
+        "VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *",
+        eval_set_id, label, model, config, prompt_json, budget_json, content, raw_response,
+    )
+    return dict(row)
+
+
+async def update_eval_candidate(candidate_id: int, content: str,
+                                raw_response: dict | None = None,
+                                prompt_json: list | None = None,
+                                budget_json: dict | None = None) -> dict:
+    pool = await get_pool()
+    row = await pool.fetchrow(
+        "UPDATE rp_eval_candidates SET content = $2, raw_response = $3, "
+        "prompt_json = $4, budget_json = $5 WHERE id = $1 RETURNING *",
+        candidate_id, content, raw_response, prompt_json, budget_json,
+    )
+    return dict(row)
+
+
+async def select_eval_candidate(eval_set_id: int, candidate_id: int) -> dict:
+    pool = await get_pool()
+    row = await pool.fetchrow(
+        "UPDATE rp_eval_sets SET selected_id = $2 WHERE id = $1 RETURNING *",
+        eval_set_id, candidate_id,
+    )
+    return dict(row)
+
+
+async def get_eval_set(eval_set_id: int) -> dict | None:
+    pool = await get_pool()
+    row = await pool.fetchrow("SELECT * FROM rp_eval_sets WHERE id = $1", eval_set_id)
+    return dict(row) if row else None
+
+
+async def get_eval_candidates(eval_set_id: int) -> list[dict]:
+    pool = await get_pool()
+    rows = await pool.fetch(
+        "SELECT * FROM rp_eval_candidates WHERE eval_set_id = $1 ORDER BY id",
+        eval_set_id,
+    )
+    return [dict(r) for r in rows]
+
+
+async def get_eval_sets_for_conversation(conv_id: int) -> list[dict]:
+    pool = await get_pool()
+    rows = await pool.fetch(
+        "SELECT * FROM rp_eval_sets WHERE conversation_id = $1 ORDER BY sequence",
+        conv_id,
+    )
+    return [dict(r) for r in rows]
 
 
 # -- First Message Cache --
@@ -502,6 +576,19 @@ async def get_latest_summary(conv_id: int) -> dict | None:
         conv_id,
     )
     return dict(row) if row else None
+
+
+async def list_summaries(conv_id: int) -> list[dict]:
+    pool = await get_pool()
+    rows = await pool.fetch(
+        "SELECT id, conversation_id, summary, through_msg_id, through_sequence, "
+        "msg_count, token_estimate, created_at::text "
+        "FROM rp_conversation_summaries "
+        "WHERE conversation_id = $1 "
+        "ORDER BY through_sequence ASC",
+        conv_id,
+    )
+    return [dict(r) for r in rows]
 
 
 async def get_latest_metrics(

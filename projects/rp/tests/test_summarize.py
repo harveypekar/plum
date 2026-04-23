@@ -232,3 +232,45 @@ class TestMaybeGenerateSummary:
                 result = await maybe_generate_summary(1, AsyncMock(), "test-model")
                 assert result is None
         asyncio.run(run())
+
+    def test_uses_dedicated_model_when_resolve_model_provided(self):
+        """When resolve_model is given, uses SUMMARY_MODEL instead of conv model."""
+        async def run():
+            msgs = _make_messages(6)
+            with patch("projects.rp.summarize.db") as mock_db:
+                mock_db.get_messages = AsyncMock(return_value=msgs)
+                mock_db.get_latest_summary = AsyncMock(return_value=None)
+                mock_db.save_summary = AsyncMock(return_value={"id": 1})
+
+                ollama = AsyncMock()
+                ollama.generate = AsyncMock(return_value="Summary text.")
+
+                def fake_resolve(m):
+                    return "resolved-" + m
+
+                await maybe_generate_summary(
+                    1, ollama, "conv-model",
+                    resolve_model=fake_resolve,
+                )
+
+                call_args = ollama.generate.call_args
+                assert call_args[1]["model"] == "resolved-q25"
+        asyncio.run(run())
+
+    def test_falls_back_to_conv_model_without_resolve(self):
+        """Without resolve_model, uses the conversation model directly."""
+        async def run():
+            msgs = _make_messages(6)
+            with patch("projects.rp.summarize.db") as mock_db:
+                mock_db.get_messages = AsyncMock(return_value=msgs)
+                mock_db.get_latest_summary = AsyncMock(return_value=None)
+                mock_db.save_summary = AsyncMock(return_value={"id": 1})
+
+                ollama = AsyncMock()
+                ollama.generate = AsyncMock(return_value="Summary text.")
+
+                await maybe_generate_summary(1, ollama, "conv-model")
+
+                call_args = ollama.generate.call_args
+                assert call_args[1]["model"] == "conv-model"
+        asyncio.run(run())

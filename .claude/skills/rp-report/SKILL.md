@@ -36,7 +36,7 @@ WHERE c.id = <ID>
 
 **Messages (with pipeline context):**
 ```sql
-SELECT id, role, content, sequence, system_prompt, scene_state, post_prompt, budget_json,
+SELECT id, role, content, sequence, system_prompt, scene_state, post_prompt, budget_json, prompt_json,
        created_at::text
 FROM rp_messages WHERE conversation_id = <ID> ORDER BY sequence
 ```
@@ -89,33 +89,38 @@ Write a detailed analysis covering:
 
 ### 4. Part 3 — Per-message prompt replay
 
-For each **assistant** message, print the prompt context that was used to generate it:
+For each **assistant** message, print the full raw prompt that was sent to the model.
+
+If `prompt_json` is stored (non-NULL), print it as the complete assembled prompt — this is the exact messages array sent to Ollama. Format each entry in the array:
 
 ```
 ---
-### Message [seq] (ID: [id]) — Prompt Context
-
-**System prompt** ([char count] chars):
-> [first 500 chars of system_prompt, or "(not stored)" if NULL]
-
-**Post prompt** ([char count] chars):
-> [first 500 chars of post_prompt, or "(not stored)" if NULL]
-
-**Scene state**:
-> [scene_state content, or "(not stored)" if NULL]
+### Message [seq] (ID: [id]) — Full Prompt
 
 **Budget**:
 [If budget_json is stored, show: model_ctx, response_reserve, available, overhead,
  messages_budget, messages_kept/dropped, estimator_tokens, actual_tokens, warnings]
-[If not stored, show "(not stored — conversation predates budget tracking)"]
+[If not stored, show "(not stored)"]
 
-**Messages in context window**: [messages_kept] of [total messages at this point]
-**Messages dropped**: [messages_dropped]
+**Assembled prompt** ([N] messages):
+
+**[1] role: system** ([char count] chars):
+> [full content]
+
+**[2] role: user** ([char count] chars):
+> [full content]
+
+**[3] role: assistant** ([char count] chars):
+> [full content]
+
+[...continue for all messages in the prompt_json array...]
 
 **AI response** ([char count] chars, [word count] words):
 > [first 200 chars]...
 ---
 ```
+
+If `prompt_json` is NULL, fall back to showing system_prompt, post_prompt, and scene_state separately (as stored), with a note "(prompt_json not stored — conversation predates full prompt tracking)".
 
 For user messages, just show:
 ```
@@ -128,6 +133,6 @@ For user messages, just show:
 ### Notes
 
 - If the output is very long, it's OK to split across multiple response messages
-- Use the stored pipeline data (system_prompt, scene_state, post_prompt, budget_json) when available
-- For older conversations without stored data, note "(not stored)" and skip reconstruction
+- Use prompt_json as the authoritative source when available — it contains the exact payload sent to the model
+- For older conversations without prompt_json, fall back to the individual stored fields (system_prompt, scene_state, post_prompt, budget_json)
 - The report is for the user's analysis — be honest about quality issues, don't sugarcoat
