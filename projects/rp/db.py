@@ -577,6 +577,19 @@ async def get_latest_summary(conv_id: int) -> dict | None:
     return dict(row) if row else None
 
 
+async def list_summaries(conv_id: int) -> list[dict]:
+    pool = await get_pool()
+    rows = await pool.fetch(
+        "SELECT id, conversation_id, summary, through_msg_id, through_sequence, "
+        "msg_count, token_estimate, created_at::text "
+        "FROM rp_conversation_summaries "
+        "WHERE conversation_id = $1 "
+        "ORDER BY through_sequence ASC",
+        conv_id,
+    )
+    return [dict(r) for r in rows]
+
+
 async def get_latest_metrics(
     target_type: str, target_id: str, domain: str,
     pool: "asyncpg.Pool | None" = None,

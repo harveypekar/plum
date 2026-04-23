@@ -370,6 +370,19 @@
     } else {
       $("underHoodContent").textContent = "No data yet.";
     }
+
+    // Load latest summary for the Summary tab
+    api("GET", "/rp/conversations/" + id + "/summaries").then(function (summaries) {
+      if (summaries && summaries.length > 0) {
+        var latest = summaries[summaries.length - 1];
+        $("underHoodSummaryContent").textContent =
+          "[Through seq " + latest.through_sequence + ", " +
+          latest.msg_count + " msgs, ~" + latest.token_estimate + " tokens]\n\n" +
+          latest.summary;
+      } else {
+        $("underHoodSummaryContent").textContent = "No summary yet.";
+      }
+    });
   }
 
   function appendMessageBubble(container, msg, userCard, aiCard, msgIndex) {
@@ -593,6 +606,12 @@
           if (chunk.debug_prompt !== undefined) {
             $("underHoodPromptContent").textContent = chunk.debug_prompt || "(empty)";
             $("underHoodUserPromptContent").textContent = chunk.debug_user_prompt || "(empty)";
+            if (chunk.debug_summary) {
+              $("underHoodSummaryContent").textContent =
+                "[Through seq " + chunk.debug_summary_through + "]\n\n" + chunk.debug_summary;
+            } else {
+              $("underHoodSummaryContent").textContent = "No summary active.";
+            }
             // Update bubble side if auto_role differs
             if (chunk.auto_role && chunk.auto_role !== streamRole) {
               streamRole = chunk.auto_role;

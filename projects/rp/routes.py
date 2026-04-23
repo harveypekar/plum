@@ -423,6 +423,36 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         conv_log.log_scene_state(conv_id, previous_state, clean)
         return {"scene_state": clean}
 
+    # -- Summaries --
+
+    @app.get("/rp/conversations/{conv_id}/summaries")
+    async def list_summaries(conv_id: int):
+        conv = await db.get_conversation(conv_id)
+        if not conv:
+            raise HTTPException(404, "Conversation not found")
+        return await db.list_summaries(conv_id)
+
+    @app.post("/rp/conversations/{conv_id}/summarize")
+    async def trigger_summary(conv_id: int):
+        conv = await db.get_conversation(conv_id)
+        if not conv:
+            raise HTTPException(404, "Conversation not found")
+        ai_card = await db.get_card(conv["ai_card_id"])
+        user_card = await db.get_card(conv["user_card_id"])
+        ai_data = ai_card.get("card_data", {}).get("data", ai_card.get("card_data", {}))
+        user_data = user_card.get("card_data", {}).get("data", user_card.get("card_data", {}))
+        model = _resolve_model(conv["model"])
+        result = await maybe_generate_summary(
+            conv_id, _ollama, model,
+            char_name=ai_data.get("name", "Character"),
+            user_name=user_data.get("name", "User"),
+            ai_personality=ai_data.get("description", ""),
+            resolve_model=_resolve_model,
+        )
+        if result is None:
+            return {"ok": False, "reason": "not enough unsummarized messages"}
+        return {"ok": True, "summary": result}
+
     # -- Chat --
 
     _chat_defaults = {"num_predict": 768, "temperature": 1.05, "repeat_penalty": 1.08, "min_p": 0.1}
@@ -508,6 +538,7 @@ def setup(app: FastAPI, ollama, resolve_model=None):
                 conv_id, _ollama, model,
                 char_name=ai_name, user_name=user_name,
                 ai_personality=ai_personality,
+                resolve_model=_resolve_model,
             )
         except Exception as e:
             _log.warning("Summary generation failed for conv %d: %s", conv_id, e)
@@ -796,11 +827,15 @@ def setup(app: FastAPI, ollama, resolve_model=None):
                             ctx["messages"], ollama_options)
 
         async def stream():
-            yield json.dumps({
+            debug = {
                 "debug_prompt": ctx["system_prompt"],
                 "debug_user_prompt": ctx.get("post_prompt", ""),
                 "debug_messages": ctx["messages"],
-            }) + "\n"
+            }
+            if ctx.get("_summary"):
+                debug["debug_summary"] = ctx["_summary"]
+                debug["debug_summary_through"] = ctx.get("_summary_through_sequence", 0)
+            yield json.dumps(debug) + "\n"
 
             cur_messages = list(chat_messages)
             max_tool_rounds = 3
@@ -939,11 +974,15 @@ def setup(app: FastAPI, ollama, resolve_model=None):
                             ctx["messages"], ollama_options)
 
         async def stream():
-            yield json.dumps({
+            debug = {
                 "debug_prompt": ctx["system_prompt"],
                 "debug_user_prompt": ctx.get("post_prompt", ""),
                 "debug_messages": ctx["messages"],
-            }) + "\n"
+            }
+            if ctx.get("_summary"):
+                debug["debug_summary"] = ctx["_summary"]
+                debug["debug_summary_through"] = ctx.get("_summary_through_sequence", 0)
+            yield json.dumps(debug) + "\n"
 
             tokens = []
             raw = {}
@@ -1021,11 +1060,15 @@ def setup(app: FastAPI, ollama, resolve_model=None):
                             ctx["messages"], ollama_options)
 
         async def stream():
-            yield json.dumps({
+            debug = {
                 "debug_prompt": ctx["system_prompt"],
                 "debug_user_prompt": ctx.get("post_prompt", ""),
                 "debug_messages": ctx["messages"],
-            }) + "\n"
+            }
+            if ctx.get("_summary"):
+                debug["debug_summary"] = ctx["_summary"]
+                debug["debug_summary_through"] = ctx.get("_summary_through_sequence", 0)
+            yield json.dumps(debug) + "\n"
 
             tokens = []
             raw = {}
@@ -1150,12 +1193,16 @@ def setup(app: FastAPI, ollama, resolve_model=None):
                             ctx["messages"], ollama_options)
 
         async def stream():
-            yield json.dumps({
+            debug = {
                 "debug_prompt": ctx["system_prompt"],
                 "debug_user_prompt": ctx.get("post_prompt", ""),
                 "debug_messages": ctx["messages"],
                 "auto_role": save_role,
-            }) + "\n"
+            }
+            if ctx.get("_summary"):
+                debug["debug_summary"] = ctx["_summary"]
+                debug["debug_summary_through"] = ctx.get("_summary_through_sequence", 0)
+            yield json.dumps(debug) + "\n"
 
             tokens = []
             raw = {}
