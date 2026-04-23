@@ -57,19 +57,14 @@ gap with assumptions, causing scene coherence errors.
 - After the greeting, before the first kept message, inject a system message:
   `"[Messages 2-29 not shown. Key context: {scene_state}]"`
 - Reuse the already-computed scene state as the bridge content — it's the right shape.
-- This is "SummaryBuffer lite" without needing the full rolling summary infrastructure.
+- SlidingWindow is the only context strategy in use. SummaryBuffer exists in code but
+  is unused — don't build on it.
 
 ### Key files
 
 - `context.py` — `SlidingWindow.fit()` (line 12)
 - `scene_state.py` — already computes the data needed for the bridge
 - `routes.py` — `_build_pipeline_ctx()` sets up ctx with scene_state
-
-### Notes
-
-SummaryBuffer exists but isn't the default. Its summary threshold is 10 messages, so
-early conversations get no summary. The summary generation also uses the same 12B model
-at T=0.3 — a dedicated smaller model (like qwen3:8b used for research) would be better.
 
 ---
 
