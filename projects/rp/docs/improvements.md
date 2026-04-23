@@ -48,23 +48,27 @@ post-prompt directly reduces message retention. Fix the post-prompt, not the bud
 
 **Priority: high — low-effort, high-impact coherence fix**
 
-`SlidingWindow.fit()` drops oldest messages silently. Between the greeting (seq 1) and
-the next kept message (might be seq 30), there's a jarring gap. The model fills that
-gap with assumptions, causing scene coherence errors.
+**Status: DONE** — SummaryBuffer is now fully wired up and active as the default
+context strategy. Uses dedicated lightweight model (q25), has API endpoints for
+viewing/triggering summaries, Summary tab in Under the Hood panel, and summary info
+in NDJSON debug chunks.
 
-### Plan
+`SlidingWindow.fit()` drops oldest messages silently. SummaryBuffer addresses this by
+injecting a rolling summary of dropped messages after the greeting, so the model has
+context about what happened before the window.
 
-- After the greeting, before the first kept message, inject a system message:
-  `"[Messages 2-29 not shown. Key context: {scene_state}]"`
-- Reuse the already-computed scene state as the bridge content — it's the right shape.
-- SlidingWindow is the only context strategy in use. SummaryBuffer exists in code but
-  is unused — don't build on it.
+### Remaining opportunity
+
+Even with SummaryBuffer active, a scene-state-based bridge message for conversations
+that haven't accumulated enough messages for a summary (< 10 messages) would help.
+The summary threshold means the first 10 messages get pure SlidingWindow behavior.
 
 ### Key files
 
-- `context.py` — `SlidingWindow.fit()` (line 12)
-- `scene_state.py` — already computes the data needed for the bridge
-- `routes.py` — `_build_pipeline_ctx()` sets up ctx with scene_state
+- `context.py` — `SummaryBuffer.fit()` — injects summary, filters covered messages
+- `summarize.py` — `maybe_generate_summary()` with dedicated model support
+- `routes.py` — endpoints: GET/POST summaries, debug chunk includes summary info
+- `static/app.js` — Summary tab in Under the Hood panel
 
 ---
 
