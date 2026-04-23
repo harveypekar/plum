@@ -461,7 +461,7 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         """Build ollama options from scenario settings with sensible defaults."""
         opts = dict(_chat_defaults)
         for k, v in settings.items():
-            if k not in ("context_strategy", "max_context_tokens", "model"):
+            if k not in ("max_context_tokens", "model"):
                 opts[k] = v
         return opts
 
@@ -506,14 +506,12 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         return await _pipeline.run_pre(ctx)
 
     async def _budget_ctx(ctx, model, ollama_options):
-        """Run fit_prompt against ctx, using scenario-configured strategy.
+        """Run fit_prompt against ctx using SummaryBuffer strategy.
 
         On BudgetError, logs a WARNING and re-raises — callers handle the
         response (HTTP 413, stream error chunk, etc.).
         """
-        scenario = ctx.get("scenario") or {}
-        settings = scenario.get("settings", {})
-        strategy = get_strategy(settings.get("context_strategy", "summary_buffer"))
+        strategy = get_strategy("summary_buffer")
         num_predict = ollama_options.get("num_predict")
         try:
             return await fit_prompt(

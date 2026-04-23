@@ -190,10 +190,10 @@ class TestGetStrategy:
         s = get_strategy("summary_buffer")
         assert isinstance(s, SummaryBuffer)
 
-    def test_unknown_falls_back_to_sliding_window(self):
+    def test_unknown_falls_back_to_summary_buffer(self):
         s = get_strategy("nonexistent_strategy")
-        assert isinstance(s, SlidingWindow)
+        assert isinstance(s, SummaryBuffer)
 
-    def test_default_is_sliding_window(self):
+    def test_default_is_summary_buffer(self):
         s = get_strategy()
-        assert isinstance(s, SlidingWindow)
+        assert isinstance(s, SummaryBuffer)

@@ -1579,13 +1579,6 @@
     $("scenarioModel").insertBefore(defaultOpt, $("scenarioModel").firstChild);
     if (!s || !s.settings || !s.settings.model) defaultOpt.selected = true;
 
-    // Context strategy
-    if (s && s.settings && s.settings.context_strategy) {
-      $("scenarioContext").value = s.settings.context_strategy;
-    } else {
-      $("scenarioContext").value = "sliding_window";
-    }
-
     // Think toggle
     $("scenarioThink").checked = !!(s && s.settings && s.settings.think);
     updateThinkHint($("scenarioModel"));
@@ -1618,9 +1611,7 @@
     const name = $("scenarioName").value.trim();
     if (!name) { alert("Name is required."); return; }
 
-    const settings = {
-      context_strategy: $("scenarioContext").value,
-    };
+    const settings = {};
     if ($("scenarioThink").checked) settings.think = true;
     const modelOverride = $("scenarioModel").value;
     if (modelOverride) settings.model = modelOverride;
