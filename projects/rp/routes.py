@@ -455,7 +455,7 @@ def setup(app: FastAPI, ollama, resolve_model=None):
 
     # -- Chat --
 
-    _chat_defaults = {"num_predict": 768, "temperature": 1.05, "repeat_penalty": 1.08, "min_p": 0.1}
+    _chat_defaults = {"num_predict": 768, "num_ctx": 16384, "temperature": 1.05, "repeat_penalty": 1.08, "min_p": 0.1}
 
     def _build_ollama_options(settings: dict) -> dict:
         """Build ollama options from scenario settings with sensible defaults."""
@@ -524,6 +524,7 @@ def setup(app: FastAPI, ollama, resolve_model=None):
                 ctx, model=model, ollama=_ollama,
                 strategy=strategy, num_predict=num_predict,
                 ground_truth=True,
+                model_ctx_override=ollama_options.get("num_ctx"),
             )
         except BudgetError as e:
             _log.warning("Budget error for model=%s: %s", model, e)
