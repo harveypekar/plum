@@ -36,6 +36,19 @@ workspace "Joon"
         error("VULKAN_SDK environment variable not set")
     end
 
+    -- LunarG layout differs between Windows (Include/Lib, vulkan-1.lib) and
+    -- Linux (include/lib, libvulkan.so). Resolve once here and reuse below.
+    local vulkan_include, vulkan_libdir, vulkan_libname
+    if os.host() == "windows" then
+        vulkan_include = vulkan_sdk .. "/Include"
+        vulkan_libdir  = vulkan_sdk .. "/Lib"
+        vulkan_libname = "vulkan-1"
+    else
+        vulkan_include = vulkan_sdk .. "/include"
+        vulkan_libdir  = vulkan_sdk .. "/lib"
+        vulkan_libname = "vulkan"
+    end
+
 -- GLFW built from source
 project "glfw"
     kind "StaticLib"
@@ -124,11 +137,11 @@ project "joon-lib"
         "src",
         "third_party",
         "third_party/vma/include",
-        vulkan_sdk .. "/Include"
+        vulkan_include
     }
 
-    libdirs { vulkan_sdk .. "/Lib" }
-    links { "vulkan-1" }
+    libdirs { vulkan_libdir }
+    links { vulkan_libname }
 
 -- CLI
 project "joon-cli"
@@ -143,11 +156,11 @@ project "joon-cli"
         "include",
         "src",
         "third_party",
-        vulkan_sdk .. "/Include"
+        vulkan_include
     }
 
-    libdirs { vulkan_sdk .. "/Lib" }
-    links { "joon-lib", "vulkan-1" }
+    libdirs { vulkan_libdir }
+    links { "joon-lib", vulkan_libname }
 
     -- Compile shaders before building (only if changed)
     filter "system:windows"
@@ -181,11 +194,11 @@ project "joon-gui"
         "third_party/imgui/backends",
         "third_party/glfw/include",
         "third_party/vma/include",
-        vulkan_sdk .. "/Include"
+        vulkan_include
     }
 
-    libdirs { vulkan_sdk .. "/Lib" }
-    links { "joon-lib", "glfw", "vulkan-1" }
+    libdirs { vulkan_libdir }
+    links { "joon-lib", "glfw", vulkan_libname }
 
     filter "system:windows"
         links { "gdi32", "shell32", "user32" }
@@ -213,8 +226,8 @@ project "joon-tests"
         "third_party",
         "third_party/catch2/extras",
         "third_party/vma/include",
-        vulkan_sdk .. "/Include"
+        vulkan_include
     }
 
-    libdirs { vulkan_sdk .. "/Lib" }
-    links { "joon-lib", "vulkan-1" }
+    libdirs { vulkan_libdir }
+    links { "joon-lib", vulkan_libname }
