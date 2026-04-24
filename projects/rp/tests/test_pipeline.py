@@ -24,6 +24,14 @@ def test_assemble_splits_system_and_post():
     result = assemble_prompt(ctx)
     assert result["system_prompt"] == "You are Jessica."
     assert result["post_prompt"] == "Stay in character."
+    assert result["_style_pool"] == []
+
+
+def test_assemble_with_style_section():
+    template = "## system\nSys\n\n## post\nPost\n\n## style\nRule A for {{char}}\n---\nRule B"
+    ctx = _make_ctx(template=template, ai_name="Amber")
+    result = assemble_prompt(ctx)
+    assert result["_style_pool"] == ["Rule A for Amber", "Rule B"]
 
 
 def test_assemble_no_post_section():
@@ -70,7 +78,8 @@ def test_default_template_has_system_and_post():
 
 
 from projects.rp.pipeline import (  # noqa: E402
-    _split_template, clean_response, Pipeline,
+    _split_template, _parse_style_items, select_style, clean_response,
+    check_stock_phrases, Pipeline, STYLE_ITEMS_PER_TURN,
 )
 import asyncio  # noqa: E402
 
@@ -118,29 +127,111 @@ class TestRenderTemplate:
 
 class TestSplitTemplate:
     def test_system_and_post(self):
-        sys, post = _split_template("## system\nSys content\n\n## post\nPost content")
+        sys, post, style = _split_template("## system\nSys content\n\n## post\nPost content")
         assert "Sys content" in sys
         assert "Post content" in post
+        assert style == ""
 
     def test_system_only(self):
-        sys, post = _split_template("## system\nOnly system")
+        sys, post, style = _split_template("## system\nOnly system")
         assert "Only system" in sys
         assert post == ""
+        assert style == ""
 
     def test_post_only(self):
-        sys, post = _split_template("## post\nOnly post")
+        sys, post, style = _split_template("## post\nOnly post")
         assert sys == ""
         assert "Only post" in post
 
     def test_no_markers(self):
-        sys, post = _split_template("Just plain text")
+        sys, post, style = _split_template("Just plain text")
         assert "Just plain text" in sys
         assert post == ""
 
     def test_extra_whitespace_in_markers(self):
-        sys, post = _split_template("##  system\nSys\n\n##  post\nPost")
+        sys, post, style = _split_template("##  system\nSys\n\n##  post\nPost")
         assert "Sys" in sys
         assert "Post" in post
+
+    def test_all_three_sections(self):
+        tmpl = "## system\nSys\n\n## post\nPost\n\n## style\nStyle A\n---\nStyle B"
+        sys, post, style = _split_template(tmpl)
+        assert "Sys" in sys
+        assert "Post" in post
+        assert "Style A" in style
+        assert "Style B" in style
+
+    def test_style_without_post(self):
+        sys, post, style = _split_template("## system\nSys\n\n## style\nS1\n---\nS2")
+        assert "Sys" in sys
+        assert post == ""
+        assert "S1" in style
+
+
+class TestParseStyleItems:
+    def test_splits_on_separator(self):
+        items = _parse_style_items("Item A\n---\nItem B\n---\nItem C")
+        assert items == ["Item A", "Item B", "Item C"]
+
+    def test_empty_string(self):
+        assert _parse_style_items("") == []
+
+    def test_single_item(self):
+        assert _parse_style_items("Just one rule.") == ["Just one rule."]
+
+    def test_strips_whitespace(self):
+        items = _parse_style_items("  A  \n---\n  B  ")
+        assert items == ["A", "B"]
+
+    def test_skips_empty_items(self):
+        items = _parse_style_items("A\n---\n\n---\nB")
+        assert items == ["A", "B"]
+
+
+class TestSelectStyle:
+    def test_appends_to_post_prompt(self):
+        ctx = {
+            "post_prompt": "Core rules.",
+            "_style_pool": ["Style A", "Style B", "Style C", "Style D"],
+            "messages": [{"role": "user", "content": "hi"}],
+        }
+        select_style(ctx)
+        assert "Core rules." in ctx["post_prompt"]
+        assert "Voice and style:" in ctx["post_prompt"]
+
+    def test_selects_correct_count(self):
+        pool = [f"Item {i}" for i in range(12)]
+        ctx = {"post_prompt": "", "_style_pool": pool, "messages": []}
+        select_style(ctx)
+        selected = [item for item in pool if item in ctx["post_prompt"]]
+        assert len(selected) == STYLE_ITEMS_PER_TURN
+
+    def test_rotates_with_message_count(self):
+        pool = [f"Item {i}" for i in range(6)]
+        results = []
+        for n_msgs in range(6):
+            ctx = {"post_prompt": "", "_style_pool": list(pool),
+                   "messages": [{}] * n_msgs}
+            select_style(ctx)
+            selected = [item for item in pool if item in ctx["post_prompt"]]
+            results.append(selected)
+        # Different message counts should produce different selections
+        assert len(set(tuple(r) for r in results)) > 1
+
+    def test_no_pool_leaves_post_unchanged(self):
+        ctx = {"post_prompt": "Original.", "_style_pool": [], "messages": []}
+        select_style(ctx)
+        assert ctx["post_prompt"] == "Original."
+
+    def test_no_pool_key_leaves_post_unchanged(self):
+        ctx = {"post_prompt": "Original.", "messages": []}
+        select_style(ctx)
+        assert ctx["post_prompt"] == "Original."
+
+    def test_small_pool_uses_all(self):
+        ctx = {"post_prompt": "", "_style_pool": ["Only one"], "messages": []}
+        select_style(ctx)
+        assert "Only one" in ctx["post_prompt"]
 
 
 class TestExpandVariables:
@@ -220,6 +311,28 @@ class TestCleanResponse:
     def test_empty_response(self):
         ctx = {"response": "", "ai_name": "Test"}
         assert clean_response(ctx)["response"] == ""
+
+
+class TestCheckStockPhrases:
+    def test_detects_violations(self):
+        ctx = {"response": "Her heart pounded in her chest as she looked away."}
+        check_stock_phrases(ctx)
+        assert "heart pounded in" in ctx["_stock_phrase_violations"]
+
+    def test_no_violations(self):
+        ctx = {"response": "She turned away, fingers tight on the mug."}
+        check_stock_phrases(ctx)
+        assert "_stock_phrase_violations" not in ctx
+
+    def test_multiple_violations(self):
+        ctx = {"response": "Her breath caught in her throat. Her pulse quickened."}
+        check_stock_phrases(ctx)
+        assert len(ctx["_stock_phrase_violations"]) == 2
+
+    def test_case_insensitive(self):
+        ctx = {"response": "Her HEART POUNDED IN her chest."}
+        check_stock_phrases(ctx)
+        assert len(ctx["_stock_phrase_violations"]) == 1
 
 
 class TestDefaultTemplate:

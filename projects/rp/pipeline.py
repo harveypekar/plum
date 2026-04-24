@@ -94,20 +94,31 @@ DEFAULT_PROMPT_TEMPLATE = """## system
 Write only {{char}}'s next response. Stay in character. Do not narrate {{user}}'s actions.
 Each character has distinct physical traits — use the correct details for the correct person. Do not blend or swap attributes between {{char}} and {{user}}.
 Vary response length to match the beat — a gut-punch moment can be two lines; a vulnerable confession can breathe longer. Don't default to the same length every time.
+
+## style
 Describe bodies naturally when clothing state calls for it — anatomy is not inherently sexual. If a character is undressed, describe what is visible: shape, skin, scars, weight, muscle, breasts, everything. Avoidance is more conspicuous than honesty.
+---
 Honor the scene state constraints — if {{char}} is nonverbal or near-mute, replace speech with physical expression and sensory detail: touch, gesture, posture shifts, proximity, textures, smells, temperature, sounds. Characters always participate; they just shift channels from words to body and senses.
+---
 Emotions don't reset between messages. If {{char}} was crying, grieving, or in crisis earlier, that bleeds through — sudden silence, laughing too hard at nothing, flinching at a memory, losing focus. Recovery takes the whole conversation, not two exchanges.
+---
 {{char}} is NOT a mirror. Do not just reflect praise or affection back at {{user}}. {{char}} has their own perspective, their own unrelated thoughts, things they want to bring up. Deflect, change the subject, sit with it awkwardly — don't just echo kindness back.
+---
 Responses can be concise — not every message needs dialogue + action + inner thought. Sometimes just action. Sometimes just words. Sometimes silence. A single sentence is fine if that's the beat. Long responses are earned by dramatic moments, not the default.
+---
 When {{user}} is vulnerable, {{char}} does NOT respond like a therapist. Real people fumble, project, say the wrong thing, sit in uncomfortable silence. Emotional conversations are messy, not eloquent."""
 
 
-def _split_template(template: str) -> tuple[str, str]:
-    """Split a template into system and post sections."""
+STYLE_ITEMS_PER_TURN = 3
+
+
+def _split_template(template: str) -> tuple[str, str, str]:
+    """Split a template into system, post, and style sections."""
     import re
-    sections = re.split(r'^## +(system|post)\s*$', template, flags=re.MULTILINE)
+    sections = re.split(r'^## +(system|post|style)\s*$', template, flags=re.MULTILINE)
     system_part = ""
     post_part = ""
+    style_part = ""
     i = 0
     while i < len(sections):
         if sections[i].strip() == "system" and i + 1 < len(sections):
@@ -116,15 +127,26 @@ def _split_template(template: str) -> tuple[str, str]:
         elif sections[i].strip() == "post" and i + 1 < len(sections):
             post_part = sections[i + 1]
             i += 2
+        elif sections[i].strip() == "style" and i + 1 < len(sections):
+            style_part = sections[i + 1]
+            i += 2
         else:
             if not system_part and not post_part:
                 system_part = sections[i]
             i += 1
-    return system_part, post_part
+    return system_part, post_part, style_part
+
+
+def _parse_style_items(style_text: str) -> list[str]:
+    """Split a style section into individual items separated by --- lines."""
+    if not style_text.strip():
+        return []
+    items = [item.strip() for item in style_text.split("\n---\n")]
+    return [item for item in items if item]
 
 
 def assemble_prompt(ctx: dict) -> dict:
-    """Build system_prompt and post_prompt from template + character card data."""
+    """Build system_prompt, post_prompt, and style pool from template + card data."""
     ai_card = ctx.get("ai_card", {})
     scenario = ctx.get("scenario", {})
     user_card = ctx.get("user_card", {})
@@ -145,9 +167,12 @@ def assemble_prompt(ctx: dict) -> dict:
         "char_pronouns": ai_data.get("pronouns", ""),
     }
 
-    system_part, post_part = _split_template(template)
+    system_part, post_part, style_part = _split_template(template)
     ctx["system_prompt"] = render_template(system_part, values)
     ctx["post_prompt"] = render_template(post_part, values) if post_part else ""
+
+    raw_items = _parse_style_items(style_part)
+    ctx["_style_pool"] = [render_template(item, values) for item in raw_items]
     return ctx
 
 
@@ -184,6 +209,32 @@ def clean_response(ctx: dict) -> dict:
     return ctx
 
 
+def check_stock_phrases(ctx: dict) -> dict:
+    """Flag stock phrase violations in the response."""
+    from .lora_curate import STOCK_PHRASES
+    response = ctx.get("response", "")
+    lower = response.lower()
+    found = [p for p in STOCK_PHRASES if p in lower]
+    if found:
+        ctx["_stock_phrase_violations"] = found
+        _log.warning("Stock phrases detected (%d): %s", len(found), found)
+    return ctx
+
+
+def select_style(ctx: dict) -> dict:
+    """Pick a rotating subset of style instructions and append to post_prompt."""
+    pool = ctx.get("_style_pool", [])
+    if not pool:
+        return ctx
+    n = min(STYLE_ITEMS_PER_TURN, len(pool))
+    msg_count = len(ctx.get("messages", []))
+    offset = msg_count % len(pool)
+    indices = [(offset + i) for i in range(n)]
+    selected = [pool[i % len(pool)] for i in indices]
+    ctx["post_prompt"] += "\n\nVoice and style:\n- " + "\n- ".join(selected)
+    return ctx
+
+
 def inject_tools(ctx: dict) -> dict:
     """Add tool descriptions to the system prompt if MCP tools are available."""
     router = get_router()
@@ -203,6 +254,8 @@ def create_default_pipeline() -> Pipeline:
     p = Pipeline()
     p.add_pre(assemble_prompt)
     p.add_pre(expand_variables)
+    p.add_pre(select_style)
     p.add_pre(inject_tools)
     p.add_post(clean_response)
+    p.add_post(check_stock_phrases)
     return p

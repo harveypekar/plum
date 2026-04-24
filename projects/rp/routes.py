@@ -465,6 +465,12 @@ def setup(app: FastAPI, ollama, resolve_model=None):
                 opts[k] = v
         return opts
 
+    def _scale_num_predict(opts: dict, user_message: str) -> dict:
+        """Scale num_predict based on user message length to match response to beat."""
+        user_tokens = len(user_message) // 4
+        scaled = max(256, min(1024, user_tokens * 2))
+        return {**opts, "num_predict": scaled}
+
     _template_path = Path(__file__).parent / "prompt.md"
 
     async def _build_pipeline_ctx(conv, messages):
@@ -779,7 +785,8 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         model = _resolve_model(conv["model"])
         scenario = ctx.get("scenario") or {}
         settings = scenario.get("settings", {})
-        ollama_options = _build_ollama_options(settings)
+        ollama_options = _scale_num_predict(
+            _build_ollama_options(settings), req.content)
 
         # Two-model research dispatch: check if user message needs factual lookup
         research = await research_dispatch(_ollama, req.content)
@@ -1261,7 +1268,8 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         base_model = _resolve_model(conv["model"])
         scenario = base_ctx.get("scenario") or {}
         settings = scenario.get("settings", {})
-        base_ollama_options = _build_ollama_options(settings)
+        base_ollama_options = _scale_num_predict(
+            _build_ollama_options(settings), req.content)
 
         research = await research_dispatch(_ollama, req.content)
         if research:
