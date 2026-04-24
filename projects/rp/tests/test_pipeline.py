@@ -78,8 +78,8 @@ def test_default_template_has_system_and_post():
 
 
 from projects.rp.pipeline import (  # noqa: E402
-    _split_template, _parse_style_items, select_style, clean_response, Pipeline,
-    STYLE_ITEMS_PER_TURN,
+    _split_template, _parse_style_items, select_style, clean_response,
+    check_stock_phrases, Pipeline, STYLE_ITEMS_PER_TURN,
 )
 import asyncio  # noqa: E402
 
@@ -311,6 +311,28 @@ class TestCleanResponse:
     def test_empty_response(self):
         ctx = {"response": "", "ai_name": "Test"}
         assert clean_response(ctx)["response"] == ""
+
+
+class TestCheckStockPhrases:
+    def test_detects_violations(self):
+        ctx = {"response": "Her heart pounded in her chest as she looked away."}
+        check_stock_phrases(ctx)
+        assert "heart pounded in" in ctx["_stock_phrase_violations"]
+
+    def test_no_violations(self):
+        ctx = {"response": "She turned away, fingers tight on the mug."}
+        check_stock_phrases(ctx)
+        assert "_stock_phrase_violations" not in ctx
+
+    def test_multiple_violations(self):
+        ctx = {"response": "Her breath caught in her throat. Her pulse quickened."}
+        check_stock_phrases(ctx)
+        assert len(ctx["_stock_phrase_violations"]) == 2
+
+    def test_case_insensitive(self):
+        ctx = {"response": "Her HEART POUNDED IN her chest."}
+        check_stock_phrases(ctx)
+        assert len(ctx["_stock_phrase_violations"]) == 1
 
 
 class TestDefaultTemplate:

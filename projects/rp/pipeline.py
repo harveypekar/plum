@@ -209,6 +209,18 @@ def clean_response(ctx: dict) -> dict:
     return ctx
 
 
+def check_stock_phrases(ctx: dict) -> dict:
+    """Flag stock phrase violations in the response."""
+    from .lora_curate import STOCK_PHRASES
+    response = ctx.get("response", "")
+    lower = response.lower()
+    found = [p for p in STOCK_PHRASES if p in lower]
+    if found:
+        ctx["_stock_phrase_violations"] = found
+        _log.warning("Stock phrases detected (%d): %s", len(found), found)
+    return ctx
+
+
 def select_style(ctx: dict) -> dict:
     """Pick a rotating subset of style instructions and append to post_prompt."""
     pool = ctx.get("_style_pool", [])
@@ -245,4 +257,5 @@ def create_default_pipeline() -> Pipeline:
     p.add_pre(select_style)
     p.add_pre(inject_tools)
     p.add_post(clean_response)
+    p.add_post(check_stock_phrases)
     return p
