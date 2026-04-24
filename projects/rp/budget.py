@@ -148,9 +148,10 @@ def _truncate_mes_example(ctx: dict) -> bool:
     ai_data["mes_example"] = truncated
 
     # Re-run the prompt assembly chain to rebuild system_prompt/post_prompt.
-    from .pipeline import assemble_prompt, expand_variables, inject_tools
+    from .pipeline import assemble_prompt, expand_variables, select_style, inject_tools
     assemble_prompt(ctx)
     expand_variables(ctx)
+    select_style(ctx)
     inject_tools(ctx)
     return True
 
