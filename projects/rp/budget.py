@@ -184,6 +184,7 @@ async def fit_prompt(
     strategy: "ContextStrategy",
     num_predict: int | None = None,
     ground_truth: bool = True,
+    model_ctx_override: int | None = None,
 ) -> BudgetReport:
     """Shrink ctx["messages"] (and, if needed, other prompt pieces) so the
     assembled prompt fits within model_ctx - response_reserve.
@@ -199,7 +200,7 @@ async def fit_prompt(
     Raises BudgetError with a populated report if the minimum viable
     prompt (system + greeting + most-recent user message) doesn't fit.
     """
-    model_ctx = await _get_model_ctx(model, ollama)
+    model_ctx = model_ctx_override or await _get_model_ctx(model, ollama)
     response_reserve = num_predict if num_predict is not None else 1024
     available = model_ctx - response_reserve
 

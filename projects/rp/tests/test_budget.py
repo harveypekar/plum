@@ -208,6 +208,24 @@ class TestFitPromptHappyPath:
         assert report.messages_budget == 300
 
 
+    @pytest.mark.asyncio
+    async def test_model_ctx_override_skips_ollama_query(self, stub_ollama_factory):
+        stub = stub_ollama_factory(num_ctx_map={"m": 8192})
+        ctx = _build_ctx(
+            system_prompt="system",
+            messages=[{"role": "user", "content": "hi"}],
+        )
+        report = await fit_prompt(
+            ctx, model="m", ollama=stub, strategy=SlidingWindow(),
+            num_predict=512, ground_truth=False,
+            model_ctx_override=16384,
+        )
+        assert report.model_ctx == 16384
+        assert report.available == 16384 - 512
+        assert ctx["_num_ctx"] == 16384
+        assert stub.show_calls == {}
+
+
 class TestFitPromptPriority3:
     @pytest.mark.asyncio
     async def test_summary_kept_when_it_fits(self, stub_ollama_factory):
