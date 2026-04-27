@@ -19,6 +19,7 @@ from .pipeline import create_default_pipeline
 from dataclasses import asdict
 from .budget import fit_prompt, BudgetError, BudgetReport
 from .context import get_strategy
+from .tokenizer import count_tokens
 from .mcp_client import get_router as get_mcp_router
 from .research import research_dispatch
 from .fewshot import get_fewshot_messages
@@ -467,7 +468,7 @@ def setup(app: FastAPI, ollama, resolve_model=None):
 
     def _scale_num_predict(opts: dict, user_message: str) -> dict:
         """Scale num_predict based on user message length to match response to beat."""
-        user_tokens = len(user_message) // 4
+        user_tokens = count_tokens(user_message)
         scaled = max(256, min(1024, user_tokens * 2))
         return {**opts, "num_predict": scaled}
 

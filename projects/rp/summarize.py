@@ -7,6 +7,7 @@ context strategy can inject them instead of losing older messages entirely.
 import logging
 
 from . import db
+from .tokenizer import count_tokens
 
 _log = logging.getLogger("rp.summarize")
 
@@ -111,7 +112,7 @@ async def maybe_generate_summary(
         return None
 
     last_msg = new_msgs[-1]
-    token_estimate = len(summary) // 4
+    token_estimate = count_tokens(summary)
 
     saved = await db.save_summary(
         conv_id,

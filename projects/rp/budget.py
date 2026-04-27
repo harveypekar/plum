@@ -13,6 +13,8 @@ from typing import TYPE_CHECKING, Protocol
 if TYPE_CHECKING:
     from .context import ContextStrategy  # noqa: F401
 
+from .tokenizer import count_tokens
+
 _log = logging.getLogger(__name__)
 
 
@@ -55,8 +57,7 @@ class BudgetReport:
 
 
 def _estimate_tokens(text: str) -> int:
-    """Rough token count: ~4 chars per token. Cheap, used for iterative shrinking."""
-    return len(text) // 4
+    return count_tokens(text)
 
 
 async def _get_model_ctx(model: str, ollama: _OllamaLike) -> int:
@@ -227,7 +228,8 @@ async def fit_prompt(
     # protection, oldest-first drop, and summary injection.
     if messages_budget > 0:
         ctx["messages"] = strategy.fit(
-            messages_snapshot, messages_budget, ctx=ctx
+            messages_snapshot, messages_budget,
+            token_counter=_estimate_tokens, ctx=ctx,
         )
 
     # Priority 3: if still over budget, drop the summary (if any) and re-fit
@@ -242,7 +244,8 @@ async def fit_prompt(
         ctx["_summary"] = None
         if messages_budget > 0:
             ctx["messages"] = strategy.fit(
-                messages_snapshot, messages_budget, ctx=ctx
+                messages_snapshot, messages_budget,
+                token_counter=_estimate_tokens, ctx=ctx,
             )
         summary_dropped = True
         warnings.append("summary dropped to fit messages budget")
@@ -257,7 +260,8 @@ async def fit_prompt(
             messages_budget = available - overhead
             if messages_budget > 0:
                 ctx["messages"] = strategy.fit(
-                    messages_snapshot, messages_budget, ctx=ctx
+                    messages_snapshot, messages_budget,
+                    token_counter=_estimate_tokens, ctx=ctx,
                 )
 
     # Ground-truth check: ask Ollama for the real prompt_eval_count.

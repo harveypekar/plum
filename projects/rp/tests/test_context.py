@@ -1,5 +1,8 @@
 from projects.rp.context import SlidingWindow, SummaryBuffer, get_strategy
 
+def _char4(t):
+    return len(t) // 4
+
 
 def _msg(role, content):
     return {"role": role, "content": content}
@@ -19,7 +22,7 @@ class TestSlidingWindow:
         greeting = _msg("assistant", "A" * 100)
         old = _msg("user", "B" * 100)
         recent = _msg("assistant", "C" * 50)
-        result = SlidingWindow().fit([greeting, old, recent], 40)
+        result = SlidingWindow().fit([greeting, old, recent], 40, token_counter=_char4)
         assert result[0] == greeting
         assert recent in result
         assert old not in result
@@ -32,7 +35,7 @@ class TestSlidingWindow:
             _msg("user", "msg3"),
             _msg("assistant", "msg4"),
         ]
-        result = SlidingWindow().fit(msgs, 10)
+        result = SlidingWindow().fit(msgs, 10, token_counter=_char4)
         assert result[0] == msgs[0]
         assert result[-1] == msgs[-1]
 
@@ -54,7 +57,7 @@ class TestSlidingWindow:
 
     def test_single_message_over_budget(self):
         msgs = [_msg("assistant", "A" * 10000)]
-        result = SlidingWindow().fit(msgs, 1)
+        result = SlidingWindow().fit(msgs, 1, token_counter=_char4)
         assert result == msgs
 
     def test_oversized_message_blocks_all_older(self):
@@ -64,7 +67,7 @@ class TestSlidingWindow:
             _msg("user", "X" * 10000),
             _msg("assistant", "recent short"),
         ]
-        result = SlidingWindow().fit(msgs, 20)
+        result = SlidingWindow().fit(msgs, 20, token_counter=_char4)
         assert result[0] == msgs[0]
         assert msgs[-1] in result
         assert msgs[1] not in result
@@ -120,14 +123,13 @@ class TestSummaryBuffer:
 
     def test_summary_budget_cap(self):
         """Summary should not exceed 25% of budget."""
-        huge_summary = "X" * 2000  # ~500 tokens at len//4
+        huge_summary = "X" * 2000
         msgs = [
             _seq_msg("assistant", "greeting", 1),
             _seq_msg("user", "recent", 10),
         ]
-        # Budget 100 tokens: 25% = 25, but summary is ~500 tokens -> too big, no injection
         ctx = {"_summary": huge_summary, "_summary_through_sequence": 5}
-        result = SummaryBuffer().fit(msgs, 100, ctx=ctx)
+        result = SummaryBuffer().fit(msgs, 100, token_counter=_char4, ctx=ctx)
         for m in result:
             assert "[Story so far]" not in m.get("content", "")
 
@@ -151,15 +153,13 @@ class TestSummaryBuffer:
             _seq_msg("user", "D" * 40, 10),
         ]
         ctx = {"_summary": "Summary.", "_summary_through_sequence": 7}
-        # Budget tight enough that not all unsummarized messages fit
-        result = SummaryBuffer().fit(msgs, 30, ctx=ctx)
+        result = SummaryBuffer().fit(msgs, 30, token_counter=_char4, ctx=ctx)
         contents = [m["content"] for m in result]
-        # Newest should be present, oldest after greeting may be dropped
         assert "D" * 40 in contents
 
     def test_greeting_always_kept(self):
         msgs = [_seq_msg("assistant", "A" * 100, 1)]
-        result = SummaryBuffer().fit(msgs, 10)
+        result = SummaryBuffer().fit(msgs, 10, token_counter=_char4)
         assert result[0] == msgs[0]
 
     def test_no_ctx_no_crash(self):

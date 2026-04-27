@@ -17,10 +17,12 @@ from projects.rp.tests.conftest import StubOllama
 
 
 @pytest.fixture(autouse=True)
-def _clear_budget_cache():
-    """Ensure each test sees a fresh module-level cache."""
+def _clear_budget_cache(monkeypatch):
+    """Ensure each test sees a fresh module-level cache and a deterministic
+    estimator so budget-logic tests don't depend on tiktoken's encoding."""
     budget._ctx_cache.clear()
     budget._ctx_locks.clear()
+    monkeypatch.setattr(budget, "_estimate_tokens", lambda t: len(t) // 4)
     yield
     budget._ctx_cache.clear()
     budget._ctx_locks.clear()
@@ -605,7 +607,9 @@ class TestEquivalenceWithOldBehavior:
             messages.append({"role": "user", "content": f"msg {i:02d} " + "X" * 100})
 
         ctx = _build_ctx(system_prompt="", post_prompt="", messages=messages)
-        expected = SlidingWindow().fit(list(messages), max_tokens=500)
+        def _char4(t):
+            return len(t) // 4
+        expected = SlidingWindow().fit(list(messages), max_tokens=500, token_counter=_char4)
 
         await fit_prompt(
             ctx, model="m", ollama=stub, strategy=SlidingWindow(),
