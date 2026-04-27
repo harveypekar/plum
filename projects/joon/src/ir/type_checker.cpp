@@ -30,6 +30,12 @@ void type_check(IRGraph& graph) {
             continue;
         }
 
+        // Scene and render tiers carry their own output types set during
+        // IR lowering; type checking for those is handled by future passes.
+        if (node.tier == Tier::SCENE || node.tier == Tier::RENDER) {
+            continue;
+        }
+
         if (node.op == "image") {
             node.output_type = Type::IMAGE;
             continue;

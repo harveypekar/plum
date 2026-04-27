@@ -1,6 +1,7 @@
 #include "ir/ir_graph.h"
 #include <algorithm>
 #include <queue>
+#include <unordered_set>
 
 namespace joon {
 
@@ -96,12 +97,32 @@ uint32_t IRGraph::resolve_expr(const AstNode& expr) {
     }
 
     if (auto* call = std::get_if<CallNode>(&expr.data)) {
-        Tier tier = Tier::GPU;
-        if (call->op == "image" || call->op == "color" || call->op == "save") {
+        static const std::unordered_set<std::string> SCENE_OPS = {
+            "cube", "sphere", "plane", "cylinder", "mesh", "light", "camera"
+        };
+        static const std::unordered_set<std::string> RENDER_OPS = { "pass" };
+        static const std::unordered_set<std::string> CPU_OPS = {
+            "image", "color", "save"
+        };
+
+        Tier tier;
+        Type output_type = Type::FLOAT;
+        if (SCENE_OPS.count(call->op)) {
+            tier = Tier::SCENE;
+            if (call->op == "light") output_type = Type::LIGHT;
+            else if (call->op == "camera") output_type = Type::CAMERA;
+            else output_type = Type::SCENE_OBJECT;
+        } else if (RENDER_OPS.count(call->op)) {
+            tier = Tier::RENDER;
+            output_type = Type::RENDER_TARGET;
+        } else if (CPU_OPS.count(call->op)) {
             tier = Tier::CPU;
+        } else {
+            tier = Tier::GPU;
         }
 
         uint32_t id = add_node(call->op, tier);
+        nodes[id].output_type = output_type;
 
         for (auto& arg : call->args) {
             uint32_t input_id = resolve_expr(*arg);

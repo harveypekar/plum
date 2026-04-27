@@ -8,7 +8,7 @@
 
 namespace joon {
 
-enum class Tier { GPU, CPU };
+enum class Tier { CPU, GPU, SCENE, RENDER };
 
 struct Edge {
     uint32_t from_node;
