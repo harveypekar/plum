@@ -9,6 +9,7 @@ from projects.rp.budget import (
     BudgetReport,
     _get_model_ctx,
     _ollama_count_messages,
+    allocate_injections,
     fit_prompt,
     fit_raw_prompt,
 )
@@ -616,3 +617,86 @@ class TestEquivalenceWithOldBehavior:
             num_predict=500, ground_truth=False,
         )
         assert ctx["messages"] == expected
+
+
+class TestAllocateInjections:
+    @pytest.mark.asyncio
+    async def test_both_fit_within_cap(self, stub_ollama_factory):
+        """When research + fewshot fit within 30% cap, keep both."""
+        stub = stub_ollama_factory(num_ctx_map={"m": 8192})
+        ctx = _build_ctx(system_prompt="S" * 400, post_prompt="P" * 200)
+        alloc = await allocate_injections(
+            ctx, model="m", ollama=stub, num_predict=1024,
+            research_text="R" * 100,
+            fewshot_msgs=[{"content": "F" * 100}],
+        )
+        assert alloc.keep_research is True
+        assert alloc.keep_fewshot is True
+        assert alloc.research_tokens > 0
+        assert alloc.fewshot_tokens > 0
+
+    @pytest.mark.asyncio
+    async def test_research_dropped_fewshot_kept(self, stub_ollama_factory):
+        """When combined exceeds cap but fewshot alone fits, drop research.
+
+        Budget math (len//4 estimator):
+          model_ctx=2000, num_predict=500 → available=1500
+          system="S"*3000=750t, post="P"*1000=250t → fixed=1000
+          remaining=500, cap=150 (30%)
+          research="R"*800=200t, fewshot "F"*200=50t → combined=250 > 150
+          fewshot alone=50 ≤ 150 → drop research, keep fewshot
+        """
+        stub = stub_ollama_factory(num_ctx_map={"m": 2000})
+        ctx = _build_ctx(
+            system_prompt="S" * 3000,
+            post_prompt="P" * 1000,
+        )
+        alloc = await allocate_injections(
+            ctx, model="m", ollama=stub, num_predict=500,
+            research_text="R" * 800,
+            fewshot_msgs=[{"content": "F" * 200}],
+        )
+        assert alloc.keep_research is False
+        assert alloc.keep_fewshot is True
+
+    @pytest.mark.asyncio
+    async def test_both_dropped_when_cap_zero(self, stub_ollama_factory):
+        """When fixed costs exhaust the budget, drop both."""
+        stub = stub_ollama_factory(num_ctx_map={"m": 500})
+        ctx = _build_ctx(
+            system_prompt="S" * 2000,
+            post_prompt="",
+        )
+        alloc = await allocate_injections(
+            ctx, model="m", ollama=stub, num_predict=400,
+            research_text="R" * 100,
+            fewshot_msgs=[{"content": "F" * 100}],
+        )
+        assert alloc.keep_research is False
+        assert alloc.keep_fewshot is False
+
+    @pytest.mark.asyncio
+    async def test_no_injections(self, stub_ollama_factory):
+        """No research and no fewshot — both kept (vacuously)."""
+        stub = stub_ollama_factory(num_ctx_map={"m": 4096})
+        ctx = _build_ctx(system_prompt="S" * 100)
+        alloc = await allocate_injections(
+            ctx, model="m", ollama=stub, num_predict=512,
+            research_text=None, fewshot_msgs=None,
+        )
+        assert alloc.keep_research is True
+        assert alloc.keep_fewshot is True
+        assert alloc.research_tokens == 0
+        assert alloc.fewshot_tokens == 0
+
+    @pytest.mark.asyncio
+    async def test_model_ctx_override(self, stub_ollama_factory):
+        """model_ctx_override should be used instead of fetching from Ollama."""
+        stub = stub_ollama_factory(num_ctx_map={"m": 99999})
+        ctx = _build_ctx(system_prompt="S" * 400, post_prompt="P" * 200)
+        alloc = await allocate_injections(
+            ctx, model="m", ollama=stub, num_predict=1024,
+            research_text="R" * 100,
+            model_ctx_override=2000,
+        )
+        assert alloc.available_after_fixed < 99999 - 1024

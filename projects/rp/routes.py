@@ -17,7 +17,7 @@ from .models import (
 )
 from .pipeline import create_default_pipeline
 from dataclasses import asdict
-from .budget import fit_prompt, BudgetError, BudgetReport
+from .budget import fit_prompt, BudgetError, BudgetReport, allocate_injections
 from .context import get_strategy
 from .tokenizer import count_tokens
 from .mcp_client import get_router as get_mcp_router
@@ -42,7 +42,11 @@ def _budget_to_json(ctx: dict) -> dict | None:
     report = ctx.get("_budget_report")
     if not isinstance(report, BudgetReport):
         return None
-    return asdict(report)
+    result = asdict(report)
+    alloc = ctx.get("_injection_alloc")
+    if alloc is not None:
+        result["injection"] = asdict(alloc)
+    return result
 
 
 async def init_mcp():
@@ -790,9 +794,22 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         ollama_options = _scale_num_predict(
             _build_ollama_options(settings), req.content)
 
-        # Two-model research dispatch: check if user message needs factual lookup
+        # Gather optional injections (research + fewshot)
         research = await research_dispatch(_ollama, req.content)
-        if research:
+        fewshot_msgs = await get_fewshot_messages(
+            _ollama, ctx["messages"], card_id=conv["ai_card_id"],
+        )
+
+        # Budget gate: cap injections so they don't starve conversation history
+        alloc = await allocate_injections(
+            ctx, model=model, ollama=_ollama,
+            num_predict=ollama_options.get("num_predict"),
+            research_text=research,
+            fewshot_msgs=fewshot_msgs if fewshot_msgs and ctx["messages"] else None,
+            model_ctx_override=ollama_options.get("num_ctx"),
+        )
+
+        if research and alloc.keep_research:
             _log.info("Injecting research into context (%d chars)", len(research))
             conv_log.log_research(conv_id, req.content, research)
             ctx["post_prompt"] = (
@@ -802,13 +819,12 @@ def setup(app: FastAPI, ollama, resolve_model=None):
                 + research
             )
 
-        # Vector-matched fewshot examples: inject style-similar examples
-        fewshot_msgs = await get_fewshot_messages(_ollama, ctx["messages"], card_id=conv["ai_card_id"])
-        if fewshot_msgs and ctx["messages"]:
+        if fewshot_msgs and ctx["messages"] and alloc.keep_fewshot:
             _log.info("Injecting %d fewshot examples (vector-matched)", len(fewshot_msgs) // 2)
             conv_log.log_fewshot(conv_id, len(fewshot_msgs) // 2, fewshot_msgs)
-            # Prepend after greeting (messages[0]), before real conversation
             ctx["messages"] = [ctx["messages"][0]] + fewshot_msgs + ctx["messages"][1:]
+
+        ctx["_injection_alloc"] = alloc
 
         try:
             await _budget_ctx(ctx, model, ollama_options)
@@ -1274,7 +1290,19 @@ def setup(app: FastAPI, ollama, resolve_model=None):
             _build_ollama_options(settings), req.content)
 
         research = await research_dispatch(_ollama, req.content)
-        if research:
+        fewshot_msgs = await get_fewshot_messages(
+            _ollama, base_ctx["messages"], card_id=conv["ai_card_id"],
+        )
+
+        alloc = await allocate_injections(
+            base_ctx, model=base_model, ollama=_ollama,
+            num_predict=base_ollama_options.get("num_predict"),
+            research_text=research,
+            fewshot_msgs=fewshot_msgs if fewshot_msgs and base_ctx["messages"] else None,
+            model_ctx_override=base_ollama_options.get("num_ctx"),
+        )
+
+        if research and alloc.keep_research:
             base_ctx["post_prompt"] = (
                 base_ctx.get("post_prompt", "")
                 + "\n\n[Research notes — weave these facts naturally if relevant, "
@@ -1282,11 +1310,10 @@ def setup(app: FastAPI, ollama, resolve_model=None):
                 + research
             )
 
-        fewshot_msgs = await get_fewshot_messages(
-            _ollama, base_ctx["messages"], card_id=conv["ai_card_id"],
-        )
-        if fewshot_msgs and base_ctx["messages"]:
+        if fewshot_msgs and base_ctx["messages"] and alloc.keep_fewshot:
             base_ctx["messages"] = [base_ctx["messages"][0]] + fewshot_msgs + base_ctx["messages"][1:]
+
+        base_ctx["_injection_alloc"] = alloc
 
         async def generate_candidate(cfg, candidate_row):
             ctx = copy.deepcopy(base_ctx)
