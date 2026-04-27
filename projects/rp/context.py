@@ -1,3 +1,6 @@
+from .tokenizer import count_tokens as _count_tokens
+
+
 class ContextStrategy:
     """Base class for context window management strategies."""
 
@@ -14,7 +17,7 @@ class SlidingWindow(ContextStrategy):
         if not messages:
             return []
 
-        count = token_counter or (lambda t: len(t) // 4)
+        count = token_counter or _count_tokens
 
         # Always keep first message (character greeting)
         first = messages[0]
@@ -50,7 +53,7 @@ class SummaryBuffer(ContextStrategy):
         if not messages:
             return []
 
-        count = token_counter or (lambda t: len(t) // 4)
+        count = token_counter or _count_tokens
         ctx = ctx or {}
 
         # Always keep first message (character greeting)
