@@ -162,14 +162,6 @@ project "joon-cli"
     libdirs { vulkan_libdir }
     links { "joon-lib", vulkan_libname }
 
-    -- Compile shaders before building (only if changed)
-    filter "system:windows"
-        prebuildcommands {
-            "{CHDIR} %{wks.location}/../shaders",
-            "call .\\compile_if_changed.bat"
-        }
-    filter {}
-
 -- GUI
 project "joon-gui"
     kind "ConsoleApp"
@@ -202,10 +194,6 @@ project "joon-gui"
 
     filter "system:windows"
         links { "gdi32", "shell32", "user32" }
-        prebuildcommands {
-            "{CHDIR} %{wks.location}/../shaders",
-            "call .\\compile_if_changed.bat"
-        }
 
     filter {}
 
