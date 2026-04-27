@@ -60,6 +60,75 @@ def _estimate_tokens(text: str) -> int:
     return count_tokens(text)
 
 
+INJECTION_CAP = 0.30
+
+
+@dataclass
+class InjectionAllocation:
+    keep_research: bool
+    keep_fewshot: bool
+    research_tokens: int
+    fewshot_tokens: int
+    available_after_fixed: int
+    injection_cap: int
+
+
+async def allocate_injections(
+    ctx: dict,
+    *,
+    model: str,
+    ollama: _OllamaLike,
+    num_predict: int | None = None,
+    research_text: str | None = None,
+    fewshot_msgs: list[dict] | None = None,
+    model_ctx_override: int | None = None,
+) -> InjectionAllocation:
+    """Decide which optional injections fit within the token budget.
+
+    Measures fixed costs (system_prompt, post_prompt, num_predict) and caps
+    research + fewshot at INJECTION_CAP of remaining budget. Drops research
+    first (lowest priority), then fewshot.
+    """
+    model_ctx = model_ctx_override or await _get_model_ctx(model, ollama)
+    reserve = num_predict if num_predict is not None else 1024
+    available = model_ctx - reserve
+
+    fixed = _estimate_tokens(ctx.get("system_prompt", "")) + _estimate_tokens(
+        ctx.get("post_prompt", "")
+    )
+    remaining = max(0, available - fixed)
+    cap = int(remaining * INJECTION_CAP)
+
+    research_tokens = _estimate_tokens(research_text) if research_text else 0
+    fewshot_tokens = sum(
+        _estimate_tokens(m.get("content", "")) for m in (fewshot_msgs or [])
+    )
+
+    keep_research = True
+    keep_fewshot = True
+
+    if research_tokens + fewshot_tokens <= cap:
+        pass
+    elif fewshot_tokens <= cap:
+        keep_research = False
+        _log.info("Dropping research (%d tokens) — injection cap %d",
+                  research_tokens, cap)
+    else:
+        keep_research = False
+        keep_fewshot = False
+        _log.info("Dropping research (%d tokens) + fewshot (%d tokens) — "
+                  "injection cap %d", research_tokens, fewshot_tokens, cap)
+
+    return InjectionAllocation(
+        keep_research=keep_research,
+        keep_fewshot=keep_fewshot,
+        research_tokens=research_tokens if keep_research else 0,
+        fewshot_tokens=fewshot_tokens if keep_fewshot else 0,
+        available_after_fixed=remaining,
+        injection_cap=cap,
+    )
+
+
 async def _get_model_ctx(model: str, ollama: _OllamaLike) -> int:
     """Return cached num_ctx for `model`, fetching once on first use.
 
