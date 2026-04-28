@@ -279,5 +279,47 @@ if static_dir.exists():
 
 
 if __name__ == "__main__":
+    import logging
     import uvicorn
-    uvicorn.run("main:app", host=config.host, port=config.port, reload=True)
+
+    logging.basicConfig(
+        format="%(asctime)s %(levelname)s %(message)s",
+        datefmt="%H:%M:%S",
+        level=logging.INFO,
+    )
+    uvicorn.run(
+        "main:app", host=config.host, port=config.port, reload=True,
+        log_config={
+            "version": 1,
+            "disable_existing_loggers": False,
+            "formatters": {
+                "default": {
+                    "format": "%(asctime)s %(levelprefix)s %(message)s",
+                    "datefmt": "%H:%M:%S",
+                    "()": "uvicorn.logging.DefaultFormatter",
+                },
+                "access": {
+                    "format": '%(asctime)s %(levelprefix)s %(client_addr)s - "%(request_line)s" %(status_code)s',
+                    "datefmt": "%H:%M:%S",
+                    "()": "uvicorn.logging.AccessFormatter",
+                },
+            },
+            "handlers": {
+                "default": {
+                    "formatter": "default",
+                    "class": "logging.StreamHandler",
+                    "stream": "ext://sys.stderr",
+                },
+                "access": {
+                    "formatter": "access",
+                    "class": "logging.StreamHandler",
+                    "stream": "ext://sys.stdout",
+                },
+            },
+            "loggers": {
+                "uvicorn": {"handlers": ["default"], "level": "INFO", "propagate": False},
+                "uvicorn.error": {"level": "INFO"},
+                "uvicorn.access": {"handlers": ["access"], "level": "INFO", "propagate": False},
+            },
+        },
+    )
