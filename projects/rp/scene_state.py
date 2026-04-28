@@ -1,4 +1,27 @@
-"""Scene state prompt building and response cleaning — extracted for testability."""
+"""Scene state prompt building, response cleaning, and hallucination validation."""
+
+import logging
+import re
+
+_log = logging.getLogger("rp.scene_state")
+
+_STOPWORDS = frozenset({
+    "the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
+    "have", "has", "had", "do", "does", "did", "will", "would", "could",
+    "should", "may", "might", "shall", "can", "need", "to", "of", "in",
+    "for", "on", "with", "at", "by", "from", "as", "into", "through",
+    "during", "before", "after", "above", "below", "between", "out",
+    "off", "over", "under", "again", "then", "once", "here", "there",
+    "when", "where", "all", "each", "every", "both", "few", "more",
+    "most", "other", "some", "such", "nor", "not", "only", "own",
+    "same", "so", "than", "too", "very", "just", "and", "but", "or",
+    "if", "while", "that", "this", "these", "those", "it", "its",
+    "her", "his", "they", "them", "their", "she", "he", "him", "we",
+    "us", "our", "you", "your", "my", "me", "currently", "right",
+    "now", "still", "also", "about", "up", "down",
+})
+
+_SKIP_VALIDATION = frozenset({"mood", "voice"})
 
 
 def build_scene_state_prompt(messages: list[dict], previous_state: str = "",
@@ -50,3 +73,101 @@ def clean_scene_state_response(raw: str) -> str:
         elif line.strip():
             lines.append(line)
     return "\n".join(lines)
+
+
+def parse_scene_state(state: str) -> dict[str, str]:
+    """Parse scene state text into {category_label: value} dict."""
+    result: dict[str, str] = {}
+    for line in state.strip().splitlines():
+        if ":" in line:
+            cat, val = line.split(":", 1)
+            key = cat.strip()
+            if key:
+                result[key] = val.strip()
+    return result
+
+
+def _extract_content_words(text: str) -> set[str]:
+    """Extract meaningful words (3+ chars, no stopwords) from text."""
+    return {w for w in re.findall(r"[a-z]{3,}", text.lower()) if w not in _STOPWORDS}
+
+
+def _has_evidence(new_words: set[str], msg_words: set[str]) -> bool:
+    """Check if any new word has a match in message words.
+
+    Matches on: exact equality, substring containment (4+ chars),
+    or shared prefix of 6+ chars (handles conjugation like unbuttons/unbuttoned).
+    """
+    if new_words & msg_words:
+        return True
+    for nw in new_words:
+        if len(nw) < 4:
+            continue
+        for mw in msg_words:
+            if len(mw) < 4:
+                continue
+            if nw in mw or mw in nw:
+                return True
+            if len(nw) >= 5 and len(mw) >= 5:
+                prefix = min(len(nw), len(mw), 6)
+                if nw[:prefix] == mw[:prefix]:
+                    return True
+    return False
+
+
+def validate_scene_state(
+    new_state: str,
+    previous_state: str,
+    messages: list[dict],
+) -> str:
+    """Revert scene state categories that changed without evidence in messages.
+
+    For each category whose value differs from the previous state, checks
+    whether any new content words appear in the source messages.  Unsupported
+    changes are reverted to the previous value.  Interpretive categories
+    (mood, voice) are always kept as-is.  Initial generation (no previous
+    state) is returned unmodified since it's grounded in scenario context.
+    """
+    if not previous_state.strip():
+        return new_state
+
+    new = parse_scene_state(new_state)
+    old = parse_scene_state(previous_state)
+
+    msg_text = " ".join(m.get("content", "") for m in messages)
+    msg_words = _extract_content_words(msg_text)
+
+    validated: dict[str, str] = {}
+
+    for cat, new_val in new.items():
+        cat_key = cat.lower()
+        if cat_key in _SKIP_VALIDATION:
+            validated[cat] = new_val
+            continue
+
+        old_val = old.get(cat, "")
+        if not old_val:
+            for ok, ov in old.items():
+                if ok.lower() == cat_key:
+                    old_val = ov
+                    break
+
+        if new_val.lower() == old_val.lower():
+            validated[cat] = new_val
+            continue
+
+        new_words = _extract_content_words(new_val)
+        old_words = _extract_content_words(old_val) if old_val else set()
+        added_words = new_words - old_words
+
+        if not added_words or _has_evidence(added_words, msg_words):
+            validated[cat] = new_val
+        else:
+            _log.info(
+                "Reverted scene state [%s]: %r -> %r (no evidence; words: %s)",
+                cat, old_val, new_val, added_words,
+            )
+            if old_val:
+                validated[cat] = old_val
+
+    return "\n".join(f"{cat}: {val}" for cat, val in validated.items())
