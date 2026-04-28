@@ -742,7 +742,7 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         result = await _ollama.generate(
             model=summary_model, prompt=prompt,
             system="Output only the scene state summary. No thinking, no preamble.",
-            options={"temperature": 0.2, "num_predict": 200, "think": False},
+            options={"temperature": 0.2, "num_predict": 800},
         )
         clean = clean_scene_state_response(result)
         return validate_scene_state(clean, previous_state, messages)
