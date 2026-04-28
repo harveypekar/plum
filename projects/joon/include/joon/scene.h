@@ -23,7 +23,8 @@ struct SceneObject {
     vec3 scale{1, 1, 1};
     // Material wired by node id when fragment shading is per-object.
     // Sub-project 2 uses a single hardcoded fragment, so this is unused for now.
-    uint32_t material_node_id = 0;
+    // UINT32_MAX = unset; matches ResolvedKwarg::source_node convention in ir/node.h.
+    uint32_t material_node_id = UINT32_MAX;
 };
 
 enum class LightType { Directional, Point, Spot };
