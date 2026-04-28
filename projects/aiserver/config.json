@@ -9,6 +9,7 @@
     "q4": "qwen3:4b",
     "q8": "qwen3:8b",
     "q25": "qwen2.5:7b-instruct-q3_K_M",
+    "q36": "qwen3.6:35b",
     "nemo": "mistral-nemo"
   },
   "default_options": {
