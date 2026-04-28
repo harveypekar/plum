@@ -738,13 +738,14 @@ def setup(app: FastAPI, ollama, resolve_model=None):
                                      scenario_context: str = "") -> str:
         prompt = _build_scene_state_prompt(messages, previous_state, ai_name, user_name, ai_personality, scenario_context)
         summary_model = _resolve_model(_scene_state_model) if _resolve_model else model
-        from .scene_state import clean_scene_state_response
+        from .scene_state import clean_scene_state_response, validate_scene_state
         result = await _ollama.generate(
             model=summary_model, prompt=prompt,
             system="Output only the scene state summary. No thinking, no preamble.",
             options={"temperature": 0.2, "num_predict": 200, "think": False},
         )
-        return clean_scene_state_response(result)
+        clean = clean_scene_state_response(result)
+        return validate_scene_state(clean, previous_state, messages)
 
     async def _auto_update_scene_state(conv_id: int, model: str,
                                         ai_name: str = "Character", user_name: str = "User",
