@@ -681,7 +681,7 @@ def setup(app: FastAPI, ollama, resolve_model=None):
 
     _log = logging.getLogger("rp.routes")
 
-    _scene_state_model = "q25"
+    _scene_state_model = "q36"
 
     def _build_scene_state_prompt(messages: list[dict], previous_state: str = "",
                                    ai_name: str = "Character", user_name: str = "User",
