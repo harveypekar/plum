@@ -8,6 +8,9 @@
 
 namespace joon {
 
+// Order matches interpreter execution phases: CPU constants resolve first,
+// then GPU compute dispatches, then SCENE collection, then RENDER pass.
+// Don't reorder without auditing the interpreter walk in interpreter.cpp.
 enum class Tier { CPU, GPU, SCENE, RENDER };
 
 struct Edge {
