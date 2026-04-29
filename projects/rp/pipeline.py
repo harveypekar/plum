@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import re
 from typing import Callable
 from .mcp_client import get_router
 
@@ -112,13 +113,13 @@ When {{user}} is vulnerable, {{char}} does NOT respond like a therapist. Real pe
 STYLE_ITEMS_PER_TURN = 3
 
 
-def _split_template(template: str) -> tuple[str, str, str]:
-    """Split a template into system, post, and style sections."""
-    import re
-    sections = re.split(r'^## +(system|post|style)\s*$', template, flags=re.MULTILINE)
+def _split_template(template: str) -> tuple[str, str, str, str]:
+    """Split a template into system, post, style, and scene-style sections."""
+    sections = re.split(r'^## +(system|post|scene-style|style)\s*$', template, flags=re.MULTILINE)
     system_part = ""
     post_part = ""
     style_part = ""
+    scene_style_part = ""
     i = 0
     while i < len(sections):
         if sections[i].strip() == "system" and i + 1 < len(sections):
@@ -127,6 +128,9 @@ def _split_template(template: str) -> tuple[str, str, str]:
         elif sections[i].strip() == "post" and i + 1 < len(sections):
             post_part = sections[i + 1]
             i += 2
+        elif sections[i].strip() == "scene-style" and i + 1 < len(sections):
+            scene_style_part = sections[i + 1]
+            i += 2
         elif sections[i].strip() == "style" and i + 1 < len(sections):
             style_part = sections[i + 1]
             i += 2
@@ -134,7 +138,7 @@ def _split_template(template: str) -> tuple[str, str, str]:
             if not system_part and not post_part:
                 system_part = sections[i]
             i += 1
-    return system_part, post_part, style_part
+    return system_part, post_part, style_part, scene_style_part
 
 
 def _parse_style_items(style_text: str) -> list[str]:
@@ -143,6 +147,48 @@ def _parse_style_items(style_text: str) -> list[str]:
         return []
     items = [item.strip() for item in style_text.split("\n---\n")]
     return [item for item in items if item]
+
+
+def _parse_scene_style_items(text: str) -> list[tuple[str, str, list[str]]]:
+    """Parse scene-style section into (category, text, keywords) tuples.
+
+    Each item starts with a condition line: [category] or [category=kw1,kw2].
+    Items are separated by --- lines. A bare [category] matches when that
+    category exists in scene state; [category=kw1,kw2] matches when the
+    category value contains any listed keyword.
+    """
+    if not text.strip():
+        return []
+    items = []
+    for block in text.split("\n---\n"):
+        block = block.strip()
+        if not block:
+            continue
+        lines = block.split("\n", 1)
+        m = re.match(r'\[(\w[\w-]*)(?:=([^\]]+))?\]', lines[0].strip())
+        if not m:
+            continue
+        category = m.group(1).lower()
+        keywords = [k.strip().lower() for k in m.group(2).split(",")] if m.group(2) else []
+        body = lines[1].strip() if len(lines) > 1 else ""
+        if body:
+            items.append((category, body, keywords))
+    return items
+
+
+def _match_scene_condition(category: str, keywords: list[str],
+                           scene_state: dict[str, str]) -> bool:
+    """Check if a scene-style condition matches the current scene state."""
+    value = ""
+    for k, v in scene_state.items():
+        if k.lower() == category:
+            value = v.lower()
+            break
+    if not value:
+        return False
+    if not keywords:
+        return True
+    return any(kw in value for kw in keywords)
 
 
 def assemble_prompt(ctx: dict) -> dict:
@@ -167,12 +213,18 @@ def assemble_prompt(ctx: dict) -> dict:
         "char_pronouns": ai_data.get("pronouns", ""),
     }
 
-    system_part, post_part, style_part = _split_template(template)
+    system_part, post_part, style_part, scene_style_part = _split_template(template)
     ctx["system_prompt"] = render_template(system_part, values)
     ctx["post_prompt"] = render_template(post_part, values) if post_part else ""
 
     raw_items = _parse_style_items(style_part)
     ctx["_style_pool"] = [render_template(item, values) for item in raw_items]
+
+    raw_scene_items = _parse_scene_style_items(scene_style_part)
+    ctx["_scene_style_pool"] = [
+        (cat, render_template(body, values), kws)
+        for cat, body, kws in raw_scene_items
+    ]
     return ctx
 
 
@@ -222,16 +274,33 @@ def check_stock_phrases(ctx: dict) -> dict:
 
 
 def select_style(ctx: dict) -> dict:
-    """Pick a rotating subset of style instructions and append to post_prompt."""
+    """Pick style instructions: scene-state conditionals + rotating general items."""
+    from .scene_state import parse_scene_state
+
     pool = ctx.get("_style_pool", [])
-    if not pool:
+    scene_pool = ctx.get("_scene_style_pool", [])
+
+    matched = []
+    if scene_pool:
+        scene_state = parse_scene_state(ctx.get("scene_state", ""))
+        for category, text, keywords in scene_pool:
+            if _match_scene_condition(category, keywords, scene_state):
+                matched.append(text)
+
+    selected_general = []
+    if pool:
+        n = min(STYLE_ITEMS_PER_TURN, len(pool))
+        msg_count = len(ctx.get("messages", []))
+        offset = msg_count % len(pool)
+        indices = [(offset + i) for i in range(n)]
+        selected_general = [pool[i % len(pool)] for i in indices]
+
+    all_selected = matched + selected_general
+    if not all_selected:
         return ctx
-    n = min(STYLE_ITEMS_PER_TURN, len(pool))
-    msg_count = len(ctx.get("messages", []))
-    offset = msg_count % len(pool)
-    indices = [(offset + i) for i in range(n)]
-    selected = [pool[i % len(pool)] for i in indices]
-    ctx["post_prompt"] += "\n\nVoice and style:\n- " + "\n- ".join(selected)
+
+    ctx["post_prompt"] += "\n\nVoice and style:\n- " + "\n- ".join(all_selected)
+    ctx["_matched_scene_styles"] = len(matched)
     return ctx
 
 
