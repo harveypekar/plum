@@ -13,20 +13,28 @@ static Mesh build_mesh(const tinyobj::attrib_t& attrib,
     Mesh out;
     for (const auto& shape : shapes) {
         for (const auto& idx : shape.mesh.indices) {
+            // Bounds-check before indexing — tinyobjloader uses negative indices
+            // as "absent" sentinels and doesn't validate index ranges itself.
+            if (idx.vertex_index < 0 ||
+                static_cast<size_t>(3 * idx.vertex_index + 2) >= attrib.vertices.size()) {
+                throw std::runtime_error("OBJ has invalid vertex index");
+            }
             Vertex v{};
             v.position = {
                 attrib.vertices[3 * idx.vertex_index + 0],
                 attrib.vertices[3 * idx.vertex_index + 1],
                 attrib.vertices[3 * idx.vertex_index + 2],
             };
-            if (idx.normal_index >= 0) {
+            if (idx.normal_index >= 0 &&
+                static_cast<size_t>(3 * idx.normal_index + 2) < attrib.normals.size()) {
                 v.normal = {
                     attrib.normals[3 * idx.normal_index + 0],
                     attrib.normals[3 * idx.normal_index + 1],
                     attrib.normals[3 * idx.normal_index + 2],
                 };
             }
-            if (idx.texcoord_index >= 0) {
+            if (idx.texcoord_index >= 0 &&
+                static_cast<size_t>(2 * idx.texcoord_index + 1) < attrib.texcoords.size()) {
                 v.uv = {
                     attrib.texcoords[2 * idx.texcoord_index + 0],
                     attrib.texcoords[2 * idx.texcoord_index + 1],
