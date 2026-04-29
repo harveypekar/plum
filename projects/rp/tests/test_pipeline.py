@@ -25,6 +25,7 @@ def test_assemble_splits_system_and_post():
     assert result["system_prompt"] == "You are Jessica."
     assert result["post_prompt"] == "Stay in character."
     assert result["_style_pool"] == []
+    assert result["_scene_style_pool"] == []
 
 
 def test_assemble_with_style_section():
@@ -78,7 +79,8 @@ def test_default_template_has_system_and_post():
 
 
 from projects.rp.pipeline import (  # noqa: E402
-    _split_template, _parse_style_items, select_style, clean_response,
+    _split_template, _parse_style_items, _parse_scene_style_items,
+    _match_scene_condition, select_style, clean_response,
     check_stock_phrases, Pipeline, STYLE_ITEMS_PER_TURN,
 )
 import asyncio  # noqa: E402
@@ -127,45 +129,61 @@ class TestRenderTemplate:
 
 class TestSplitTemplate:
     def test_system_and_post(self):
-        sys, post, style = _split_template("## system\nSys content\n\n## post\nPost content")
+        sys, post, style, ss = _split_template("## system\nSys content\n\n## post\nPost content")
         assert "Sys content" in sys
         assert "Post content" in post
         assert style == ""
+        assert ss == ""
 
     def test_system_only(self):
-        sys, post, style = _split_template("## system\nOnly system")
+        sys, post, style, ss = _split_template("## system\nOnly system")
         assert "Only system" in sys
         assert post == ""
         assert style == ""
 
     def test_post_only(self):
-        sys, post, style = _split_template("## post\nOnly post")
+        sys, post, style, ss = _split_template("## post\nOnly post")
         assert sys == ""
         assert "Only post" in post
 
     def test_no_markers(self):
-        sys, post, style = _split_template("Just plain text")
+        sys, post, style, ss = _split_template("Just plain text")
         assert "Just plain text" in sys
         assert post == ""
 
     def test_extra_whitespace_in_markers(self):
-        sys, post, style = _split_template("##  system\nSys\n\n##  post\nPost")
+        sys, post, style, ss = _split_template("##  system\nSys\n\n##  post\nPost")
         assert "Sys" in sys
         assert "Post" in post
 
     def test_all_three_sections(self):
         tmpl = "## system\nSys\n\n## post\nPost\n\n## style\nStyle A\n---\nStyle B"
-        sys, post, style = _split_template(tmpl)
+        sys, post, style, ss = _split_template(tmpl)
         assert "Sys" in sys
         assert "Post" in post
         assert "Style A" in style
         assert "Style B" in style
 
     def test_style_without_post(self):
-        sys, post, style = _split_template("## system\nSys\n\n## style\nS1\n---\nS2")
+        sys, post, style, ss = _split_template("## system\nSys\n\n## style\nS1\n---\nS2")
         assert "Sys" in sys
         assert post == ""
         assert "S1" in style
+
+    def test_scene_style_section(self):
+        tmpl = "## system\nSys\n\n## style\nS1\n\n## scene-style\n[mood=sad]\nBe sad"
+        sys, post, style, ss = _split_template(tmpl)
+        assert "Sys" in sys
+        assert "S1" in style
+        assert "[mood=sad]" in ss
+
+    def test_all_four_sections(self):
+        tmpl = "## system\nS\n\n## post\nP\n\n## style\nSt\n\n## scene-style\nSS"
+        sys, post, style, ss = _split_template(tmpl)
+        assert "S" in sys
+        assert "P" in post
+        assert "St" in style
+        assert "SS" in ss
 
 
 class TestParseStyleItems:
@@ -232,6 +250,174 @@ class TestSelectStyle:
         ctx = {"post_prompt": "", "_style_pool": ["Only one"], "messages": []}
         select_style(ctx)
         assert "Only one" in ctx["post_prompt"]
+
+
+class TestParseSceneStyleItems:
+    def test_basic_condition(self):
+        items = _parse_scene_style_items("[restraints]\nShow the limitation.")
+        assert len(items) == 1
+        assert items[0] == ("restraints", "Show the limitation.", [])
+
+    def test_condition_with_keywords(self):
+        items = _parse_scene_style_items("[mood=grieving,crying]\nDon't soften it.")
+        assert len(items) == 1
+        assert items[0][0] == "mood"
+        assert items[0][2] == ["grieving", "crying"]
+
+    def test_multiple_items(self):
+        text = "[restraints]\nItem A\n---\n[mood=sad]\nItem B"
+        items = _parse_scene_style_items(text)
+        assert len(items) == 2
+        assert items[0][0] == "restraints"
+        assert items[1][0] == "mood"
+
+    def test_empty_string(self):
+        assert _parse_scene_style_items("") == []
+
+    def test_skips_items_without_condition(self):
+        text = "No condition here\n---\n[mood]\nHas condition"
+        items = _parse_scene_style_items(text)
+        assert len(items) == 1
+        assert items[0][0] == "mood"
+
+    def test_skips_condition_without_body(self):
+        items = _parse_scene_style_items("[restraints]")
+        assert items == []
+
+    def test_hyphenated_category(self):
+        items = _parse_scene_style_items("[scene-mood]\nText here")
+        assert items[0][0] == "scene-mood"
+
+
+class TestMatchSceneCondition:
+    def test_category_exists(self):
+        assert _match_scene_condition("restraints", [], {"Restraints": "wrists bound"})
+
+    def test_category_missing(self):
+        assert not _match_scene_condition("restraints", [], {"Location": "kitchen"})
+
+    def test_keyword_match(self):
+        assert _match_scene_condition("mood", ["grieving", "crying"],
+                                      {"Mood": "Amber is grieving silently"})
+
+    def test_keyword_no_match(self):
+        assert not _match_scene_condition("mood", ["grieving", "crying"],
+                                          {"Mood": "calm and relaxed"})
+
+    def test_case_insensitive_category(self):
+        assert _match_scene_condition("restraints", [], {"RESTRAINTS": "tied"})
+
+    def test_case_insensitive_value(self):
+        assert _match_scene_condition("mood", ["crying"],
+                                      {"Mood": "CRYING loudly"})
+
+    def test_empty_scene_state(self):
+        assert not _match_scene_condition("mood", [], {})
+
+    def test_partial_keyword_match(self):
+        assert _match_scene_condition("voice", ["whisper"],
+                                      {"Voice": "barely whispering"})
+
+
+class TestSelectStyleWithSceneState:
+    def test_scene_items_included_when_matching(self):
+        ctx = {
+            "post_prompt": "",
+            "_style_pool": ["General A", "General B", "General C"],
+            "_scene_style_pool": [("restraints", "Show limitation", [])],
+            "scene_state": "Restraints: wrists bound\nMood: calm",
+            "messages": [],
+        }
+        select_style(ctx)
+        assert "Show limitation" in ctx["post_prompt"]
+        assert ctx["_matched_scene_styles"] == 1
+
+    def test_scene_items_excluded_when_not_matching(self):
+        ctx = {
+            "post_prompt": "",
+            "_style_pool": ["General A", "General B", "General C"],
+            "_scene_style_pool": [("restraints", "Show limitation", [])],
+            "scene_state": "Location: kitchen\nMood: calm",
+            "messages": [],
+        }
+        select_style(ctx)
+        assert "Show limitation" not in ctx["post_prompt"]
+        assert ctx["_matched_scene_styles"] == 0
+
+    def test_keyword_filtered_scene_items(self):
+        ctx = {
+            "post_prompt": "",
+            "_style_pool": ["Gen"],
+            "_scene_style_pool": [("mood", "Acute distress", ["grieving", "crying"])],
+            "scene_state": "Mood: Amber is grieving",
+            "messages": [],
+        }
+        select_style(ctx)
+        assert "Acute distress" in ctx["post_prompt"]
+
+    def test_keyword_filtered_scene_items_no_match(self):
+        ctx = {
+            "post_prompt": "",
+            "_style_pool": ["Gen"],
+            "_scene_style_pool": [("mood", "Acute distress", ["grieving", "crying"])],
+            "scene_state": "Mood: calm",
+            "messages": [],
+        }
+        select_style(ctx)
+        assert "Acute distress" not in ctx["post_prompt"]
+
+    def test_scene_items_added_alongside_general(self):
+        ctx = {
+            "post_prompt": "",
+            "_style_pool": ["Gen A", "Gen B", "Gen C", "Gen D"],
+            "_scene_style_pool": [("restraints", "Restraint rule", [])],
+            "scene_state": "Restraints: tied",
+            "messages": [],
+        }
+        select_style(ctx)
+        assert "Restraint rule" in ctx["post_prompt"]
+        general_count = sum(1 for g in ["Gen A", "Gen B", "Gen C", "Gen D"]
+                           if g in ctx["post_prompt"])
+        assert general_count == STYLE_ITEMS_PER_TURN
+
+    def test_no_scene_pool_works_like_before(self):
+        ctx = {
+            "post_prompt": "",
+            "_style_pool": ["A", "B", "C"],
+            "scene_state": "Restraints: tied",
+            "messages": [],
+        }
+        select_style(ctx)
+        assert "Voice and style:" in ctx["post_prompt"]
+
+    def test_empty_scene_state_no_scene_items(self):
+        ctx = {
+            "post_prompt": "",
+            "_style_pool": ["Gen"],
+            "_scene_style_pool": [("restraints", "Show it", [])],
+            "scene_state": "",
+            "messages": [],
+        }
+        select_style(ctx)
+        assert "Show it" not in ctx["post_prompt"]
+
+    def test_multiple_scene_items_can_match(self):
+        ctx = {
+            "post_prompt": "",
+            "_style_pool": ["Gen"],
+            "_scene_style_pool": [
+                ("restraints", "Restraint rule", []),
+                ("mood", "Mood rule", ["crying"]),
+                ("voice", "Voice rule", ["mute"]),
+            ],
+            "scene_state": "Restraints: bound\nMood: crying\nVoice: soft",
+            "messages": [],
+        }
+        select_style(ctx)
+        assert "Restraint rule" in ctx["post_prompt"]
+        assert "Mood rule" in ctx["post_prompt"]
+        assert "Voice rule" not in ctx["post_prompt"]
+        assert ctx["_matched_scene_styles"] == 2
 
 
 class TestExpandVariables:
