@@ -1,4 +1,5 @@
 #include "scene/primitives.h"
+#include <algorithm>
 #include <cmath>
 
 namespace joon {
@@ -48,6 +49,11 @@ Mesh gen_cube(float size) {
 }
 
 Mesh gen_sphere(float radius, int lat, int lon) {
+    // Clamp segment counts to a sane minimum: <2 latitude rings or <3 longitude
+    // wedges produce a degenerate sphere and divide-by-zero in the parametric loops.
+    lat = std::max(lat, 2);
+    lon = std::max(lon, 3);
+
     Mesh m;
     m.vertices.reserve(static_cast<size_t>(lat + 1) * static_cast<size_t>(lon + 1));
     m.indices.reserve(static_cast<size_t>(lat) * static_cast<size_t>(lon) * 6);
@@ -121,6 +127,9 @@ Mesh gen_plane(float w, float h) {
 }
 
 Mesh gen_cylinder(float radius, float height, int segments) {
+    // Clamp segments to a sane minimum: fewer than 3 produces zero-area caps
+    // and a divide-by-zero in the cap modulo (s+1) % segments.
+    segments = std::max(segments, 3);
     const float hh = height * 0.5f;
 
     Mesh m;

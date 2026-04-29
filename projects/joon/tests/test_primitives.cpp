@@ -54,6 +54,33 @@ TEST_CASE("Plane is 4 verts / 6 indices, lies in XZ at y=0, normal +Y", "[primit
     }
 }
 
+TEST_CASE("Generators clamp degenerate segment counts", "[primitives]") {
+    // sphere: lat<2 or lon<3 should be clamped, not divide by zero
+    auto s = gen_sphere(0.5f, 0, 0);
+    CHECK(s.vertices.size() == 3 * 4);   // clamped to lat=2, lon=3 → 3*4 verts
+    CHECK(s.indices.size()  == 2 * 3 * 6);
+    for (auto& v : s.vertices) {
+        // No NaNs from divide-by-zero
+        CHECK(std::isfinite(v.position.x));
+        CHECK(std::isfinite(v.normal.y));
+    }
+
+    // cylinder: segments<3 should be clamped
+    auto c = gen_cylinder(0.5f, 1.0f, 0);
+    CHECK(c.indices.size() == size_t(12 * 3));   // clamped to segments=3
+    for (auto& v : c.vertices) CHECK(std::isfinite(v.position.x));
+}
+
+TEST_CASE("Zero-radius sphere produces origin verts and zero normals (no NaN)", "[primitives]") {
+    auto m = gen_sphere(0.0f, 8, 8);
+    for (auto& v : m.vertices) {
+        CHECK(v.position.x == Catch::Approx(0.f));
+        CHECK(v.position.y == Catch::Approx(0.f));
+        CHECK(v.position.z == Catch::Approx(0.f));
+        CHECK(std::isfinite(v.normal.x));
+    }
+}
+
 TEST_CASE("Cylinder is closed (top + bottom caps + side strip)", "[primitives]") {
     int seg = 32;
     auto m = gen_cylinder(0.5f, 1.0f, seg);
