@@ -1,6 +1,7 @@
 #include <joon/evaluator.h>
 #include <joon/context.h>
 #include <joon/graph.h>
+#include <joon/scene.h>
 #include "ir/ir_graph.h"
 #include "interpreter/interpreter.h"
 #include "nodes/node_registry.h"
@@ -102,6 +103,7 @@ struct Evaluator::Impl {
     NodeRegistry registry;
     std::unique_ptr<PipelineCache> pipelines;
     VkDescriptorPool desc_pool = VK_NULL_HANDLE;
+    SceneCollection scene;
 
     Impl(Context& ctx, const Graph& source_graph)
         : ctx(ctx),
@@ -140,12 +142,16 @@ Evaluator::~Evaluator() = default;
 void Evaluator::evaluate() {
     vkResetDescriptorPool(m_impl->ctx.device().device, m_impl->desc_pool, 0);
 
+    // Drop any scene state from a previous evaluate so re-runs don't accumulate.
+    m_impl->scene.clear();
+
     EvalContext eval_ctx{
         m_impl->ctx.device(),
         m_impl->ctx.pool(),
         *m_impl->pipelines,
         512, 512,
-        m_impl->desc_pool
+        m_impl->desc_pool,
+        m_impl->scene
     };
 
     Interpreter interp(eval_ctx, m_impl->registry);
@@ -183,6 +189,10 @@ Result Evaluator::node_result(const std::string& name) {
 
 const std::vector<Diagnostic>& Evaluator::diagnostics() const {
     return m_impl->graph.ir().diagnostics;
+}
+
+const SceneCollection& Evaluator::scene_for_test() const {
+    return m_impl->scene;
 }
 
 } // namespace joon

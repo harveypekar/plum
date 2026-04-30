@@ -8,6 +8,11 @@ Interpreter::Interpreter(EvalContext& ctx, const NodeRegistry& registry)
 void Interpreter::evaluate(IRGraph& graph) {
     auto order = graph.topological_order();
 
+    // RENDER nodes (e.g. `pass`) must run AFTER all SCENE collection and GPU
+    // compute is done — the geometry pass needs the populated SceneCollection
+    // and any compute-produced textures it samples. Defer them.
+    std::vector<uint32_t> deferred_render;
+
     for (uint32_t id : order) {
         auto& node = graph.nodes[id];
 
@@ -35,10 +40,23 @@ void Interpreter::evaluate(IRGraph& graph) {
                 kw.value = graph.nodes[kw.source_node].constant_value;
         }
 
+        if (node.tier == Tier::RENDER) {
+            deferred_render.push_back(id);
+            continue;
+        }
+
         auto* executor = m_registry.find(node.op);
         if (executor) {
             (*executor)(node, m_ctx);
         }
+    }
+
+    // Deferred RENDER pass — no executors registered for these in sub-project 2's
+    // Task 5; Task 8 wires up `pass`. Nodes without executors are skipped harmlessly.
+    for (uint32_t id : deferred_render) {
+        auto& node = graph.nodes[id];
+        auto* executor = m_registry.find(node.op);
+        if (executor) (*executor)(node, m_ctx);
     }
 }
 
