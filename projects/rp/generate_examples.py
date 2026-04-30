@@ -271,6 +271,28 @@ async def deactivate_generic_examples(pool: asyncpg.Pool) -> int:
     return int(result.split()[-1])
 
 
+async def re_embed_examples(
+    pool: asyncpg.Pool, card_id: int, ollama_url: str,
+) -> None:
+    """Re-embed all active examples for a card using assistant-only text."""
+    rows = await pool.fetch(
+        "SELECT id, assistant_message FROM rp_fewshot_examples "
+        "WHERE card_id = $1 AND active = TRUE ORDER BY id",
+        card_id,
+    )
+    print(f"Re-embedding {len(rows)} examples with assistant-only text...")
+    async with httpx.AsyncClient() as client:
+        for i, row in enumerate(rows):
+            embedding = await embed_text(client, ollama_url, row["assistant_message"])
+            embedding_str = "[" + ",".join(str(f) for f in embedding) + "]"
+            await pool.execute(
+                "UPDATE rp_fewshot_examples SET embedding = $1::vector WHERE id = $2",
+                embedding_str, row["id"],
+            )
+            print(f"  [{i + 1}/{len(rows)}] id={row['id']}")
+    print("Done.")
+
+
 async def main() -> None:
     parser = argparse.ArgumentParser(
         description="Mine real conversations to generate per-card fewshot examples"
@@ -308,6 +330,10 @@ async def main() -> None:
         "--deactivate-generic", action="store_true",
         help="Deactivate card-agnostic (card_id=NULL) examples",
     )
+    parser.add_argument(
+        "--re-embed", action="store_true",
+        help="Re-embed existing examples with assistant-only text (no regeneration)",
+    )
     args = parser.parse_args()
     args.ollama_url = resolve_url(args.ollama_url)
 
@@ -344,6 +370,10 @@ async def main() -> None:
         if args.deactivate_old:
             n = await deactivate_old_examples(pool, args.card_id)
             print(f"Deactivated {n} existing examples for {char_name}")
+
+        if args.re_embed:
+            await re_embed_examples(pool, args.card_id, args.ollama_url)
+            return
 
         pairs = await get_conversation_pairs(
             pool, args.card_id, limit=0
@@ -443,7 +473,6 @@ async def main() -> None:
                     remaining = len(pairs) - (i + 1)
                     eta_mins = (avg_secs * remaining) / 60
 
-                    # Scene context for the embedding: user message + response
                     scene_context = (
                         pair["user_message"] + "\n" + response
                     )
@@ -452,7 +481,7 @@ async def main() -> None:
                     ) // 4
 
                     embedding = await embed_text(
-                        client, args.ollama_url, scene_context
+                        client, args.ollama_url, response
                     )
 
                     row_id = await insert_example(
