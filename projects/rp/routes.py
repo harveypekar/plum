@@ -57,6 +57,9 @@ def setup(app: FastAPI, ollama, resolve_model=None):
     _pipeline = create_default_pipeline()
     _resolve_model = resolve_model or (lambda m: m)
 
+    from .stock_phrases import make_stock_phrase_rewriter
+    _pipeline.add_post(make_stock_phrase_rewriter(_ollama, _resolve_model))
+
     # -- Cards --
 
     @app.get("/rp/cards", response_model=list[CardResponse])
