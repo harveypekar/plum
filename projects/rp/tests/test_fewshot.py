@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from projects.aiserver.ollama import OllamaClient, OllamaError
 import projects.rp.db as db
-from projects.rp.fewshot import get_fewshot_messages
+from projects.rp.fewshot import get_fewshot_messages, voice_is_drifting
 
 
 def test_embed_returns_vector():
@@ -229,6 +229,70 @@ def test_count_fewshot_examples_zero():
     assert result == 0
 
 
+# -- voice_is_drifting --
+
+
+class TestVoiceIsDrifting:
+    def test_fewer_than_three_messages_assumes_drift(self):
+        msgs = [
+            {"role": "user", "content": "Hi"},
+            {"role": "assistant", "content": "Hello there"},
+        ]
+        assert voice_is_drifting(msgs) is True
+
+    def test_no_assistant_messages_assumes_drift(self):
+        msgs = [
+            {"role": "user", "content": "Hi"},
+            {"role": "user", "content": "Hello"},
+        ]
+        assert voice_is_drifting(msgs) is True
+
+    def test_clean_voice_returns_false(self):
+        msgs = [
+            {"role": "user", "content": "What are you doing?"},
+            {"role": "assistant", "content": "She glanced up from the workbench, wiping grease from her fingers."},
+            {"role": "user", "content": "Can I help?"},
+            {"role": "assistant", "content": "A small smile tugged at her lips as she handed over the wrench."},
+            {"role": "user", "content": "Like this?"},
+            {"role": "assistant", "content": "She watched his clumsy grip and stepped closer to adjust his hold."},
+        ]
+        assert voice_is_drifting(msgs) is False
+
+    def test_stock_phrase_triggers_drift(self):
+        msgs = [
+            {"role": "user", "content": "What happened?"},
+            {"role": "assistant", "content": "She looked away, uncertain."},
+            {"role": "user", "content": "Tell me."},
+            {"role": "assistant", "content": "A quiet sigh escaped her."},
+            {"role": "user", "content": "Please."},
+            {"role": "assistant", "content": "Her breath caught in her throat and her heart pounded in her chest."},
+        ]
+        assert voice_is_drifting(msgs) is True
+
+    def test_high_trigram_overlap_triggers_drift(self):
+        repeated = "She crossed her arms and leaned against the wall watching him carefully"
+        msgs = [
+            {"role": "user", "content": "A"},
+            {"role": "assistant", "content": repeated + " with narrow eyes."},
+            {"role": "user", "content": "B"},
+            {"role": "assistant", "content": repeated + " with a frown."},
+            {"role": "user", "content": "C"},
+            {"role": "assistant", "content": repeated + " with suspicion."},
+        ]
+        assert voice_is_drifting(msgs) is True
+
+    def test_only_counts_assistant_messages(self):
+        msgs = [
+            {"role": "user", "content": "Her breath caught in her throat"},
+            {"role": "assistant", "content": "She nodded slowly, considering the question."},
+            {"role": "user", "content": "Her heart pounded in her chest"},
+            {"role": "assistant", "content": "The rain drummed against the window as she spoke."},
+            {"role": "user", "content": "Electricity coursed through her veins"},
+            {"role": "assistant", "content": "She set down her cup and met his gaze steadily."},
+        ]
+        assert voice_is_drifting(msgs) is False
+
+
 # -- fewshot.py: get_fewshot_messages --
 
 
@@ -251,7 +315,8 @@ def test_get_fewshot_messages_returns_pairs():
         {"user_message": "Farewell", "assistant_message": "Until we meet again"},
     ]
 
-    with patch("projects.rp.db.search_fewshot_examples", AsyncMock(return_value=examples)):
+    with patch("projects.rp.fewshot.voice_is_drifting", return_value=True), \
+         patch("projects.rp.db.search_fewshot_examples", AsyncMock(return_value=examples)):
         result = asyncio.run(get_fewshot_messages(ollama, messages, card_id=5))
 
     assert result == [
@@ -296,7 +361,8 @@ def test_get_fewshot_messages_no_results():
         {"role": "assistant", "content": "Hi"},
     ]
 
-    with patch("projects.rp.db.search_fewshot_examples", AsyncMock(return_value=[])):
+    with patch("projects.rp.fewshot.voice_is_drifting", return_value=True), \
+         patch("projects.rp.db.search_fewshot_examples", AsyncMock(return_value=[])):
         result = asyncio.run(get_fewshot_messages(ollama, messages, card_id=5))
 
     assert result == []
@@ -311,13 +377,14 @@ def test_get_fewshot_messages_error_returns_empty():
         {"role": "assistant", "content": "Hi"},
     ]
 
-    result = asyncio.run(get_fewshot_messages(ollama, messages, card_id=5))
+    with patch("projects.rp.fewshot.voice_is_drifting", return_value=True):
+        result = asyncio.run(get_fewshot_messages(ollama, messages, card_id=5))
 
     assert result == []
 
 
-def test_get_fewshot_messages_extracts_correct_context():
-    """get_fewshot_messages() passes the last user + assistant messages to embed()."""
+def test_get_fewshot_messages_embeds_assistant_only():
+    """get_fewshot_messages() embeds only the last assistant message for style matching."""
     ollama = _make_ollama()
     messages = [
         {"role": "user", "content": "First user message"},
@@ -326,8 +393,42 @@ def test_get_fewshot_messages_extracts_correct_context():
         {"role": "assistant", "content": "Second assistant response"},
     ]
 
-    with patch("projects.rp.db.search_fewshot_examples", AsyncMock(return_value=[])):
+    with patch("projects.rp.fewshot.voice_is_drifting", return_value=True), \
+         patch("projects.rp.db.search_fewshot_examples", AsyncMock(return_value=[])):
         asyncio.run(get_fewshot_messages(ollama, messages, card_id=5))
 
-    expected_summary = "Second user message\nSecond assistant response"
-    ollama.embed.assert_called_once_with("nomic-embed-text", expected_summary)
+    ollama.embed.assert_called_once_with("nomic-embed-text", "Second assistant response")
+
+
+def test_get_fewshot_messages_skips_when_voice_strong():
+    """get_fewshot_messages() returns [] without calling embed when voice is strong."""
+    ollama = _make_ollama()
+    messages = [
+        {"role": "user", "content": "Hello"},
+        {"role": "assistant", "content": "Hi"},
+    ]
+
+    with patch("projects.rp.fewshot.voice_is_drifting", return_value=False):
+        result = asyncio.run(get_fewshot_messages(ollama, messages, card_id=5))
+
+    assert result == []
+    ollama.embed.assert_not_called()
+
+
+def test_get_fewshot_messages_proceeds_when_voice_drifting():
+    """get_fewshot_messages() proceeds to retrieval when voice is drifting."""
+    ollama = _make_ollama()
+    messages = [
+        {"role": "user", "content": "Hello"},
+        {"role": "assistant", "content": "Hi there"},
+    ]
+    examples = [
+        {"user_message": "Hey", "assistant_message": "Greetings"},
+    ]
+
+    with patch("projects.rp.fewshot.voice_is_drifting", return_value=True), \
+         patch("projects.rp.db.search_fewshot_examples", AsyncMock(return_value=examples)):
+        result = asyncio.run(get_fewshot_messages(ollama, messages, card_id=5))
+
+    assert len(result) == 2
+    ollama.embed.assert_called_once()
