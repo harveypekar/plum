@@ -261,6 +261,79 @@ def clean_response(ctx: dict) -> dict:
     return ctx
 
 
+_PRONOUN_MAP = {
+    "she/her": {
+        "they": "she", "them": "her", "their": "her",
+        "themselves": "herself", "themself": "herself",
+        "They": "She", "Them": "Her", "Their": "Her",
+        "Themselves": "Herself", "Themself": "Herself",
+    },
+    "he/him": {
+        "they": "he", "them": "him", "their": "his",
+        "themselves": "himself", "themself": "himself",
+        "They": "He", "Them": "Him", "Their": "His",
+        "Themselves": "Himself", "Themself": "Himself",
+    },
+}
+
+_PLURAL_SIGNALS = re.compile(
+    r'\b(both|all|together|each other|the two|the three|the group|everyone)\b',
+    re.IGNORECASE,
+)
+
+
+def _fix_pronouns_in_sentence(sentence: str, mapping: dict) -> str:
+    """Replace they/them/their with correct pronouns in a single sentence."""
+    result = sentence
+    for wrong, right in mapping.items():
+        result = re.sub(r'\b' + wrong + r'\b', right, result)
+    return result
+
+
+def enforce_pronouns(ctx: dict) -> dict:
+    """Fix they/them → she/her or he/him when the character has explicit pronouns."""
+    pronouns = ctx.get("_char_pronouns", "")
+    if not pronouns:
+        return ctx
+
+    mapping = _PRONOUN_MAP.get(pronouns.lower().strip())
+    if not mapping:
+        return ctx
+
+    ai_name = ctx.get("ai_name", "")
+    response = ctx.get("response", "")
+    if not ai_name or not response:
+        return ctx
+
+    sentences = re.split(r'(?<=[.!?…"])\s+', response)
+    fixed = []
+    name_recent = False
+    corrections = 0
+    for sent in sentences:
+        has_name = ai_name.lower() in sent.lower()
+        has_plural = bool(_PLURAL_SIGNALS.search(sent))
+        has_they = bool(re.search(r'\b[Tt]he(?:y|m|ir|msel(?:f|ves))\b', sent))
+
+        if has_they and not has_plural and (has_name or name_recent):
+            new_sent = _fix_pronouns_in_sentence(sent, mapping)
+            if new_sent != sent:
+                corrections += 1
+            fixed.append(new_sent)
+        else:
+            fixed.append(sent)
+
+        if has_name:
+            name_recent = True
+        elif re.search(r'\b[A-Z][a-z]+\b', sent) and not has_name:
+            name_recent = False
+
+    if corrections:
+        ctx["response"] = " ".join(fixed)
+        ctx["_pronoun_corrections"] = corrections
+        _log.info("Fixed %d pronoun(s) for %s (%s)", corrections, ai_name, pronouns)
+    return ctx
+
+
 def check_stock_phrases(ctx: dict) -> dict:
     """Flag stock phrase violations in the response."""
     from .lora_curate import STOCK_PHRASES
@@ -326,5 +399,6 @@ def create_default_pipeline() -> Pipeline:
     p.add_pre(select_style)
     p.add_pre(inject_tools)
     p.add_post(clean_response)
+    p.add_post(enforce_pronouns)
     p.add_post(check_stock_phrases)
     return p

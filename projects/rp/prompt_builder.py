@@ -37,6 +37,12 @@ def get_user_name(ctx: dict) -> str:
     return user_data.get("name", "User")
 
 
+def get_ai_pronouns(ctx: dict) -> str:
+    ai_data = ctx.get("ai_card", {}).get("card_data", {}).get(
+        "data", ctx.get("ai_card", {}).get("card_data", {}))
+    return ai_data.get("pronouns", "")
+
+
 def get_ai_personality(ctx: dict) -> str:
     ai_data = ctx.get("ai_card", {}).get("card_data", {}).get(
         "data", ctx.get("ai_card", {}).get("card_data", {}))
@@ -63,7 +69,12 @@ def build_chat_messages(ctx: dict) -> list[dict]:
     if ctx.get("post_prompt"):
         chat_messages.append({"role": "system", "content": ctx["post_prompt"]})
     ai_name = get_ai_name(ctx)
-    chat_messages.append({"role": "assistant", "content": ai_name + " "})
+    pronouns = get_ai_pronouns(ctx)
+    if pronouns:
+        anchor = f"{ai_name} [{pronouns}] "
+    else:
+        anchor = ai_name + " "
+    chat_messages.append({"role": "assistant", "content": anchor})
     return chat_messages
 
 
