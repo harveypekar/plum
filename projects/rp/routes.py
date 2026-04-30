@@ -1,5 +1,4 @@
 import asyncio
-import copy
 import json
 import logging
 from fastapi import FastAPI, UploadFile, File, HTTPException, Request
@@ -13,17 +12,18 @@ from .models import (
     CardCreate, CardResponse, ScenarioCreate, ScenarioResponse,
     ConversationCreate, ConversationResponse, ConversationDetailResponse,
     MessageResponse, SendMessageRequest, EditMessageRequest, SceneStateRequest,
-    CompareRequest, SelectCandidateRequest,
 )
 from .pipeline import create_default_pipeline
-from dataclasses import asdict
-from .budget import fit_prompt, BudgetError, BudgetReport, allocate_injections
-from .context import get_strategy
-from .tokenizer import count_tokens
+from .budget import BudgetError, allocate_injections
 from .mcp_client import get_router as get_mcp_router
 from .research import research_dispatch
 from .fewshot import get_fewshot_messages
 from .summarize import maybe_generate_summary
+from .prompt_builder import (
+    get_ai_name, get_user_name, get_ai_personality,
+    build_chat_messages, build_ollama_options, scale_num_predict,
+    budget_to_json, build_pipeline_ctx, budget_ctx,
+)
 from . import conv_log
 
 # Priority levels from aiserver's inference queue (lower = higher priority).
@@ -36,17 +36,6 @@ _log = logging.getLogger(__name__)
 _ollama = None
 _pipeline = None
 _resolve_model = None
-
-
-def _budget_to_json(ctx: dict) -> dict | None:
-    report = ctx.get("_budget_report")
-    if not isinstance(report, BudgetReport):
-        return None
-    result = asdict(report)
-    alloc = ctx.get("_injection_alloc")
-    if alloc is not None:
-        result["injection"] = asdict(alloc)
-    return result
 
 
 async def init_mcp():
@@ -460,85 +449,14 @@ def setup(app: FastAPI, ollama, resolve_model=None):
 
     # -- Chat --
 
-    _chat_defaults = {"num_predict": 768, "num_ctx": 16384, "temperature": 1.05, "repeat_penalty": 1.08, "min_p": 0.1}
-
-    def _build_ollama_options(settings: dict) -> dict:
-        """Build ollama options from scenario settings with sensible defaults."""
-        opts = dict(_chat_defaults)
-        for k, v in settings.items():
-            if k not in ("max_context_tokens", "model"):
-                opts[k] = v
-        return opts
-
-    def _scale_num_predict(opts: dict, user_message: str) -> dict:
-        """Scale num_predict based on user message length to match response to beat."""
-        user_tokens = count_tokens(user_message)
-        scaled = max(256, min(1024, user_tokens * 2))
-        return {**opts, "num_predict": scaled}
-
     _template_path = Path(__file__).parent / "prompt.md"
 
     async def _build_pipeline_ctx(conv, messages):
-        """Load cards, scenario, template file and run pipeline pre-hooks."""
-        user_card = await db.get_card(conv["user_card_id"])
-        ai_card = await db.get_card(conv["ai_card_id"])
-        scenario = await db.get_scenario(conv["scenario_id"]) if conv["scenario_id"] else {}
-        scenario = scenario or {}
-
-        # Read prompt template from file (re-read each time so edits take effect)
-        prompt_template = ""
-        if _template_path.exists():
-            prompt_template = _template_path.read_text()
-
-        # Attach _sequence to each message so SummaryBuffer can filter
-        msg_dicts = []
-        for m in messages:
-            d = {"role": m["role"], "content": m["content"]}
-            d["_sequence"] = m.get("sequence", 0)
-            msg_dicts.append(d)
-
-        ctx = {
-            "user_card": user_card,
-            "ai_card": ai_card,
-            "scenario": scenario,
-            "messages": msg_dicts,
-            "system_prompt": "",
-            "post_prompt": "",
-            "scene_state": conv.get("scene_state", ""),
-            "prompt_template": prompt_template,
-        }
-
-        # Load latest summary for SummaryBuffer context strategy
-        summary_row = await db.get_latest_summary(conv["id"])
-        if summary_row:
-            ctx["_summary"] = summary_row["summary"]
-            ctx["_summary_through_sequence"] = summary_row["through_sequence"]
-
-        return await _pipeline.run_pre(ctx)
+        return await build_pipeline_ctx(
+            conv, messages, pipeline=_pipeline, template_path=_template_path)
 
     async def _budget_ctx(ctx, model, ollama_options):
-        """Run fit_prompt against ctx using SummaryBuffer strategy.
-
-        On BudgetError, logs a WARNING and re-raises — callers handle the
-        response (HTTP 413, stream error chunk, etc.).
-        """
-        strategy = get_strategy("summary_buffer")
-        num_predict = ollama_options.get("num_predict")
-        try:
-            return await fit_prompt(
-                ctx, model=model, ollama=_ollama,
-                strategy=strategy, num_predict=num_predict,
-                ground_truth=True,
-                model_ctx_override=ollama_options.get("num_ctx"),
-            )
-        except BudgetError as e:
-            _log.warning("Budget error for model=%s: %s", model, e)
-            raise
-
-    def _get_ai_name(ctx):
-        """Extract AI character name for response prefixing."""
-        ai_data = ctx.get("ai_card", {}).get("card_data", {}).get("data", ctx.get("ai_card", {}).get("card_data", {}))
-        return ai_data.get("name", "Character")
+        return await budget_ctx(ctx, model, ollama_options, ollama=_ollama)
 
     async def _maybe_summarize(conv_id: int, model: str,
                                ai_name: str, user_name: str, ai_personality: str):
@@ -658,27 +576,6 @@ def setup(app: FastAPI, ollama, resolve_model=None):
             clean = clean[len(char_name) + 1:].strip()
         return clean
 
-    def _build_chat_messages(ctx):
-        """Assemble the messages array for chat_stream()."""
-        chat_messages = [{"role": "system", "content": ctx["system_prompt"]}]
-        chat_messages.extend(ctx["messages"])
-        if ctx.get("post_prompt"):
-            chat_messages.append({"role": "system", "content": ctx["post_prompt"]})
-        # Add partial assistant message to anchor the model's voice
-        ai_name = _get_ai_name(ctx)
-        chat_messages.append({"role": "assistant", "content": ai_name + " "})
-        return chat_messages
-
-    def _get_user_name(ctx):
-        """Extract user character name for stop sequences."""
-        user_data = ctx.get("user_card", {}).get("card_data", {}).get("data", ctx.get("user_card", {}).get("card_data", {}))
-        return user_data.get("name", "User")
-
-    def _get_ai_personality(ctx):
-        """Extract AI character personality description."""
-        ai_data = ctx.get("ai_card", {}).get("card_data", {}).get("data", ctx.get("ai_card", {}).get("card_data", {}))
-        return ai_data.get("description", "")
-
     _log = logging.getLogger("rp.routes")
 
     _scene_state_model = "q36"
@@ -792,8 +689,8 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         model = _resolve_model(conv["model"])
         scenario = ctx.get("scenario") or {}
         settings = scenario.get("settings", {})
-        ollama_options = _scale_num_predict(
-            _build_ollama_options(settings), req.content)
+        ollama_options = scale_num_predict(
+            build_ollama_options(settings), req.content)
 
         # Gather optional injections (research + fewshot)
         research = await research_dispatch(_ollama, req.content)
@@ -844,8 +741,8 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         # Tell Ollama to load the model with its real context window
         ollama_options = {**ollama_options, "num_ctx": ctx["_num_ctx"]}
 
-        chat_messages = _build_chat_messages(ctx)
-        user_name = _get_user_name(ctx)
+        chat_messages = build_chat_messages(ctx)
+        user_name = get_user_name(ctx)
         conv_log.log_prompt(conv_id, "send_message", model,
                             ctx["system_prompt"], ctx.get("post_prompt", ""),
                             ctx["messages"], ollama_options)
@@ -909,22 +806,22 @@ def setup(app: FastAPI, ollama, resolve_model=None):
                 cur_messages.append({"role": "user", "content": "\n".join(tool_results) + "\n\nContinue your response naturally, incorporating the information above. Do not use [TOOL:] again for the same query."})
 
             try:
-                post_ctx = {"response": final_text, "ai_name": _get_ai_name(ctx)}
+                post_ctx = {"response": final_text, "ai_name": get_ai_name(ctx)}
                 post_ctx = await _pipeline.run_post(post_ctx)
                 await db.add_message(
                     conv_id, "assistant", post_ctx["response"], raw_response=raw,
                     system_prompt=ctx.get("system_prompt", ""),
                     scene_state=conv.get("scene_state", ""),
                     post_prompt=ctx.get("post_prompt", ""),
-                    budget_json=_budget_to_json(ctx),
+                    budget_json=budget_to_json(ctx),
                     prompt_json=chat_messages,
                 )
                 conv_log.log_response(conv_id, "assistant", post_ctx["response"], raw)
                 # Update scene state and maybe generate summary in background
                 asyncio.create_task(_auto_update_scene_state(conv_id, model,
-                                                _get_ai_name(ctx), _get_user_name(ctx), _get_ai_personality(ctx)))
+                                                get_ai_name(ctx), get_user_name(ctx), get_ai_personality(ctx)))
                 asyncio.create_task(_maybe_summarize(conv_id, model,
-                                                _get_ai_name(ctx), _get_user_name(ctx), _get_ai_personality(ctx)))
+                                                get_ai_name(ctx), get_user_name(ctx), get_ai_personality(ctx)))
             except Exception as e:
                 yield json.dumps({"error": f"Failed to save response: {e}", "done": True}) + "\n"
 
@@ -972,7 +869,7 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         model = _resolve_model(conv["model"])
         scenario = ctx.get("scenario") or {}
         settings = scenario.get("settings", {})
-        ollama_options = _build_ollama_options(settings)
+        ollama_options = build_ollama_options(settings)
 
         try:
             await _budget_ctx(ctx, model, ollama_options)
@@ -991,8 +888,8 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         # Tell Ollama to load the model with its real context window
         ollama_options = {**ollama_options, "num_ctx": ctx["_num_ctx"]}
 
-        chat_messages = _build_chat_messages(ctx)
-        user_name = _get_user_name(ctx)
+        chat_messages = build_chat_messages(ctx)
+        user_name = get_user_name(ctx)
         conv_log.log_prompt(conv_id, "regenerate", model,
                             ctx["system_prompt"], ctx.get("post_prompt", ""),
                             ctx["messages"], ollama_options)
@@ -1025,22 +922,22 @@ def setup(app: FastAPI, ollama, resolve_model=None):
                 return
             try:
                 response_text = "".join(tokens)
-                post_ctx = {"response": response_text, "ai_name": _get_ai_name(ctx)}
+                post_ctx = {"response": response_text, "ai_name": get_ai_name(ctx)}
                 post_ctx = await _pipeline.run_post(post_ctx)
                 await db.add_message(
                     conv_id, "assistant", post_ctx["response"], raw_response=raw,
                     system_prompt=ctx.get("system_prompt", ""),
                     scene_state=conv.get("scene_state", ""),
                     post_prompt=ctx.get("post_prompt", ""),
-                    budget_json=_budget_to_json(ctx),
+                    budget_json=budget_to_json(ctx),
                     prompt_json=chat_messages,
                 )
                 conv_log.log_response(conv_id, "assistant", post_ctx["response"], raw)
                 # Update scene state and maybe generate summary in background
                 asyncio.create_task(_auto_update_scene_state(conv_id, model,
-                                                _get_ai_name(ctx), _get_user_name(ctx), _get_ai_personality(ctx)))
+                                                get_ai_name(ctx), get_user_name(ctx), get_ai_personality(ctx)))
                 asyncio.create_task(_maybe_summarize(conv_id, model,
-                                                _get_ai_name(ctx), _get_user_name(ctx), _get_ai_personality(ctx)))
+                                                get_ai_name(ctx), get_user_name(ctx), get_ai_personality(ctx)))
             except Exception as e:
                 yield json.dumps({"error": f"Failed to save response: {e}", "done": True}) + "\n"
 
@@ -1058,7 +955,7 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         model = _resolve_model(conv["model"])
         scenario = ctx.get("scenario") or {}
         settings = scenario.get("settings", {})
-        ollama_options = _build_ollama_options(settings)
+        ollama_options = build_ollama_options(settings)
 
         try:
             await _budget_ctx(ctx, model, ollama_options)
@@ -1077,8 +974,8 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         # Tell Ollama to load the model with its real context window
         ollama_options = {**ollama_options, "num_ctx": ctx["_num_ctx"]}
 
-        chat_messages = _build_chat_messages(ctx)
-        user_name = _get_user_name(ctx)
+        chat_messages = build_chat_messages(ctx)
+        user_name = get_user_name(ctx)
         conv_log.log_prompt(conv_id, "continue", model,
                             ctx["system_prompt"], ctx.get("post_prompt", ""),
                             ctx["messages"], ollama_options)
@@ -1111,22 +1008,22 @@ def setup(app: FastAPI, ollama, resolve_model=None):
                 return
             try:
                 response_text = "".join(tokens)
-                post_ctx = {"response": response_text, "ai_name": _get_ai_name(ctx)}
+                post_ctx = {"response": response_text, "ai_name": get_ai_name(ctx)}
                 post_ctx = await _pipeline.run_post(post_ctx)
                 await db.add_message(
                     conv_id, "assistant", post_ctx["response"], raw_response=raw,
                     system_prompt=ctx.get("system_prompt", ""),
                     scene_state=conv.get("scene_state", ""),
                     post_prompt=ctx.get("post_prompt", ""),
-                    budget_json=_budget_to_json(ctx),
+                    budget_json=budget_to_json(ctx),
                     prompt_json=chat_messages,
                 )
                 conv_log.log_response(conv_id, "assistant", post_ctx["response"], raw)
                 # Update scene state and maybe generate summary in background
                 asyncio.create_task(_auto_update_scene_state(conv_id, model,
-                                                _get_ai_name(ctx), _get_user_name(ctx), _get_ai_personality(ctx)))
+                                                get_ai_name(ctx), get_user_name(ctx), get_ai_personality(ctx)))
                 asyncio.create_task(_maybe_summarize(conv_id, model,
-                                                _get_ai_name(ctx), _get_user_name(ctx), _get_ai_personality(ctx)))
+                                                get_ai_name(ctx), get_user_name(ctx), get_ai_personality(ctx)))
             except Exception as e:
                 yield json.dumps({"error": f"Failed to save response: {e}", "done": True}) + "\n"
 
@@ -1188,7 +1085,7 @@ def setup(app: FastAPI, ollama, resolve_model=None):
             model = _resolve_model(conv["model"])
         scenario = ctx.get("scenario") or {}
         settings = scenario.get("settings", {})
-        ollama_options = _build_ollama_options(settings)
+        ollama_options = build_ollama_options(settings)
         if generating_as_user:
             # Instruct model: lower temperature, no thinking
             ollama_options = {"temperature": 0.7, "num_predict": 256, "think": False}
@@ -1210,8 +1107,8 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         # Tell Ollama to load the model with its real context window
         ollama_options = {**ollama_options, "num_ctx": ctx["_num_ctx"]}
 
-        chat_messages = _build_chat_messages(ctx)
-        user_name = _get_user_name(ctx)
+        chat_messages = build_chat_messages(ctx)
+        user_name = get_user_name(ctx)
         conv_log.log_prompt(conv_id, "auto_reply", model,
                             ctx["system_prompt"], ctx.get("post_prompt", ""),
                             ctx["messages"], ollama_options)
@@ -1246,199 +1143,33 @@ def setup(app: FastAPI, ollama, resolve_model=None):
 
             try:
                 response_text = "".join(tokens)
-                post_ctx = {"response": response_text, "ai_name": _get_ai_name(ctx)}
+                post_ctx = {"response": response_text, "ai_name": get_ai_name(ctx)}
                 post_ctx = await _pipeline.run_post(post_ctx)
                 await db.add_message(
                     conv_id, save_role, post_ctx["response"], raw_response=raw,
                     system_prompt=ctx.get("system_prompt", ""),
                     scene_state=conv.get("scene_state", ""),
                     post_prompt=ctx.get("post_prompt", ""),
-                    budget_json=_budget_to_json(ctx),
+                    budget_json=budget_to_json(ctx),
                     prompt_json=chat_messages,
                 )
                 conv_log.log_response(conv_id, save_role, post_ctx["response"], raw)
                 # Update scene state and maybe generate summary in background
                 asyncio.create_task(_auto_update_scene_state(conv_id, model,
-                                                _get_ai_name(ctx), _get_user_name(ctx), _get_ai_personality(ctx)))
+                                                get_ai_name(ctx), get_user_name(ctx), get_ai_personality(ctx)))
                 asyncio.create_task(_maybe_summarize(conv_id, model,
-                                                _get_ai_name(ctx), _get_user_name(ctx), _get_ai_personality(ctx)))
+                                                get_ai_name(ctx), get_user_name(ctx), get_ai_personality(ctx)))
             except Exception as e:
                 yield json.dumps({"error": f"Failed to save response: {e}", "done": True}) + "\n"
 
         return StreamingResponse(stream(), media_type="application/x-ndjson")
 
     # -- Compare (A/B eval) --
-
-    @app.post("/rp/conversations/{conv_id}/compare")
-    async def compare_message(conv_id: int, req: CompareRequest):
-        conv = await db.get_conversation(conv_id)
-        if not conv:
-            raise HTTPException(404, "Conversation not found")
-
-        await db.add_message(conv_id, "user", req.content)
-        conv_log.log_response(conv_id, "user", req.content)
-
-        messages = await db.get_messages(conv_id)
-        next_seq = max((m["sequence"] for m in messages), default=0) + 1
-
-        eval_set = await db.create_eval_set(conv_id, next_seq)
-
-        base_ctx = await _build_pipeline_ctx(conv, messages)
-        base_model = _resolve_model(conv["model"])
-        scenario = base_ctx.get("scenario") or {}
-        settings = scenario.get("settings", {})
-        base_ollama_options = _scale_num_predict(
-            _build_ollama_options(settings), req.content)
-
-        research = await research_dispatch(_ollama, req.content)
-        fewshot_msgs = await get_fewshot_messages(
-            _ollama, base_ctx["messages"], card_id=conv["ai_card_id"],
-        )
-
-        alloc = await allocate_injections(
-            base_ctx, model=base_model, ollama=_ollama,
-            num_predict=base_ollama_options.get("num_predict"),
-            research_text=research,
-            fewshot_msgs=fewshot_msgs if fewshot_msgs and base_ctx["messages"] else None,
-            model_ctx_override=base_ollama_options.get("num_ctx"),
-        )
-
-        if research and alloc.keep_research:
-            base_ctx["post_prompt"] = (
-                base_ctx.get("post_prompt", "")
-                + "\n\n[Research notes — weave these facts naturally if relevant, "
-                + "don't quote them verbatim or mention looking anything up]\n"
-                + research
-            )
-
-        if fewshot_msgs and base_ctx["messages"] and alloc.keep_fewshot:
-            base_ctx["messages"] = [base_ctx["messages"][0]] + fewshot_msgs + base_ctx["messages"][1:]
-
-        base_ctx["_injection_alloc"] = alloc
-
-        async def generate_candidate(cfg, candidate_row):
-            ctx = copy.deepcopy(base_ctx)
-            model = _resolve_model(cfg.model) if cfg.model else base_model
-            ollama_options = dict(base_ollama_options)
-            if cfg.temperature is not None:
-                ollama_options["temperature"] = cfg.temperature
-            if cfg.num_predict is not None:
-                ollama_options["num_predict"] = cfg.num_predict
-
-            try:
-                await _budget_ctx(ctx, model, ollama_options)
-            except BudgetError as e:
-                await db.update_eval_candidate(
-                    candidate_row["id"],
-                    content=f"[budget error: {e}]",
-                )
-                return
-
-            ollama_options = {**ollama_options, "num_ctx": ctx["_num_ctx"]}
-            chat_messages = _build_chat_messages(ctx)
-            user_name = _get_user_name(ctx)
-
-            tokens = []
-            raw = {}
-            try:
-                async for chunk in _ollama.chat_stream(
-                    model=model, messages=chat_messages,
-                    options=ollama_options, stop=[f"{user_name}:"],
-                ):
-                    if chunk.get("done"):
-                        raw = chunk
-                    elif not chunk.get("thinking"):
-                        tokens.append(chunk["token"])
-            except Exception as e:
-                await db.update_eval_candidate(
-                    candidate_row["id"],
-                    content=f"[generation error: {e}]",
-                )
-                return
-
-            response_text = "".join(tokens)
-            post_ctx = {"response": response_text, "ai_name": _get_ai_name(ctx)}
-            post_ctx = await _pipeline.run_post(post_ctx)
-            await db.update_eval_candidate(
-                candidate_row["id"],
-                content=post_ctx["response"],
-                raw_response=raw,
-                prompt_json=chat_messages,
-                budget_json=_budget_to_json(ctx),
-            )
-
-        # Create candidate rows first, then generate in parallel
-        tasks = []
-        for cfg in req.configs:
-            label = cfg.label or cfg.model or "default"
-            model_name = cfg.model or conv["model"]
-            config_dict = cfg.model_dump(exclude_none=True)
-            candidate_row = await db.add_eval_candidate(
-                eval_set["id"], label, model_name, config_dict,
-            )
-            tasks.append(generate_candidate(cfg, candidate_row))
-
-        await asyncio.gather(*tasks)
-
-        candidates = await db.get_eval_candidates(eval_set["id"])
-        return {
-            "eval_set_id": eval_set["id"],
-            "conversation_id": conv_id,
-            "sequence": next_seq,
-            "candidates": candidates,
-        }
-
-    @app.post("/rp/eval-sets/{eval_set_id}/select")
-    async def select_candidate(eval_set_id: int, req: SelectCandidateRequest):
-        eval_set = await db.get_eval_set(eval_set_id)
-        if not eval_set:
-            raise HTTPException(404, "Eval set not found")
-
-        candidates = await db.get_eval_candidates(eval_set_id)
-        winner = next((c for c in candidates if c["id"] == req.candidate_id), None)
-        if not winner:
-            raise HTTPException(404, "Candidate not found in this eval set")
-
-        conv_id = eval_set["conversation_id"]
-        conv = await db.get_conversation(conv_id)
-
-        await db.add_message(
-            conv_id, "assistant", winner["content"],
-            raw_response=winner.get("raw_response"),
-            system_prompt=None,
-            scene_state=conv.get("scene_state", ""),
-            post_prompt=None,
-            budget_json=winner.get("budget_json"),
-            prompt_json=winner.get("prompt_json"),
-        )
-        await db.select_eval_candidate(eval_set_id, req.candidate_id)
-
-        asyncio.create_task(_auto_update_scene_state(
-            conv_id, conv["model"],
-            _get_ai_name({"ai_card": await db.get_card(conv["ai_card_id"])}),
-            _get_user_name({"user_card": await db.get_card(conv["user_card_id"])}),
-            _get_ai_personality({"ai_card": await db.get_card(conv["ai_card_id"])}),
-        ))
-
-        return {
-            "ok": True,
-            "eval_set_id": eval_set_id,
-            "selected_candidate_id": req.candidate_id,
-            "content": winner["content"],
-        }
-
-    @app.get("/rp/eval-sets/{eval_set_id}")
-    async def get_eval_set_detail(eval_set_id: int):
-        eval_set = await db.get_eval_set(eval_set_id)
-        if not eval_set:
-            raise HTTPException(404, "Eval set not found")
-        candidates = await db.get_eval_candidates(eval_set_id)
-        return {"eval_set": eval_set, "candidates": candidates}
-
-    @app.get("/rp/conversations/{conv_id}/eval-sets")
-    async def list_eval_sets(conv_id: int):
-        sets = await db.get_eval_sets_for_conversation(conv_id)
-        return sets
+    from .eval_routes import setup_eval_routes
+    setup_eval_routes(
+        app, _ollama, _pipeline, _resolve_model, _template_path,
+        _auto_update_scene_state,
+    )
 
     # -- Static files --
     static_dir = Path(__file__).parent / "static"
