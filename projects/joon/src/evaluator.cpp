@@ -114,15 +114,17 @@ struct Evaluator::Impl {
         graph = ctx.parse_string(""); // placeholder
         graph.ir() = source_graph.ir(); // copy IR
 
-        VkDescriptorPoolSize pool_size{};
-        pool_size.type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-        pool_size.descriptorCount = 256;
+        VkDescriptorPoolSize pool_sizes[2]{};
+        pool_sizes[0].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+        pool_sizes[0].descriptorCount = 256;
+        pool_sizes[1].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        pool_sizes[1].descriptorCount = 256;   // for graphics-pipeline UBOs (geometry pass)
 
         VkDescriptorPoolCreateInfo pool_info{};
         pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-        pool_info.maxSets = 128;
-        pool_info.poolSizeCount = 1;
-        pool_info.pPoolSizes = &pool_size;
+        pool_info.maxSets = 256;
+        pool_info.poolSizeCount = 2;
+        pool_info.pPoolSizes = pool_sizes;
         pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
         vkCreateDescriptorPool(ctx.device().device, &pool_info, nullptr, &desc_pool);
     }

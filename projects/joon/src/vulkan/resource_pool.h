@@ -22,6 +22,16 @@ public:
     GpuImage* alloc_image(uint32_t node_id, uint32_t width, uint32_t height,
                           VkFormat format = VK_FORMAT_R32G32B32A32_SFLOAT);
 
+    // Like alloc_image but adds COLOR_ATTACHMENT_BIT for use as a render target.
+    // Same format default keeps the existing read_pixels() / compute pipeline
+    // contract — render targets are sampleable and compute-writeable.
+    GpuImage* alloc_render_target(uint32_t node_id, uint32_t width, uint32_t height,
+                                   VkFormat format = VK_FORMAT_R32G32B32A32_SFLOAT);
+
+    // Depth attachment with DEPTH_STENCIL_ATTACHMENT_BIT and depth-aspect view.
+    GpuImage* alloc_depth(uint32_t node_id, uint32_t width, uint32_t height,
+                           VkFormat format = VK_FORMAT_D32_SFLOAT);
+
     GpuImage* get_image(uint32_t node_id);
 
     void upload(GpuImage* img, const void* data, size_t size);

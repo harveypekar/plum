@@ -21,6 +21,7 @@ NodeRegistry NodeRegistry::create_default() {
     register_image_ops(reg);
     register_save(reg);
     register_scene_nodes(reg);
+    register_geometry_pass(reg);
     return reg;
 }
 

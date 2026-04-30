@@ -42,5 +42,6 @@ void register_math_ops(NodeRegistry& reg);
 void register_image_ops(NodeRegistry& reg);
 void register_save(NodeRegistry& reg);
 void register_scene_nodes(NodeRegistry& reg);
+void register_geometry_pass(NodeRegistry& reg);
 
 } // namespace joon
