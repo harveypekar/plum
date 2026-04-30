@@ -242,7 +242,12 @@ def _render_for_count(ctx: dict) -> list[dict]:
         "data", ctx.get("ai_card", {}).get("card_data", {})
     )
     ai_name = ai_data.get("name", "Character")
-    msgs.append({"role": "assistant", "content": ai_name + " "})
+    pronouns = ai_data.get("pronouns", "")
+    if pronouns:
+        anchor = f"{ai_name} [{pronouns}] "
+    else:
+        anchor = ai_name + " "
+    msgs.append({"role": "assistant", "content": anchor})
     return msgs
 
 

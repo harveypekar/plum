@@ -14,7 +14,7 @@ from .budget import BudgetError, allocate_injections
 from .research import research_dispatch
 from .fewshot import get_fewshot_messages
 from .prompt_builder import (
-    get_ai_name, get_user_name, get_ai_personality,
+    get_ai_name, get_user_name, get_ai_personality, get_ai_pronouns,
     build_chat_messages, build_ollama_options, scale_num_predict,
     budget_to_json, build_pipeline_ctx, budget_ctx,
 )
@@ -128,7 +128,7 @@ def setup_eval_routes(
                 return
 
             response_text = "".join(tokens)
-            post_ctx = {"response": response_text, "ai_name": get_ai_name(ctx)}
+            post_ctx = {"response": response_text, "ai_name": get_ai_name(ctx), "_char_pronouns": get_ai_pronouns(ctx)}
             post_ctx = await pipeline.run_post(post_ctx)
             await db.update_eval_candidate(
                 candidate_row["id"],

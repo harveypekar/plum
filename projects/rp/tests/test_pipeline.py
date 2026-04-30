@@ -81,7 +81,7 @@ def test_default_template_has_system_and_post():
 from projects.rp.pipeline import (  # noqa: E402
     _split_template, _parse_style_items, _parse_scene_style_items,
     _match_scene_condition, select_style, clean_response,
-    check_stock_phrases, Pipeline, STYLE_ITEMS_PER_TURN,
+    check_stock_phrases, enforce_pronouns, Pipeline, STYLE_ITEMS_PER_TURN,
 )
 import asyncio  # noqa: E402
 
@@ -519,6 +519,112 @@ class TestCheckStockPhrases:
         ctx = {"response": "Her HEART POUNDED IN her chest."}
         check_stock_phrases(ctx)
         assert len(ctx["_stock_phrase_violations"]) == 1
+
+
+class TestEnforcePronouns:
+    def test_fixes_they_to_she(self):
+        ctx = {
+            "response": "Kasa looked up. They smiled softly.",
+            "ai_name": "Kasa",
+            "_char_pronouns": "she/her",
+        }
+        result = enforce_pronouns(ctx)
+        assert "She smiled softly" in result["response"]
+        assert result["_pronoun_corrections"] == 1
+
+    def test_fixes_them_to_her(self):
+        ctx = {
+            "response": "Kasa stepped forward and Val reached for them.",
+            "ai_name": "Kasa",
+            "_char_pronouns": "she/her",
+        }
+        result = enforce_pronouns(ctx)
+        assert "reached for her" in result["response"]
+
+    def test_fixes_their_to_her(self):
+        ctx = {
+            "response": "Kasa tucked their hair behind their ear.",
+            "ai_name": "Kasa",
+            "_char_pronouns": "she/her",
+        }
+        result = enforce_pronouns(ctx)
+        assert "her hair" in result["response"]
+        assert "her ear" in result["response"]
+
+    def test_fixes_he_him(self):
+        ctx = {
+            "response": "Marcus crossed the room. They sat down heavily.",
+            "ai_name": "Marcus",
+            "_char_pronouns": "he/him",
+        }
+        result = enforce_pronouns(ctx)
+        assert "He sat down" in result["response"]
+
+    def test_no_fix_without_pronouns(self):
+        ctx = {
+            "response": "Kasa looked up. They smiled.",
+            "ai_name": "Kasa",
+            "_char_pronouns": "",
+        }
+        result = enforce_pronouns(ctx)
+        assert "They smiled" in result["response"]
+        assert "_pronoun_corrections" not in result
+
+    def test_no_fix_for_they_them_character(self):
+        ctx = {
+            "response": "River smiled. They waved goodbye.",
+            "ai_name": "River",
+            "_char_pronouns": "they/them",
+        }
+        result = enforce_pronouns(ctx)
+        assert "They waved" in result["response"]
+        assert "_pronoun_corrections" not in result
+
+    def test_skips_plural_context(self):
+        ctx = {
+            "response": "Kasa and Val looked at each other. They both laughed.",
+            "ai_name": "Kasa",
+            "_char_pronouns": "she/her",
+        }
+        result = enforce_pronouns(ctx)
+        assert "They both" in result["response"]
+
+    def test_skips_sentences_without_name_context(self):
+        ctx = {
+            "response": "The crowd dispersed. They headed home.",
+            "ai_name": "Kasa",
+            "_char_pronouns": "she/her",
+        }
+        result = enforce_pronouns(ctx)
+        assert "They headed home" in result["response"]
+
+    def test_fixes_continuation_after_name(self):
+        ctx = {
+            "response": "Kasa stood up slowly. They brushed off their jeans.",
+            "ai_name": "Kasa",
+            "_char_pronouns": "she/her",
+        }
+        result = enforce_pronouns(ctx)
+        assert "She brushed off her jeans" in result["response"]
+
+    def test_preserves_case_at_sentence_start(self):
+        ctx = {
+            "response": "Kasa waited. They fidgeted with the hem.",
+            "ai_name": "Kasa",
+            "_char_pronouns": "she/her",
+        }
+        result = enforce_pronouns(ctx)
+        assert "She fidgeted" in result["response"]
+
+    def test_no_change_when_no_misgendering(self):
+        ctx = {
+            "response": "Kasa smiled. She tucked her hair back.",
+            "ai_name": "Kasa",
+            "_char_pronouns": "she/her",
+        }
+        result = enforce_pronouns(ctx)
+        assert result["response"] == "Kasa smiled. She tucked her hair back."
+        assert "_pronoun_corrections" not in result
 
 
 class TestDefaultTemplate:

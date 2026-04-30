@@ -1,19 +1,21 @@
 from projects.rp.prompt_builder import (
-    get_ai_name, get_user_name, get_ai_personality,
+    get_ai_name, get_user_name, get_ai_personality, get_ai_pronouns,
     build_chat_messages, build_ollama_options, scale_num_predict,
     budget_to_json, CHAT_DEFAULTS,
 )
 
 
-def _card(name="Char", description="", personality=""):
+def _card(name="Char", description="", personality="", pronouns=""):
     return {"card_data": {"data": {
         "name": name, "description": description, "personality": personality,
+        "pronouns": pronouns,
     }}}
 
 
-def _ctx(ai_name="Char", user_name="User", ai_desc="", messages=None):
+def _ctx(ai_name="Char", user_name="User", ai_desc="", messages=None,
+         ai_pronouns=""):
     return {
-        "ai_card": _card(ai_name, description=ai_desc),
+        "ai_card": _card(ai_name, description=ai_desc, pronouns=ai_pronouns),
         "user_card": _card(user_name),
         "system_prompt": "System prompt",
         "post_prompt": "Post prompt",
@@ -108,6 +110,41 @@ class TestScaleNumPredict:
     def test_preserves_other_keys(self):
         opts = scale_num_predict({"num_predict": 768, "temperature": 0.8}, "hello")
         assert opts["temperature"] == 0.8
+
+
+class TestGetAiPronouns:
+    def test_extracts_pronouns(self):
+        ctx = {"ai_card": _card("Kasa", pronouns="she/her")}
+        assert get_ai_pronouns(ctx) == "she/her"
+
+    def test_default_empty(self):
+        assert get_ai_pronouns({}) == ""
+
+    def test_no_pronouns_in_card(self):
+        ctx = {"ai_card": _card("Kasa")}
+        assert get_ai_pronouns(ctx) == ""
+
+
+class TestBuildChatMessagesWithPronouns:
+    def test_includes_pronouns_in_anchor(self):
+        ctx = _ctx(ai_name="Kasa", ai_pronouns="she/her")
+        msgs = build_chat_messages(ctx)
+        assert msgs[-1]["content"] == "Kasa [she/her] "
+
+    def test_no_pronouns_plain_anchor(self):
+        ctx = _ctx(ai_name="Kasa")
+        msgs = build_chat_messages(ctx)
+        assert msgs[-1]["content"] == "Kasa "
+
+    def test_he_him_pronouns(self):
+        ctx = _ctx(ai_name="Marcus", ai_pronouns="he/him")
+        msgs = build_chat_messages(ctx)
+        assert msgs[-1]["content"] == "Marcus [he/him] "
+
+    def test_they_them_pronouns(self):
+        ctx = _ctx(ai_name="River", ai_pronouns="they/them")
+        msgs = build_chat_messages(ctx)
+        assert msgs[-1]["content"] == "River [they/them] "
 
 
 class TestBudgetToJson:
