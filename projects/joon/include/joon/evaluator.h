@@ -12,6 +12,7 @@ class Graph;
 struct Diagnostic;
 class ResourcePool;
 struct GpuImage;
+struct SceneCollection;
 
 template<typename T>
 class Param {
@@ -55,6 +56,11 @@ public:
     Result node_result(const std::string& name);
 
     const std::vector<Diagnostic>& diagnostics() const;
+
+    // Test-only accessor returning the most recent SceneCollection populated
+    // during evaluate(). Sub-project 2 exposes this so unit tests can verify
+    // scene-tier executors without going through the renderer.
+    const SceneCollection& scene_for_test() const;
 
 private:
     friend class Context;

@@ -7,11 +7,14 @@ void App::init() {
     ctx = joon::Context::create();
     ctx->device().log_fn = joon_log::write;
 
-    dsl_source = R"(; Joon - edit this code
-(def base (noise :scale 4.0 :octaves 3))
-(param contrast float 1.2 :min 0.0 :max 3.0)
-(def result (levels base :contrast contrast))
-(output result)
+    dsl_source = R"(; Joon - 3D scene
+(def c (cube :scale 1.0))
+(def cam (camera :fov 60))
+(def l (light :intensity 1.0))
+(def gbuf (pass))
+(param contrast float 1.0 :min 0.0 :max 3.0)
+(def final (levels gbuf :contrast contrast))
+(output final)
 )";
 
     VkSamplerCreateInfo sampler_info{};

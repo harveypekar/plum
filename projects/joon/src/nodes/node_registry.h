@@ -10,6 +10,8 @@
 
 namespace joon {
 
+struct SceneCollection;
+
 struct EvalContext {
     Device& device;
     ResourcePool& pool;
@@ -17,6 +19,7 @@ struct EvalContext {
     uint32_t default_width;
     uint32_t default_height;
     VkDescriptorPool desc_pool;
+    SceneCollection& scene;
 };
 
 using NodeExecutor = std::function<void(const Node& node, EvalContext& ctx)>;
@@ -38,5 +41,7 @@ void register_color(NodeRegistry& reg);
 void register_math_ops(NodeRegistry& reg);
 void register_image_ops(NodeRegistry& reg);
 void register_save(NodeRegistry& reg);
+void register_scene_nodes(NodeRegistry& reg);
+void register_geometry_pass(NodeRegistry& reg);
 
 } // namespace joon

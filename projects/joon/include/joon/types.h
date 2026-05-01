@@ -42,7 +42,11 @@ enum class Type {
     VEC4,
     MAT3,
     MAT4,
-    IMAGE
+    IMAGE,
+    SCENE_OBJECT,
+    LIGHT,
+    CAMERA,
+    RENDER_TARGET
 };
 
 using Value = std::variant<
