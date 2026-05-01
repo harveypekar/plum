@@ -30,9 +30,9 @@ void type_check(IRGraph& graph) {
             continue;
         }
 
-        // Scene and render tiers carry their own output types set during
-        // IR lowering; type checking for those is handled by future passes.
-        if (node.tier == Tier::SCENE || node.tier == Tier::RENDER) {
+        // Material, scene, and render tiers carry their own output types set
+        // during IR lowering; type checking for those is handled by future passes.
+        if (node.tier == Tier::MATERIAL || node.tier == Tier::SCENE || node.tier == Tier::RENDER) {
             continue;
         }
 

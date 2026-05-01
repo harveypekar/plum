@@ -46,7 +46,8 @@ enum class Type {
     SCENE_OBJECT,
     LIGHT,
     CAMERA,
-    RENDER_TARGET
+    RENDER_TARGET,
+    MATERIAL
 };
 
 using Value = std::variant<

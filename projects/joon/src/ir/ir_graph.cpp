@@ -104,10 +104,14 @@ uint32_t IRGraph::resolve_expr(const AstNode& expr) {
         static const std::unordered_set<std::string> CPU_OPS = {
             "image", "color", "save"
         };
+        static const std::unordered_set<std::string> MATERIAL_OPS = { "shader" };
 
         Tier tier;
         Type output_type = Type::FLOAT;
-        if (SCENE_OPS.count(call->op)) {
+        if (MATERIAL_OPS.count(call->op)) {
+            tier = Tier::MATERIAL;
+            output_type = Type::MATERIAL;
+        } else if (SCENE_OPS.count(call->op)) {
             tier = Tier::SCENE;
             if (call->op == "light") output_type = Type::LIGHT;
             else if (call->op == "camera") output_type = Type::CAMERA;
@@ -146,6 +150,24 @@ uint32_t IRGraph::resolve_expr(const AstNode& expr) {
                     nodes[id].string_arg = ksym->name;
                 }
             }
+        }
+
+        if (call->op == "shader") {
+            ShaderDef sd;
+            for (auto& kw : call->kwargs) {
+                auto* fn = std::get_if<FnNode>(&kw.value->data);
+                if (!fn) continue;
+                ShaderFnDef fndef;
+                fndef.params = fn->params;
+                for (auto& o : fn->outputs)
+                    fndef.outputs.push_back({o.name, o.type_name});
+                for (auto& b : fn->body)
+                    fndef.body.push_back(std::shared_ptr<AstNode>(std::move(b)));
+                if (kw.name == "vertex") sd.vertex = std::move(fndef);
+                else if (kw.name == "fragment") sd.fragment = std::move(fndef);
+                else if (kw.name == "brdf") sd.brdf = std::move(fndef);
+            }
+            shader_defs[id] = std::move(sd);
         }
 
         return id;

@@ -22,6 +22,7 @@ public:
     std::vector<ParamInfo> params;
     std::vector<OutputInfo> outputs;
     std::vector<Diagnostic> diagnostics;
+    std::unordered_map<uint32_t, ShaderDef> shader_defs;
 
     static IRGraph from_ast(const Program& program);
 

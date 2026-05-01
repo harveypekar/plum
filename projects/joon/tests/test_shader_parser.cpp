@@ -1,5 +1,8 @@
 #include "catch_amalgamated.hpp"
 #include "dsl/parser.h"
+#include <joon/context.h>
+#include <joon/graph.h>
+#include "ir/ir_graph.h"
 using namespace joon;
 
 TEST_CASE("Parse vector literal", "[shader][parser]") {
@@ -86,4 +89,58 @@ TEST_CASE("Parse chained dot access", "[shader][parser]") {
     auto* inner = std::get_if<DotAccessNode>(&dot->object->data);
     REQUIRE(inner != nullptr);
     CHECK(inner->field == "b");
+}
+
+TEST_CASE("shader op lowers to MATERIAL tier", "[shader][ir]") {
+    auto ctx = Context::create();
+    auto graph = ctx->parse_string(R"(
+        (def mat (shader
+          :fragment (fn [normal uv] -> [albedo vec4]
+            (set albedo [1 0 0 1]))))
+    )");
+    REQUIRE_FALSE(graph.has_errors());
+
+    auto& ir = graph.ir();
+    bool found_material = false;
+    for (auto& n : ir.nodes) {
+        if (n.tier == Tier::MATERIAL) {
+            found_material = true;
+            CHECK(n.op == "shader");
+            CHECK(n.output_type == Type::MATERIAL);
+            auto sd_it = ir.shader_defs.find(n.id);
+            REQUIRE(sd_it != ir.shader_defs.end());
+            auto& sd = sd_it->second;
+            REQUIRE(sd.fragment.has_value());
+            CHECK(sd.fragment->params.size() == 2);
+            CHECK(sd.fragment->outputs.size() == 1);
+            CHECK(sd.fragment->outputs[0].name == "albedo");
+            CHECK(sd.fragment->body.size() == 1);
+        }
+    }
+    CHECK(found_material);
+}
+
+TEST_CASE("shader with all three clauses", "[shader][ir]") {
+    auto ctx = Context::create();
+    auto graph = ctx->parse_string(R"(
+        (def mat (shader
+          :vertex (fn [pos normal uv] (set pos.y (* pos.x 2.0)))
+          :brdf (fn [normal light_dir view_dir albedo]
+            (* albedo (dot normal light_dir)))
+          :fragment (fn [normal uv] -> [albedo vec4]
+            (set albedo [1 0 0 1]))))
+    )");
+    REQUIRE_FALSE(graph.has_errors());
+
+    auto& ir = graph.ir();
+    auto* mat = ir.find_node_by_name("mat");
+    REQUIRE(mat);
+    auto sd_it = ir.shader_defs.find(mat->id);
+    REQUIRE(sd_it != ir.shader_defs.end());
+    auto& sd = sd_it->second;
+    CHECK(sd.vertex.has_value());
+    CHECK(sd.fragment.has_value());
+    CHECK(sd.brdf.has_value());
+    CHECK(sd.vertex->params.size() == 3);
+    CHECK(sd.brdf->params.size() == 4);
 }
