@@ -187,6 +187,12 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_column THEN NULL;
 END $$;
 
+-- Migration: preference tags on eval selections
+DO $$ BEGIN
+    ALTER TABLE rp_eval_sets ADD COLUMN preference_tags JSONB DEFAULT '[]';
+EXCEPTION WHEN duplicate_column THEN NULL;
+END $$;
+
 CREATE TABLE IF NOT EXISTS rp_eval_metrics (
     id              SERIAL PRIMARY KEY,
     domain          TEXT NOT NULL,

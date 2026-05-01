@@ -96,3 +96,4 @@ class CompareRequest(BaseModel):
 
 class SelectCandidateRequest(BaseModel):
     candidate_id: int
+    preference_tags: list[str] = []

@@ -339,11 +339,14 @@ async def update_eval_candidate(candidate_id: int, content: str,
     return dict(row)
 
 
-async def select_eval_candidate(eval_set_id: int, candidate_id: int) -> dict:
+async def select_eval_candidate(eval_set_id: int, candidate_id: int,
+                                preference_tags: list[str] | None = None) -> dict:
     pool = await get_pool()
+    tags_json = json.dumps(preference_tags or [])
     row = await pool.fetchrow(
-        "UPDATE rp_eval_sets SET selected_id = $2 WHERE id = $1 RETURNING *",
-        eval_set_id, candidate_id,
+        "UPDATE rp_eval_sets SET selected_id = $2, preference_tags = $3::jsonb "
+        "WHERE id = $1 RETURNING *",
+        eval_set_id, candidate_id, tags_json,
     )
     return dict(row)
 

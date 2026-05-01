@@ -754,9 +754,9 @@
     if (!content || !currentConvId || isStreaming) return;
 
     const configs = [
-      { label: "T=0.6", temperature: 0.6 },
-      { label: "T=0.8 (default)", temperature: 0.8 },
-      { label: "T=1.0", temperature: 1.0 },
+      { label: "Baseline", temperature: 0.8 },
+      { label: "Creative", temperature: 1.1 },
+      { label: "Concise", temperature: 0.8, num_predict: 384 },
     ];
 
     input.value = "";
