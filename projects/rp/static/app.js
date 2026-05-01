@@ -372,7 +372,7 @@
     }
 
     // Load latest summary for the Summary tab
-    api("GET", "/rp/conversations/" + id + "/summaries").then(function (summaries) {
+    api("GET", "/rp/conversations/" + conversation.id + "/summaries").then(function (summaries) {
       if (summaries && summaries.length > 0) {
         var latest = summaries[summaries.length - 1];
         $("underHoodSummaryContent").textContent =

@@ -73,6 +73,11 @@ class SendMessageRequest(BaseModel):
     content: str
 
 
+class SavePartialRequest(BaseModel):
+    content: str
+    role: str = "assistant"
+
+
 class EditMessageRequest(BaseModel):
     content: str
 

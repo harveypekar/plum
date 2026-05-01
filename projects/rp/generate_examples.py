@@ -376,7 +376,7 @@ async def main() -> None:
             return
 
         pairs = await get_conversation_pairs(
-            pool, args.card_id, limit=0
+            pool, args.card_id, limit=args.limit
         )
         total_mined = len(pairs)
 
