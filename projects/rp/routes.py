@@ -567,7 +567,7 @@ def setup(app: FastAPI, ollama, resolve_model=None):
             _ollama.generate(
                 model=model, prompt=full_prompt,
                 system=f"You are writing the opening narration for {char_name}. Stay in character.",
-                options={"temperature": 1.05, "num_predict": 768, "min_p": 0.1, "repeat_penalty": 1.08},
+                options={"temperature": 1.05, "num_predict": 768, "min_p": 0.1, "repeat_penalty": 1.08, "think": False},
             ),
             timeout=300,
         )
@@ -641,7 +641,7 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         result = await _ollama.generate(
             model=summary_model, prompt=prompt,
             system="Output only the scene state summary. No thinking, no preamble.",
-            options={"temperature": 0.2, "num_predict": 800},
+            options={"temperature": 0.2, "num_predict": 800, "think": False},
         )
         clean = clean_scene_state_response(result)
         return validate_scene_state(clean, previous_state, messages)
