@@ -68,7 +68,8 @@ Token Lexer::read_symbol_or_keyword() {
     advance();
     while (m_pos < m_source.size()) {
         char c = peek();
-        if (c == '(' || c == ')' || c == ' ' || c == '\t' ||
+        if (c == '(' || c == ')' || c == '[' || c == ']' ||
+            c == '.' || c == ',' || c == ' ' || c == '\t' ||
             c == '\n' || c == '\r' || c == ';' || c == '"')
             break;
         advance();
@@ -90,6 +91,19 @@ std::vector<Token> Lexer::tokenize() {
             advance();
         } else if (c == ')') {
             tokens.push_back({ TokenType::RPAREN, ")", m_line, m_col });
+            advance();
+        } else if (c == '[') {
+            tokens.push_back({ TokenType::LBRACKET, "[", m_line, m_col });
+            advance();
+        } else if (c == ']') {
+            tokens.push_back({ TokenType::RBRACKET, "]", m_line, m_col });
+            advance();
+        } else if (c == '.') {
+            tokens.push_back({ TokenType::DOT, ".", m_line, m_col });
+            advance();
+        } else if (c == '-' && m_pos + 1 < m_source.size() && m_source[m_pos + 1] == '>') {
+            tokens.push_back({ TokenType::ARROW, "->", m_line, m_col });
+            advance();
             advance();
         } else if (c == '"') {
             tokens.push_back(read_string());
