@@ -40,6 +40,14 @@ public:
                                           VkRenderPass render_pass,
                                           uint32_t push_constant_size = 0);
 
+    const GraphicsPipeline& get_graphics_from_source(
+        const std::string& key,
+        const std::string& vert_hlsl_source,
+        const std::string& frag_hlsl_source,
+        VkRenderPass render_pass,
+        uint32_t push_constant_size = 0,
+        uint32_t num_color_attachments = 1);
+
 private:
     Device& m_device;
     std::string m_shaderDir;
@@ -55,6 +63,12 @@ private:
                                                 const std::string& stage,
                                                 const std::string& target_profile);
     std::vector<uint8_t> read_file(const std::string& path);
+
+    VkPipeline build_graphics_pipeline(VkShaderModule vert_module,
+                                        VkShaderModule frag_module,
+                                        VkPipelineLayout layout,
+                                        VkRenderPass render_pass,
+                                        uint32_t num_color_attachments);
 };
 
 } // namespace joon

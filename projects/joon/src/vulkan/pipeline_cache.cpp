@@ -245,7 +245,91 @@ const GraphicsPipeline& PipelineCache::get_graphics(const std::string& name,
     if (vkCreatePipelineLayout(m_device.device, &layout_info, nullptr, &p.layout) != VK_SUCCESS)
         throw std::runtime_error("graphics: vkCreatePipelineLayout failed");
 
-    // Vertex input — matches joon::Vertex {position, normal, uv}.
+    p.pipeline = build_graphics_pipeline(p.vert_module, p.frag_module, p.layout, render_pass, 1);
+
+    m_graphics_pipelines[key] = p;
+    return m_graphics_pipelines[key];
+}
+
+const GraphicsPipeline& PipelineCache::get_graphics_from_source(
+    const std::string& key,
+    const std::string& vert_hlsl_source,
+    const std::string& frag_hlsl_source,
+    VkRenderPass render_pass,
+    uint32_t push_constant_size,
+    uint32_t num_color_attachments) {
+
+    auto it = m_graphics_pipelines.find(key);
+    if (it != m_graphics_pipelines.end()) return it->second;
+
+    GraphicsPipeline p{};
+
+    std::string vert_tmp = m_shaderDir + "/__gen_" + key + ".vert.hlsl";
+    std::string frag_tmp = m_shaderDir + "/__gen_" + key + ".frag.hlsl";
+    std::string vert_spv = m_shaderDir + "/__gen_" + key + ".vert.spv";
+    std::string frag_spv = m_shaderDir + "/__gen_" + key + ".frag.spv";
+
+    { std::ofstream f(vert_tmp); f << vert_hlsl_source; }
+    { std::ofstream f(frag_tmp); f << frag_hlsl_source; }
+
+    auto vs_spirv = compile_hlsl(vert_tmp, vert_spv, "vs_6_0");
+    auto fs_spirv = compile_hlsl(frag_tmp, frag_spv, "ps_6_0");
+
+    auto make_module = [&](const std::vector<uint8_t>& spirv, const char* what) {
+        if (spirv.size() % 4 != 0)
+            throw std::runtime_error(std::string("SPIR-V size not multiple of 4: ") + what);
+        VkShaderModuleCreateInfo info{};
+        info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+        info.codeSize = spirv.size();
+        info.pCode = reinterpret_cast<const uint32_t*>(spirv.data());
+        VkShaderModule mod = VK_NULL_HANDLE;
+        if (vkCreateShaderModule(m_device.device, &info, nullptr, &mod) != VK_SUCCESS)
+            throw std::runtime_error(std::string("vkCreateShaderModule failed: ") + what);
+        return mod;
+    };
+    p.vert_module = make_module(vs_spirv, (key + ".vert").c_str());
+    p.frag_module = make_module(fs_spirv, (key + ".frag").c_str());
+
+    VkDescriptorSetLayoutBinding ubo_binding{};
+    ubo_binding.binding = 0;
+    ubo_binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    ubo_binding.descriptorCount = 1;
+    ubo_binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+    VkDescriptorSetLayoutCreateInfo desc_info{};
+    desc_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    desc_info.bindingCount = 1;
+    desc_info.pBindings = &ubo_binding;
+    if (vkCreateDescriptorSetLayout(m_device.device, &desc_info, nullptr, &p.desc_layout) != VK_SUCCESS)
+        throw std::runtime_error("graphics_from_source: vkCreateDescriptorSetLayout failed");
+
+    VkPipelineLayoutCreateInfo layout_info{};
+    layout_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    layout_info.setLayoutCount = 1;
+    layout_info.pSetLayouts = &p.desc_layout;
+
+    VkPushConstantRange push_range{};
+    if (push_constant_size > 0) {
+        push_range.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+        push_range.offset = 0;
+        push_range.size = push_constant_size;
+        layout_info.pushConstantRangeCount = 1;
+        layout_info.pPushConstantRanges = &push_range;
+    }
+    if (vkCreatePipelineLayout(m_device.device, &layout_info, nullptr, &p.layout) != VK_SUCCESS)
+        throw std::runtime_error("graphics_from_source: vkCreatePipelineLayout failed");
+
+    p.pipeline = build_graphics_pipeline(p.vert_module, p.frag_module, p.layout, render_pass, num_color_attachments);
+
+    m_graphics_pipelines[key] = p;
+    return m_graphics_pipelines[key];
+}
+
+VkPipeline PipelineCache::build_graphics_pipeline(VkShaderModule vert_module,
+                                                    VkShaderModule frag_module,
+                                                    VkPipelineLayout layout,
+                                                    VkRenderPass render_pass,
+                                                    uint32_t num_color_attachments) {
     VkVertexInputBindingDescription vb_desc{};
     vb_desc.binding = 0;
     vb_desc.stride = sizeof(Vertex);
@@ -298,17 +382,19 @@ const GraphicsPipeline& PipelineCache::get_graphics(const std::string& name,
     ds.depthWriteEnable = VK_TRUE;
     ds.depthCompareOp = VK_COMPARE_OP_LESS;
 
-    VkPipelineColorBlendAttachmentState cba{};
-    cba.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT
-                       | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-    cba.blendEnable = VK_FALSE;
+    std::vector<VkPipelineColorBlendAttachmentState> cbas(num_color_attachments);
+    for (auto& cba : cbas) {
+        cba = {};
+        cba.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT
+                           | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+        cba.blendEnable = VK_FALSE;
+    }
 
     VkPipelineColorBlendStateCreateInfo cb{};
     cb.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-    cb.attachmentCount = 1;
-    cb.pAttachments = &cba;
+    cb.attachmentCount = num_color_attachments;
+    cb.pAttachments = cbas.data();
 
-    // Dynamic viewport+scissor — set per draw via vkCmdSetViewport/Scissor.
     VkDynamicState dyn_states[2] = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
     VkPipelineDynamicStateCreateInfo dyn{};
     dyn.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
@@ -318,11 +404,11 @@ const GraphicsPipeline& PipelineCache::get_graphics(const std::string& name,
     VkPipelineShaderStageCreateInfo stages[2]{};
     stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
-    stages[0].module = p.vert_module;
+    stages[0].module = vert_module;
     stages[0].pName = "main";
     stages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-    stages[1].module = p.frag_module;
+    stages[1].module = frag_module;
     stages[1].pName = "main";
 
     VkGraphicsPipelineCreateInfo gp_info{};
@@ -337,16 +423,16 @@ const GraphicsPipeline& PipelineCache::get_graphics(const std::string& name,
     gp_info.pDepthStencilState = &ds;
     gp_info.pColorBlendState = &cb;
     gp_info.pDynamicState = &dyn;
-    gp_info.layout = p.layout;
+    gp_info.layout = layout;
     gp_info.renderPass = render_pass;
     gp_info.subpass = 0;
 
+    VkPipeline pipeline = VK_NULL_HANDLE;
     if (vkCreateGraphicsPipelines(m_device.device, VK_NULL_HANDLE, 1, &gp_info, nullptr,
-                                   &p.pipeline) != VK_SUCCESS)
-        throw std::runtime_error("vkCreateGraphicsPipelines failed: " + name);
+                                   &pipeline) != VK_SUCCESS)
+        throw std::runtime_error("vkCreateGraphicsPipelines failed");
 
-    m_graphics_pipelines[key] = p;
-    return m_graphics_pipelines[key];
+    return pipeline;
 }
 
 } // namespace joon

@@ -1,6 +1,10 @@
 #include "catch_amalgamated.hpp"
 #include "shader/hlsl_emitter.h"
 #include "shader/shader_ir.h"
+#include "vulkan/pipeline_cache.h"
+#include "vulkan/render_pass.h"
+#include <joon/context.h>
+#include <filesystem>
 using namespace joon;
 
 TEST_CASE("Emit literal", "[shader][hlsl]") {
@@ -111,4 +115,40 @@ TEST_CASE("Emit prepass sample", "[shader][hlsl]") {
     HlslEmitter emitter;
     ShaderExpr e = ShaderPrepassSample{0};
     CHECK(emitter.emit_expr(e) == "__prepass_0.Sample(__sampler_0, uv)");
+}
+
+TEST_CASE("PipelineCache compiles generated HLSL source", "[shader][pipeline][gpu]") {
+    auto ctx = Context::create();
+    auto tmp_dir = std::filesystem::temp_directory_path().string();
+    PipelineCache cache(ctx->device(), tmp_dir);
+
+    std::string vert_src = R"(
+struct UBO { float4x4 mvp; float4x4 model; float time; float3 pad; };
+[[vk::binding(0, 0)]] ConstantBuffer<UBO> ubo;
+struct VSIn  { float3 pos : POSITION; float3 nrm : NORMAL; float2 uv : TEXCOORD0; };
+struct VSOut { float4 sv : SV_POSITION; float3 normal : NORMAL; float2 uv : TEXCOORD0; float3 world_pos : TEXCOORD1; };
+VSOut main(VSIn v) {
+    VSOut o;
+    o.sv = mul(ubo.mvp, float4(v.pos, 1.0));
+    o.normal = normalize(mul((float3x3)ubo.model, v.nrm));
+    o.uv = v.uv;
+    o.world_pos = mul(ubo.model, float4(v.pos, 1.0)).xyz;
+    return o;
+}
+)";
+
+    std::string frag_src = R"(
+struct PSOut { float4 albedo : SV_TARGET0; };
+struct PSIn { float4 sv : SV_POSITION; float3 normal : NORMAL; float2 uv : TEXCOORD0; float3 world_pos : TEXCOORD1; };
+PSOut main(PSIn i) {
+    PSOut o;
+    o.albedo = float4(1, 0, 0, 1);
+    return o;
+}
+)";
+
+    auto rp = create_color_depth_renderpass(ctx->device(), {VK_FORMAT_R8G8B8A8_UNORM});
+    auto& gp = cache.get_graphics_from_source("test_gen", vert_src, frag_src, rp.pass, 0);
+    CHECK(gp.pipeline != VK_NULL_HANDLE);
+    destroy_renderpass(ctx->device(), rp);
 }
