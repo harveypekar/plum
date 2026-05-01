@@ -27,11 +27,11 @@ class OllamaClient:
           {"token": "...", "thinking": bool, "done": False}
           {"token": "", "done": True, "total_tokens": N, "tokens_per_second": F}
         """
-        think = False
+        think = None
         ollama_options = {}
         if options:
             options = dict(options)
-            think = options.pop("think", False)
+            think = options.pop("think", None)
             ollama_options = {k: v for k, v in options.items() if v is not None}
 
         body: dict = {
@@ -43,8 +43,8 @@ class OllamaClient:
             body["system"] = system
         if ollama_options:
             body["options"] = ollama_options
-        if think:
-            body["think"] = True
+        if think is not None:
+            body["think"] = think
 
         total_tokens = 0
         try:
@@ -99,11 +99,11 @@ class OllamaClient:
           {"token": "...", "thinking": bool, "done": False}
           {"token": "", "done": True, "total_tokens": N, "tokens_per_second": F}
         """
-        think = False
+        think = None
         ollama_options = {}
         if options:
             options = dict(options)
-            think = options.pop("think", False)
+            think = options.pop("think", None)
             ollama_options = {k: v for k, v in options.items() if v is not None}
 
         body: dict = {
@@ -113,8 +113,8 @@ class OllamaClient:
         }
         if ollama_options:
             body["options"] = ollama_options
-        if think:
-            body["think"] = True
+        if think is not None:
+            body["think"] = think
         if stop:
             body["stop"] = stop
 
@@ -210,7 +210,7 @@ class OllamaClient:
         model: str,
         messages: list[dict],
         tools: list[dict] | None = None,
-        think: bool = False,
+        think: bool | None = None,
     ) -> dict:
         """Non-streaming chat call. Returns the full Ollama response dict.
 
@@ -223,8 +223,8 @@ class OllamaClient:
         }
         if tools:
             body["tools"] = tools
-        if think:
-            body["think"] = True
+        if think is not None:
+            body["think"] = think
         try:
             async with httpx.AsyncClient(timeout=120.0) as client:
                 resp = await client.post(f"{self.base_url}/api/chat", json=body)
