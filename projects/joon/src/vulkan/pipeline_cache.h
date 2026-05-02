@@ -54,6 +54,12 @@ public:
     const GraphicsPipeline& get_fullscreen(const std::string& frag_name,
                                             VkRenderPass render_pass);
 
+    // Like get_fullscreen but compiles frag from source string instead of file.
+    const GraphicsPipeline& get_fullscreen_from_source(
+        const std::string& key,
+        const std::string& frag_hlsl_source,
+        VkRenderPass render_pass);
+
 private:
     Device& m_device;
     std::string m_shaderDir;

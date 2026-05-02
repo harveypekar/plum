@@ -568,4 +568,142 @@ const GraphicsPipeline& PipelineCache::get_fullscreen(const std::string& frag_na
     return m_graphics_pipelines[key];
 }
 
+const GraphicsPipeline& PipelineCache::get_fullscreen_from_source(
+    const std::string& key,
+    const std::string& frag_hlsl_source,
+    VkRenderPass render_pass) {
+    std::string cache_key = "fssrc_" + key + ":" + std::to_string(reinterpret_cast<uintptr_t>(render_pass));
+    auto it = m_graphics_pipelines.find(cache_key);
+    if (it != m_graphics_pipelines.end()) return it->second;
+
+    GraphicsPipeline p{};
+
+    auto vs_spirv = load_or_compile_stage("fullscreen", "vert", "vs_6_0");
+
+    std::string frag_tmp = m_shaderDir + "/__gen_" + key + ".frag.hlsl";
+    std::string frag_spv = m_shaderDir + "/__gen_" + key + ".frag.spv";
+    { std::ofstream f(frag_tmp); f << frag_hlsl_source; }
+    auto fs_spirv = compile_hlsl(frag_tmp, frag_spv, "ps_6_0");
+
+    auto make_module = [&](const std::vector<uint8_t>& spirv, const char* what) {
+        if (spirv.size() % 4 != 0)
+            throw std::runtime_error(std::string("SPIR-V size not multiple of 4: ") + what);
+        VkShaderModuleCreateInfo info{};
+        info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+        info.codeSize = spirv.size();
+        info.pCode = reinterpret_cast<const uint32_t*>(spirv.data());
+        VkShaderModule mod = VK_NULL_HANDLE;
+        if (vkCreateShaderModule(m_device.device, &info, nullptr, &mod) != VK_SUCCESS)
+            throw std::runtime_error(std::string("vkCreateShaderModule failed: ") + what);
+        return mod;
+    };
+    p.vert_module = make_module(vs_spirv, "fullscreen.vert");
+    p.frag_module = make_module(fs_spirv, (key + ".frag").c_str());
+
+    VkDescriptorSetLayoutBinding bindings[3]{};
+    bindings[0].binding = 0;
+    bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+    bindings[0].descriptorCount = 1;
+    bindings[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    bindings[1].binding = 1;
+    bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
+    bindings[1].descriptorCount = 1;
+    bindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    bindings[2].binding = 2;
+    bindings[2].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    bindings[2].descriptorCount = 1;
+    bindings[2].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+    VkDescriptorSetLayoutCreateInfo desc_info{};
+    desc_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    desc_info.bindingCount = 3;
+    desc_info.pBindings = bindings;
+    if (vkCreateDescriptorSetLayout(m_device.device, &desc_info, nullptr, &p.desc_layout) != VK_SUCCESS)
+        throw std::runtime_error("fullscreen_from_source: vkCreateDescriptorSetLayout failed");
+
+    VkPipelineLayoutCreateInfo layout_info{};
+    layout_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    layout_info.setLayoutCount = 1;
+    layout_info.pSetLayouts = &p.desc_layout;
+    if (vkCreatePipelineLayout(m_device.device, &layout_info, nullptr, &p.layout) != VK_SUCCESS)
+        throw std::runtime_error("fullscreen_from_source: vkCreatePipelineLayout failed");
+
+    VkPipelineVertexInputStateCreateInfo vi{};
+    vi.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+
+    VkPipelineInputAssemblyStateCreateInfo ia{};
+    ia.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+    ia.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+
+    VkPipelineViewportStateCreateInfo vps{};
+    vps.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+    vps.viewportCount = 1;
+    vps.scissorCount = 1;
+
+    VkPipelineRasterizationStateCreateInfo rs{};
+    rs.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+    rs.polygonMode = VK_POLYGON_MODE_FILL;
+    rs.cullMode = VK_CULL_MODE_NONE;
+    rs.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+    rs.lineWidth = 1.0f;
+
+    VkPipelineMultisampleStateCreateInfo ms{};
+    ms.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+    ms.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+
+    VkPipelineDepthStencilStateCreateInfo ds{};
+    ds.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+    ds.depthTestEnable = VK_FALSE;
+    ds.depthWriteEnable = VK_FALSE;
+
+    VkPipelineColorBlendAttachmentState cba{};
+    cba.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT
+                       | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+    cba.blendEnable = VK_FALSE;
+
+    VkPipelineColorBlendStateCreateInfo cb{};
+    cb.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+    cb.attachmentCount = 1;
+    cb.pAttachments = &cba;
+
+    VkDynamicState dyn_states[2] = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
+    VkPipelineDynamicStateCreateInfo dyn{};
+    dyn.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+    dyn.dynamicStateCount = 2;
+    dyn.pDynamicStates = dyn_states;
+
+    VkPipelineShaderStageCreateInfo stages[2]{};
+    stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
+    stages[0].module = p.vert_module;
+    stages[0].pName = "main";
+    stages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+    stages[1].module = p.frag_module;
+    stages[1].pName = "main";
+
+    VkGraphicsPipelineCreateInfo gp_info{};
+    gp_info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+    gp_info.stageCount = 2;
+    gp_info.pStages = stages;
+    gp_info.pVertexInputState = &vi;
+    gp_info.pInputAssemblyState = &ia;
+    gp_info.pViewportState = &vps;
+    gp_info.pRasterizationState = &rs;
+    gp_info.pMultisampleState = &ms;
+    gp_info.pDepthStencilState = &ds;
+    gp_info.pColorBlendState = &cb;
+    gp_info.pDynamicState = &dyn;
+    gp_info.layout = p.layout;
+    gp_info.renderPass = render_pass;
+    gp_info.subpass = 0;
+
+    if (vkCreateGraphicsPipelines(m_device.device, VK_NULL_HANDLE, 1, &gp_info, nullptr,
+                                   &p.pipeline) != VK_SUCCESS)
+        throw std::runtime_error("vkCreateGraphicsPipelines failed: fullscreen_from_source " + key);
+
+    m_graphics_pipelines[cache_key] = p;
+    return m_graphics_pipelines[cache_key];
+}
+
 } // namespace joon

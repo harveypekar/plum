@@ -56,6 +56,10 @@ void exec_shader(const Node& n, EvalContext& ctx) {
         key, vert_src, frag_src, rp.pass, 0, num_outputs);
     ctx.material_pipelines[n.id] = &gp;
 
+    if (ir.brdf) {
+        ctx.material_brdfs[n.id] = std::move(*ir.brdf);
+    }
+
     destroy_renderpass(ctx.device, rp);
 }
 

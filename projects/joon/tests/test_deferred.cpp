@@ -38,6 +38,34 @@ TEST_CASE("Dot access on pass output resolves to aliased image", "[shader][ir][g
     CHECK(nonzero > 50);
 }
 
+TEST_CASE("Custom toon BRDF produces stepped lighting", "[shader][brdf][gpu]") {
+    auto ctx = Context::create();
+    auto graph = ctx->parse_string(R"(
+        (def toon_mat (shader
+          :brdf (fn [normal light_dir view_dir albedo]
+            (* albedo (step 0.3 (dot normal light_dir))))
+          :fragment (fn [normal uv] -> [albedo vec4]
+            (set albedo [0.3 0.8 0.2 1]))))
+        (def c (cube :material toon_mat))
+        (def cam (camera))
+        (def l (light))
+        (def gbuf (pass))
+        (output gbuf)
+    )");
+    REQUIRE_FALSE(graph.has_errors());
+
+    auto eval = ctx->create_evaluator(graph);
+    eval->evaluate();
+
+    auto px = eval->result("").read_pixels();
+    REQUIRE(px.size() == 512u * 512u * 4u);
+    int bright = 0;
+    for (size_t i = 0; i < px.size(); i += 4) {
+        if (px[i+1] > 0.5f) ++bright;
+    }
+    CHECK(bright > 50);
+}
+
 TEST_CASE("Material executor compiles shader and stores pipeline", "[shader][material][gpu]") {
     auto ctx = Context::create();
     auto graph = ctx->parse_string(R"(

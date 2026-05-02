@@ -197,10 +197,15 @@ void exec_pass(const Node& n, EvalContext& ctx) {
     destroy_renderpass(ctx.device, rp);
 
     if (!ctx.material_pipelines.empty()) {
+        const ShaderFnIR* brdf = nullptr;
+        for (auto& [mat_id, fn_ir] : ctx.material_brdfs) {
+            brdf = &fn_ir;
+            break;
+        }
         LightingPassConfig lcfg{
             ctx.device, ctx.pipelines, ctx.pool, ctx.desc_pool,
             ctx.scene, ctx.default_width, ctx.default_height,
-            albedo, n.id
+            albedo, n.id, brdf
         };
         dispatch_lighting_pass(lcfg);
     }

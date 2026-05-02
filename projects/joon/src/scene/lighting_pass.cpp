@@ -1,4 +1,5 @@
 #include "scene/lighting_pass.h"
+#include "shader/brdf_emitter.h"
 #include "vulkan/buffer.h"
 #include "vulkan/render_pass.h"
 
@@ -9,7 +10,17 @@ void dispatch_lighting_pass(const LightingPassConfig& cfg) {
         cfg.output_node_id, cfg.width, cfg.height, VK_FORMAT_R32G32B32A32_SFLOAT);
 
     RenderPass rp = create_color_renderpass(cfg.device, lit_output->format);
-    auto& gp = cfg.pipelines.get_fullscreen("deferred_default", rp.pass);
+
+    const GraphicsPipeline* gp_ptr;
+    if (cfg.brdf) {
+        BrdfEmitter brdf_emitter;
+        std::string frag_src = brdf_emitter.emit_lighting_shader(*cfg.brdf);
+        std::string brdf_key = "brdf_" + std::to_string(cfg.output_node_id);
+        gp_ptr = &cfg.pipelines.get_fullscreen_from_source(brdf_key, frag_src, rp.pass);
+    } else {
+        gp_ptr = &cfg.pipelines.get_fullscreen("deferred_default", rp.pass);
+    }
+    auto& gp = *gp_ptr;
 
     VkFramebufferCreateInfo fb_info{};
     fb_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;

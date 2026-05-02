@@ -2,6 +2,7 @@
 
 #include "ir/node.h"
 #include "ir/ir_graph.h"
+#include "shader/shader_ir.h"
 #include "vulkan/device.h"
 #include "vulkan/resource_pool.h"
 #include "vulkan/pipeline_cache.h"
@@ -23,6 +24,7 @@ struct EvalContext {
     SceneCollection& scene;
     std::unordered_map<uint32_t, ShaderDef>* shader_defs = nullptr;
     std::unordered_map<uint32_t, const GraphicsPipeline*> material_pipelines;
+    std::unordered_map<uint32_t, ShaderFnIR> material_brdfs;
 };
 
 using NodeExecutor = std::function<void(const Node& node, EvalContext& ctx)>;
