@@ -19,6 +19,7 @@ class Parser {
 public:
     explicit Parser(std::string_view source);
     Program parse();
+    AstPtr parse_expression();
 
 private:
     std::vector<Token> m_tokens;
@@ -35,6 +36,9 @@ private:
     AstPtr parse_output();
     AstPtr parse_call(const Token& op);
     AstPtr parse_expr();
+    AstPtr parse_primary();
+    AstPtr parse_vector();
+    AstPtr parse_fn(uint32_t line, uint32_t col);
 };
 
 } // namespace joon

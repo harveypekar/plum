@@ -114,16 +114,20 @@ struct Evaluator::Impl {
         graph = ctx.parse_string(""); // placeholder
         graph.ir() = source_graph.ir(); // copy IR
 
-        VkDescriptorPoolSize pool_sizes[2]{};
+        VkDescriptorPoolSize pool_sizes[4]{};
         pool_sizes[0].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
         pool_sizes[0].descriptorCount = 256;
         pool_sizes[1].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        pool_sizes[1].descriptorCount = 256;   // for graphics-pipeline UBOs (geometry pass)
+        pool_sizes[1].descriptorCount = 256;
+        pool_sizes[2].type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+        pool_sizes[2].descriptorCount = 64;
+        pool_sizes[3].type = VK_DESCRIPTOR_TYPE_SAMPLER;
+        pool_sizes[3].descriptorCount = 64;
 
         VkDescriptorPoolCreateInfo pool_info{};
         pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
         pool_info.maxSets = 256;
-        pool_info.poolSizeCount = 2;
+        pool_info.poolSizeCount = 4;
         pool_info.pPoolSizes = pool_sizes;
         pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
         vkCreateDescriptorPool(ctx.device().device, &pool_info, nullptr, &desc_pool);
@@ -153,7 +157,9 @@ void Evaluator::evaluate() {
         *m_impl->pipelines,
         512, 512,
         m_impl->desc_pool,
-        m_impl->scene
+        m_impl->scene,
+        &m_impl->graph.ir().shader_defs,
+        {}
     };
 
     Interpreter interp(eval_ctx, m_impl->registry);

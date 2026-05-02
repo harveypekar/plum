@@ -22,6 +22,7 @@ NodeRegistry NodeRegistry::create_default() {
     register_save(reg);
     register_scene_nodes(reg);
     register_geometry_pass(reg);
+    register_material_nodes(reg);
     return reg;
 }
 

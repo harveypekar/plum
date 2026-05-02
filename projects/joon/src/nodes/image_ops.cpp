@@ -80,6 +80,11 @@ void register_image_ops(NodeRegistry& reg) {
         auto* out = ctx.pool.alloc_image(node.id, w, h);
         gpu_dispatch(ctx, "blend", {a, b, out}, w, h, &pc, sizeof(pc));
     });
+
+    reg.register_node("channel_select", [](const Node& node, EvalContext& ctx) {
+        if (node.inputs.empty()) return;
+        ctx.pool.alias_image(node.id, node.inputs[0]);
+    });
 }
 
 } // namespace joon

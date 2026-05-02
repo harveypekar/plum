@@ -1,1 +1,2 @@
 *.spv
+shaders/__gen_*

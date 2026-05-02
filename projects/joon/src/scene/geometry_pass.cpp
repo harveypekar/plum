@@ -1,4 +1,5 @@
 #include "scene/geometry_pass.h"
+#include "scene/lighting_pass.h"
 #include "nodes/node_registry.h"
 #include "ir/node.h"
 #include "vulkan/buffer.h"
@@ -27,10 +28,10 @@ struct PushLight {
 };
 
 void exec_pass(const Node& n, EvalContext& ctx) {
-    // The pass node owns the color render-target slot at its own node id.
-    // The depth slot is keyed at (node_id ^ 0x80000000) — outside the normal
-    // node-id range so it can't collide with another graph node.
-    uint32_t color_id = n.id;
+    bool has_materials = !ctx.material_pipelines.empty();
+    // When materials are active, G-buffer goes to an intermediate slot and
+    // the lighting pass writes the final lit output to n.id.
+    uint32_t color_id = has_materials ? (n.id ^ 0x40000000u) : n.id;
     uint32_t depth_id = n.id ^ 0x80000000u;
 
     auto* albedo = ctx.pool.alloc_render_target(color_id, ctx.default_width, ctx.default_height);
@@ -94,15 +95,29 @@ void exec_pass(const Node& n, EvalContext& ctx) {
     scissor.extent = { ctx.default_width, ctx.default_height };
     vkCmdSetScissor(cmd, 0, 1, &scissor);
 
-    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, gp.pipeline);
-    vkCmdPushConstants(cmd, gp.layout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(pc), &pc);
-
     // Per-frame buffers — freed after submit.
     std::vector<GpuBuffer> per_frame_bufs;
     per_frame_bufs.reserve(ctx.scene.objects.size() * 3);
 
+    VkPipeline bound_pipeline = VK_NULL_HANDLE;
+
     for (const auto& obj : ctx.scene.objects) {
         if (obj.mesh.vertices.empty() || obj.mesh.indices.empty()) continue;
+
+        // Select pipeline: per-material if available, else default.
+        const GraphicsPipeline* cur_gp = &gp;
+        if (obj.material_node_id != UINT32_MAX) {
+            auto mat_it = ctx.material_pipelines.find(obj.material_node_id);
+            if (mat_it != ctx.material_pipelines.end())
+                cur_gp = mat_it->second;
+        }
+
+        if (cur_gp->pipeline != bound_pipeline) {
+            vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, cur_gp->pipeline);
+            bound_pipeline = cur_gp->pipeline;
+            if (cur_gp == &gp)
+                vkCmdPushConstants(cmd, gp.layout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(pc), &pc);
+        }
 
         auto vb = create_vertex_buffer(ctx.device,
                                         obj.mesh.vertices.data(),
@@ -121,7 +136,7 @@ void exec_pass(const Node& n, EvalContext& ctx) {
         dai.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
         dai.descriptorPool = ctx.desc_pool;
         dai.descriptorSetCount = 1;
-        dai.pSetLayouts = &gp.desc_layout;
+        dai.pSetLayouts = &cur_gp->desc_layout;
         VkDescriptorSet ds = VK_NULL_HANDLE;
         vkAllocateDescriptorSets(ctx.device.device, &dai, &ds);
 
@@ -139,7 +154,7 @@ void exec_pass(const Node& n, EvalContext& ctx) {
         wds.pBufferInfo = &dbi;
         vkUpdateDescriptorSets(ctx.device.device, 1, &wds, 0, nullptr);
 
-        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, gp.layout,
+        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, cur_gp->layout,
                                  0, 1, &ds, 0, nullptr);
 
         VkBuffer vb_handle = vb.buffer;
@@ -180,6 +195,20 @@ void exec_pass(const Node& n, EvalContext& ctx) {
     for (auto& b : per_frame_bufs) destroy_buffer(ctx.device, b);
     vkDestroyFramebuffer(ctx.device.device, fb, nullptr);
     destroy_renderpass(ctx.device, rp);
+
+    if (!ctx.material_pipelines.empty()) {
+        const ShaderFnIR* brdf = nullptr;
+        for (auto& [mat_id, fn_ir] : ctx.material_brdfs) {
+            brdf = &fn_ir;
+            break;
+        }
+        LightingPassConfig lcfg{
+            ctx.device, ctx.pipelines, ctx.pool, ctx.desc_pool,
+            ctx.scene, ctx.default_width, ctx.default_height,
+            albedo, n.id, brdf
+        };
+        dispatch_lighting_pass(lcfg);
+    }
 }
 
 } // namespace

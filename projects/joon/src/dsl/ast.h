@@ -50,6 +50,26 @@ struct SymbolNode {
     std::string name;
 };
 
+struct FnOutput {
+    std::string name;
+    std::string type_name;
+};
+
+struct FnNode {
+    std::vector<std::string> params;
+    std::vector<FnOutput> outputs;
+    std::vector<AstPtr> body;
+};
+
+struct VectorNode {
+    std::vector<AstPtr> elements;
+};
+
+struct DotAccessNode {
+    AstPtr object;
+    std::string field;
+};
+
 struct AstNode {
     std::variant<
         DefNode,
@@ -58,7 +78,10 @@ struct AstNode {
         CallNode,
         NumberNode,
         StringNode,
-        SymbolNode
+        SymbolNode,
+        FnNode,
+        VectorNode,
+        DotAccessNode
     > data;
     uint32_t line;
     uint32_t col;

@@ -8,6 +8,10 @@ namespace joon {
 enum class TokenType {
     LPAREN,      // (
     RPAREN,      // )
+    LBRACKET,    // [
+    RBRACKET,    // ]
+    DOT,         // .
+    ARROW,       // ->
     SYMBOL,      // def, noise, +, -, *, /
     KEYWORD,     // :scale, :min
     NUMBER,      // 1.0, 42

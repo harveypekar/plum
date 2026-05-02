@@ -25,11 +25,25 @@ void Interpreter::evaluate(IRGraph& graph) {
         if (executor) (*executor)(node, m_ctx);
     }
 
-    // Phase 2: CPU constants + GPU compute + RENDER passes in topological
+    // Phase 2: MATERIAL tier — compile shaders, cache pipelines.
+    for (uint32_t id : order) {
+        auto& node = graph.nodes[id];
+        if (node.tier != Tier::MATERIAL) continue;
+
+        for (auto& kw : node.kwargs) {
+            if (kw.source_node != UINT32_MAX && kw.source_node < graph.nodes.size())
+                kw.value = graph.nodes[kw.source_node].constant_value;
+        }
+
+        auto* executor = m_registry.find(node.op);
+        if (executor) (*executor)(node, m_ctx);
+    }
+
+    // Phase 3: CPU constants + GPU compute + RENDER passes in topological
     // order so producer-consumer chains (e.g. pass → levels) execute correctly.
     for (uint32_t id : order) {
         auto& node = graph.nodes[id];
-        if (node.tier == Tier::SCENE) continue;   // already done
+        if (node.tier == Tier::SCENE || node.tier == Tier::MATERIAL) continue;
 
         // Skip nodes that don't produce GPU resources via an executor
         if (node.op == "constant" || node.op == "string_constant" ||

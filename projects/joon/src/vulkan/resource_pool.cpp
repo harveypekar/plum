@@ -170,6 +170,66 @@ GpuImage* ResourcePool::alloc_depth(uint32_t node_id, uint32_t width, uint32_t h
     return &m_images[node_id];
 }
 
+GpuImage* ResourcePool::alloc_depth_sampled(uint32_t node_id, uint32_t width, uint32_t height,
+                                              VkFormat format) {
+    auto it = m_images.find(node_id);
+    if (it != m_images.end()) {
+        auto& old = it->second;
+        if (old.width == width && old.height == height && old.format == format) {
+            return &it->second;
+        }
+        vkDestroyImageView(m_device.device, old.view, nullptr);
+        vmaDestroyImage(m_device.allocator, old.image, old.allocation);
+        m_images.erase(it);
+    }
+
+    GpuImage img{};
+    img.width = width;
+    img.height = height;
+    img.format = format;
+
+    VkImageCreateInfo img_info{};
+    img_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    img_info.imageType = VK_IMAGE_TYPE_2D;
+    img_info.format = format;
+    img_info.extent = { width, height, 1 };
+    img_info.mipLevels = 1;
+    img_info.arrayLayers = 1;
+    img_info.samples = VK_SAMPLE_COUNT_1_BIT;
+    img_info.tiling = VK_IMAGE_TILING_OPTIMAL;
+    img_info.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT
+                   | VK_IMAGE_USAGE_SAMPLED_BIT;
+
+    VmaAllocationCreateInfo alloc_info{};
+    alloc_info.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+
+    if (vmaCreateImage(m_device.allocator, &img_info, &alloc_info,
+                       &img.image, &img.allocation, nullptr) != VK_SUCCESS)
+        throw std::runtime_error("Failed to allocate sampled depth image");
+
+    VkImageViewCreateInfo view_info{};
+    view_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    view_info.image = img.image;
+    view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    view_info.format = format;
+    view_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+    view_info.subresourceRange.levelCount = 1;
+    view_info.subresourceRange.layerCount = 1;
+
+    if (vkCreateImageView(m_device.device, &view_info, nullptr, &img.view) != VK_SUCCESS)
+        throw std::runtime_error("Failed to create sampled depth image view");
+
+    m_images[node_id] = img;
+    return &m_images[node_id];
+}
+
+void ResourcePool::alias_image(uint32_t alias_id, uint32_t source_id) {
+    auto it = m_images.find(source_id);
+    if (it == m_images.end()) return;
+    m_images[alias_id] = it->second;
+    m_aliases.insert(alias_id);
+}
+
 GpuImage* ResourcePool::get_image(uint32_t node_id) {
     auto it = m_images.find(node_id);
     if (it == m_images.end()) return nullptr;
@@ -283,10 +343,12 @@ void ResourcePool::download(GpuImage* img, void* data, size_t size) {
 
 void ResourcePool::clear() {
     for (auto& [id, img] : m_images) {
+        if (m_aliases.count(id)) continue;
         vkDestroyImageView(m_device.device, img.view, nullptr);
         vmaDestroyImage(m_device.allocator, img.image, img.allocation);
     }
     m_images.clear();
+    m_aliases.clear();
 }
 
 } // namespace joon

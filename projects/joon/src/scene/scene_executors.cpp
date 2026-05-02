@@ -26,11 +26,18 @@ vec3 kwarg_vec3(const Node& /*n*/, const char* /*name*/, vec3 fallback) {
     return fallback;
 }
 
+uint32_t kwarg_source_node(const Node& n, const char* name) {
+    for (const auto& k : n.kwargs)
+        if (k.name == name) return k.source_node;
+    return UINT32_MAX;
+}
+
 void exec_cube(const Node& n, EvalContext& ctx) {
     SceneObject o;
     o.mesh = gen_cube(kwarg_float(n, "scale", 1.0f));
     o.position = kwarg_vec3(n, "position", {0, 0, 0});
     o.rotation = kwarg_vec3(n, "rotation", {0, 0, 0});
+    o.material_node_id = kwarg_source_node(n, "material");
     ctx.scene.add_object(std::move(o));
 }
 
@@ -39,6 +46,7 @@ void exec_sphere(const Node& n, EvalContext& ctx) {
     o.mesh = gen_sphere(kwarg_float(n, "radius", 0.5f));
     o.position = kwarg_vec3(n, "position", {0, 0, 0});
     o.rotation = kwarg_vec3(n, "rotation", {0, 0, 0});
+    o.material_node_id = kwarg_source_node(n, "material");
     ctx.scene.add_object(std::move(o));
 }
 
@@ -48,6 +56,7 @@ void exec_plane(const Node& n, EvalContext& ctx) {
                        kwarg_float(n, "height", 1.0f));
     o.position = kwarg_vec3(n, "position", {0, 0, 0});
     o.rotation = kwarg_vec3(n, "rotation", {0, 0, 0});
+    o.material_node_id = kwarg_source_node(n, "material");
     ctx.scene.add_object(std::move(o));
 }
 
@@ -58,16 +67,16 @@ void exec_cylinder(const Node& n, EvalContext& ctx) {
                           static_cast<int>(kwarg_float(n, "segments", 32.0f)));
     o.position = kwarg_vec3(n, "position", {0, 0, 0});
     o.rotation = kwarg_vec3(n, "rotation", {0, 0, 0});
+    o.material_node_id = kwarg_source_node(n, "material");
     ctx.scene.add_object(std::move(o));
 }
 
 void exec_mesh(const Node& n, EvalContext& ctx) {
-    // The OBJ file path comes through as Node::string_arg (parser stores the
-    // first string-typed positional arg there).
     SceneObject o;
     if (!n.string_arg.empty()) o.mesh = load_obj_file(n.string_arg);
     o.position = kwarg_vec3(n, "position", {0, 0, 0});
     o.rotation = kwarg_vec3(n, "rotation", {0, 0, 0});
+    o.material_node_id = kwarg_source_node(n, "material");
     ctx.scene.add_object(std::move(o));
 }
 

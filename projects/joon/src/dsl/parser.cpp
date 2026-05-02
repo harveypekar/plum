@@ -119,6 +119,10 @@ AstPtr Parser::parse_call(const Token& op) {
     auto line = op.line, col = op.col;
     auto op_name = advance().text;
 
+    if (op_name == "fn") {
+        return parse_fn(line, col);
+    }
+
     std::vector<AstPtr> args;
     std::vector<KeywordArg> kwargs;
 
@@ -139,11 +143,89 @@ AstPtr Parser::parse_call(const Token& op) {
     return node;
 }
 
+AstPtr Parser::parse_fn(uint32_t line, uint32_t col) {
+    FnNode fn;
+
+    expect(TokenType::LBRACKET, "'[' for parameter list");
+    advance();
+    while (peek().type != TokenType::RBRACKET) {
+        auto tok = advance();
+        fn.params.push_back(tok.text);
+    }
+    advance(); // consume ]
+
+    if (peek().type == TokenType::ARROW) {
+        advance(); // consume ->
+        expect(TokenType::LBRACKET, "'[' for output list");
+        advance();
+        while (peek().type != TokenType::RBRACKET) {
+            FnOutput out;
+            out.name = advance().text;
+            out.type_name = advance().text;
+            fn.outputs.push_back(std::move(out));
+            if (peek().type == TokenType::SYMBOL && peek().text == ",")
+                advance();
+        }
+        advance(); // consume ]
+    }
+
+    while (peek().type != TokenType::RPAREN) {
+        fn.body.push_back(parse_expr());
+    }
+
+    auto node = std::make_unique<AstNode>();
+    node->data = std::move(fn);
+    node->line = line;
+    node->col = col;
+    return node;
+}
+
+AstPtr Parser::parse_vector() {
+    auto start = advance(); // consume [
+    VectorNode vec;
+    while (peek().type != TokenType::RBRACKET) {
+        vec.elements.push_back(parse_expr());
+        if (peek().type == TokenType::SYMBOL && peek().text == ",")
+            advance();
+    }
+    advance(); // consume ]
+    auto node = std::make_unique<AstNode>();
+    node->data = std::move(vec);
+    node->line = start.line;
+    node->col = start.col;
+    return node;
+}
+
+AstPtr Parser::parse_expression() {
+    return parse_expr();
+}
+
 AstPtr Parser::parse_expr() {
+    auto primary = parse_primary();
+    while (peek().type == TokenType::DOT) {
+        advance(); // consume .
+        auto field_tok = advance();
+        auto dot = std::make_unique<AstNode>();
+        DotAccessNode dn;
+        dn.object = std::move(primary);
+        dn.field = field_tok.text;
+        dot->data = std::move(dn);
+        dot->line = field_tok.line;
+        dot->col = field_tok.col;
+        primary = std::move(dot);
+    }
+    return primary;
+}
+
+AstPtr Parser::parse_primary() {
     const auto& tok = peek();
 
     if (tok.type == TokenType::LPAREN) {
         return parse_form();
+    }
+
+    if (tok.type == TokenType::LBRACKET) {
+        return parse_vector();
     }
 
     if (tok.type == TokenType::NUMBER) {

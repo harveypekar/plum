@@ -40,6 +40,26 @@ public:
                                           VkRenderPass render_pass,
                                           uint32_t push_constant_size = 0);
 
+    const GraphicsPipeline& get_graphics_from_source(
+        const std::string& key,
+        const std::string& vert_hlsl_source,
+        const std::string& frag_hlsl_source,
+        VkRenderPass render_pass,
+        uint32_t push_constant_size = 0,
+        uint32_t num_color_attachments = 1);
+
+    // Fullscreen triangle pipeline — uses fullscreen.vert.hlsl + frag_name.frag.hlsl.
+    // No vertex input, no depth test, no backface culling.
+    // Descriptor layout: binding 0 = SAMPLED_IMAGE, binding 1 = SAMPLER, binding 2 = UNIFORM_BUFFER.
+    const GraphicsPipeline& get_fullscreen(const std::string& frag_name,
+                                            VkRenderPass render_pass);
+
+    // Like get_fullscreen but compiles frag from source string instead of file.
+    const GraphicsPipeline& get_fullscreen_from_source(
+        const std::string& key,
+        const std::string& frag_hlsl_source,
+        VkRenderPass render_pass);
+
 private:
     Device& m_device;
     std::string m_shaderDir;
@@ -55,6 +75,12 @@ private:
                                                 const std::string& stage,
                                                 const std::string& target_profile);
     std::vector<uint8_t> read_file(const std::string& path);
+
+    VkPipeline build_graphics_pipeline(VkShaderModule vert_module,
+                                        VkShaderModule frag_module,
+                                        VkPipelineLayout layout,
+                                        VkRenderPass render_pass,
+                                        uint32_t num_color_attachments);
 };
 
 } // namespace joon

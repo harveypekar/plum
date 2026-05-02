@@ -30,9 +30,9 @@ void type_check(IRGraph& graph) {
             continue;
         }
 
-        // Scene and render tiers carry their own output types set during
-        // IR lowering; type checking for those is handled by future passes.
-        if (node.tier == Tier::SCENE || node.tier == Tier::RENDER) {
+        // Material, scene, and render tiers carry their own output types set
+        // during IR lowering; type checking for those is handled by future passes.
+        if (node.tier == Tier::MATERIAL || node.tier == Tier::SCENE || node.tier == Tier::RENDER) {
             continue;
         }
 
@@ -82,6 +82,13 @@ void type_check(IRGraph& graph) {
                 Type a = graph.nodes[node.inputs[0]].output_type;
                 Type b = graph.nodes[node.inputs[1]].output_type;
                 node.output_type = promote(a, b);
+            }
+            continue;
+        }
+
+        if (node.op == "channel_select") {
+            if (!node.inputs.empty()) {
+                node.output_type = graph.nodes[node.inputs[0]].output_type;
             }
             continue;
         }
