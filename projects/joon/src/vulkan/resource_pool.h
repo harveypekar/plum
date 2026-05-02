@@ -32,6 +32,10 @@ public:
     GpuImage* alloc_depth(uint32_t node_id, uint32_t width, uint32_t height,
                            VkFormat format = VK_FORMAT_D32_SFLOAT);
 
+    // Like alloc_depth but adds SAMPLED_BIT so the depth can be read in shaders.
+    GpuImage* alloc_depth_sampled(uint32_t node_id, uint32_t width, uint32_t height,
+                                   VkFormat format = VK_FORMAT_D32_SFLOAT);
+
     GpuImage* get_image(uint32_t node_id);
 
     void upload(GpuImage* img, const void* data, size_t size);
