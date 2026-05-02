@@ -86,6 +86,13 @@ void type_check(IRGraph& graph) {
             continue;
         }
 
+        if (node.op == "channel_select") {
+            if (!node.inputs.empty()) {
+                node.output_type = graph.nodes[node.inputs[0]].output_type;
+            }
+            continue;
+        }
+
         if (node.op == "save") {
             if (!node.inputs.empty()) {
                 node.output_type = graph.nodes[node.inputs[0]].output_type;

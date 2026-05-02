@@ -173,6 +173,28 @@ uint32_t IRGraph::resolve_expr(const AstNode& expr) {
         return id;
     }
 
+    if (auto* dot = std::get_if<DotAccessNode>(&expr.data)) {
+        auto* obj_sym = std::get_if<SymbolNode>(&dot->object->data);
+        if (obj_sym) {
+            auto it = m_nameToNode.find(obj_sym->name);
+            if (it != m_nameToNode.end()) {
+                uint32_t parent_id = it->second;
+                uint32_t id = add_node("channel_select", Tier::GPU);
+                nodes[id].inputs.push_back(parent_id);
+                edges.push_back({ parent_id, id, 0 });
+                nodes[id].string_arg = dot->field;
+                nodes[id].output_type = Type::IMAGE;
+                return id;
+            }
+        }
+        diagnostics.push_back({
+            Diagnostic::Level::ERROR,
+            "Invalid dot access",
+            expr.line, expr.col
+        });
+        return add_node("error", Tier::CPU);
+    }
+
     diagnostics.push_back({
         Diagnostic::Level::ERROR,
         "Unexpected expression",

@@ -223,6 +223,13 @@ GpuImage* ResourcePool::alloc_depth_sampled(uint32_t node_id, uint32_t width, ui
     return &m_images[node_id];
 }
 
+void ResourcePool::alias_image(uint32_t alias_id, uint32_t source_id) {
+    auto it = m_images.find(source_id);
+    if (it == m_images.end()) return;
+    m_images[alias_id] = it->second;
+    m_aliases.insert(alias_id);
+}
+
 GpuImage* ResourcePool::get_image(uint32_t node_id) {
     auto it = m_images.find(node_id);
     if (it == m_images.end()) return nullptr;
@@ -336,10 +343,12 @@ void ResourcePool::download(GpuImage* img, void* data, size_t size) {
 
 void ResourcePool::clear() {
     for (auto& [id, img] : m_images) {
+        if (m_aliases.count(id)) continue;
         vkDestroyImageView(m_device.device, img.view, nullptr);
         vmaDestroyImage(m_device.allocator, img.image, img.allocation);
     }
     m_images.clear();
+    m_aliases.clear();
 }
 
 } // namespace joon

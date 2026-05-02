@@ -3,6 +3,7 @@
 #include "vulkan/device.h"
 #include <joon/types.h>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace joon {
 
@@ -38,6 +39,8 @@ public:
 
     GpuImage* get_image(uint32_t node_id);
 
+    void alias_image(uint32_t alias_id, uint32_t source_id);
+
     void upload(GpuImage* img, const void* data, size_t size);
     void download(GpuImage* img, void* data, size_t size);
 
@@ -46,6 +49,7 @@ public:
 private:
     Device& m_device;
     std::unordered_map<uint32_t, GpuImage> m_images;
+    std::unordered_set<uint32_t> m_aliases;
 };
 
 } // namespace joon
