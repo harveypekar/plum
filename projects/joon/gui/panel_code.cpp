@@ -4,7 +4,7 @@
 #include <algorithm>
 
 void App::draw_code() {
-    ImGui::Begin("Code Editor");
+    ImGui::Begin("Code Editor", &show_code);
 
     if (ImGui::IsWindowHovered() && ImGui::GetIO().KeyCtrl) {
         float wheel = ImGui::GetIO().MouseWheel;

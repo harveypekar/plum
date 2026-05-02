@@ -25,6 +25,13 @@ struct App {
     VkSampler sampler = VK_NULL_HANDLE;
     VkDescriptorPool imgui_desc_pool = VK_NULL_HANDLE;
 
+    bool show_code = true;
+    bool show_tree = true;
+    bool show_properties = true;
+    bool show_viewport = true;
+    bool show_preview = true;
+    bool show_log = true;
+
     void init();
     void shutdown();
     void reparse();

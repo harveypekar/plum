@@ -3,7 +3,7 @@
 #include <imgui.h>
 
 void App::draw_properties() {
-    ImGui::Begin("Properties");
+    ImGui::Begin("Properties", &show_properties);
 
     if (eval && !graph.has_errors()) {
         for (auto& p : graph.ir().params) {

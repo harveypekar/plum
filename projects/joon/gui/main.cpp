@@ -434,6 +434,15 @@ int main() {
                     reset_layout = true;
                 ImGui::EndMenu();
             }
+            if (ImGui::BeginMenu("Windows")) {
+                ImGui::MenuItem("Code Editor", nullptr, &app.show_code);
+                ImGui::MenuItem("Graph Tree", nullptr, &app.show_tree);
+                ImGui::MenuItem("Properties", nullptr, &app.show_properties);
+                ImGui::MenuItem("Viewport", nullptr, &app.show_viewport);
+                ImGui::MenuItem("Node Preview", nullptr, &app.show_preview);
+                ImGui::MenuItem("Output Log", nullptr, &app.show_log);
+                ImGui::EndMenu();
+            }
             ImGui::EndMainMenuBar();
         }
 
@@ -471,12 +480,12 @@ int main() {
         }
 
         app.update();
-        app.draw_tree();
-        app.draw_properties();
-        app.draw_code();
-        app.draw_viewport();
-        app.draw_preview();
-        app.draw_log();
+        if (app.show_tree) app.draw_tree();
+        if (app.show_properties) app.draw_properties();
+        if (app.show_code) app.draw_code();
+        if (app.show_viewport) app.draw_viewport();
+        if (app.show_preview) app.draw_preview();
+        if (app.show_log) app.draw_log();
 
         ImGui::Render();
         ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmd);

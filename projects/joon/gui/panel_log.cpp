@@ -2,7 +2,7 @@
 #include <imgui.h>
 
 void App::draw_log() {
-    ImGui::Begin("Output Log");
+    ImGui::Begin("Output Log", &show_log);
 
     if (!eval_error.empty()) {
         ImGui::TextColored(ImVec4(1.0f, 0.3f, 0.3f, 1.0f),

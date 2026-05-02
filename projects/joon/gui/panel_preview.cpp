@@ -2,7 +2,7 @@
 #include <imgui.h>
 
 void App::draw_preview() {
-    ImGui::Begin("Node Preview");
+    ImGui::Begin("Node Preview", &show_preview);
 
     if (eval && selected_node_id != UINT32_MAX) {
         auto* node = graph.ir().find_node(selected_node_id);
