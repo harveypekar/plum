@@ -1,0 +1,23 @@
+#pragma once
+#include "vulkan/device.h"
+#include "vulkan/pipeline_cache.h"
+#include "vulkan/resource_pool.h"
+#include <joon/scene.h>
+#include <joon/math.h>
+
+namespace joon {
+
+struct LightingPassConfig {
+    Device& device;
+    PipelineCache& pipelines;
+    ResourcePool& pool;
+    VkDescriptorPool desc_pool;
+    const SceneCollection& scene;
+    uint32_t width, height;
+    GpuImage* albedo_target;
+    uint32_t output_node_id;
+};
+
+void dispatch_lighting_pass(const LightingPassConfig& cfg);
+
+} // namespace joon

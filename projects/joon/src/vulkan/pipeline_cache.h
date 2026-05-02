@@ -48,6 +48,12 @@ public:
         uint32_t push_constant_size = 0,
         uint32_t num_color_attachments = 1);
 
+    // Fullscreen triangle pipeline — uses fullscreen.vert.hlsl + frag_name.frag.hlsl.
+    // No vertex input, no depth test, no backface culling.
+    // Descriptor layout: binding 0 = SAMPLED_IMAGE, binding 1 = SAMPLER, binding 2 = UNIFORM_BUFFER.
+    const GraphicsPipeline& get_fullscreen(const std::string& frag_name,
+                                            VkRenderPass render_pass);
+
 private:
     Device& m_device;
     std::string m_shaderDir;

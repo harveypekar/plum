@@ -1,4 +1,5 @@
 #include "scene/geometry_pass.h"
+#include "scene/lighting_pass.h"
 #include "nodes/node_registry.h"
 #include "ir/node.h"
 #include "vulkan/buffer.h"
@@ -27,10 +28,10 @@ struct PushLight {
 };
 
 void exec_pass(const Node& n, EvalContext& ctx) {
-    // The pass node owns the color render-target slot at its own node id.
-    // The depth slot is keyed at (node_id ^ 0x80000000) — outside the normal
-    // node-id range so it can't collide with another graph node.
-    uint32_t color_id = n.id;
+    bool has_materials = !ctx.material_pipelines.empty();
+    // When materials are active, G-buffer goes to an intermediate slot and
+    // the lighting pass writes the final lit output to n.id.
+    uint32_t color_id = has_materials ? (n.id ^ 0x40000000u) : n.id;
     uint32_t depth_id = n.id ^ 0x80000000u;
 
     auto* albedo = ctx.pool.alloc_render_target(color_id, ctx.default_width, ctx.default_height);
@@ -194,6 +195,15 @@ void exec_pass(const Node& n, EvalContext& ctx) {
     for (auto& b : per_frame_bufs) destroy_buffer(ctx.device, b);
     vkDestroyFramebuffer(ctx.device.device, fb, nullptr);
     destroy_renderpass(ctx.device, rp);
+
+    if (!ctx.material_pipelines.empty()) {
+        LightingPassConfig lcfg{
+            ctx.device, ctx.pipelines, ctx.pool, ctx.desc_pool,
+            ctx.scene, ctx.default_width, ctx.default_height,
+            albedo, n.id
+        };
+        dispatch_lighting_pass(lcfg);
+    }
 }
 
 } // namespace

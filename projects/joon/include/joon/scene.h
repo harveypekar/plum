@@ -47,6 +47,19 @@ struct Camera {
     float far_z = 100.0f;
 };
 
+struct LightData {
+    float position_type[4];
+    float color_intensity[4];
+    float spot_params[4];
+};
+
+struct LightUBO {
+    LightData lights[16];
+    int light_count;
+    float camera_pos[3];
+    float inv_view_proj[16];
+};
+
 struct SceneCollection {
     std::vector<SceneObject> objects;
     std::vector<Light> lights;

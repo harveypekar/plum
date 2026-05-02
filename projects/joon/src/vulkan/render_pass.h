@@ -26,6 +26,8 @@ VkFramebuffer create_framebuffer(
     const std::vector<VkImageView>& color_views,
     VkImageView depth_view, uint32_t w, uint32_t h);
 
+RenderPass create_color_renderpass(Device& dev, VkFormat color_format);
+
 void destroy_renderpass(Device& dev, RenderPass& rp);
 
 } // namespace joon
