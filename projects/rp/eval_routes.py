@@ -181,7 +181,10 @@ def setup_eval_routes(
             budget_json=winner.get("budget_json"),
             prompt_json=winner.get("prompt_json"),
         )
-        await db.select_eval_candidate(eval_set_id, req.candidate_id)
+        await db.select_eval_candidate(
+            eval_set_id, req.candidate_id,
+            preference_tags=req.preference_tags,
+        )
 
         asyncio.create_task(auto_update_scene_state(
             conv_id, conv["model"],
