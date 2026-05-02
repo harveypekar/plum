@@ -59,7 +59,7 @@ def build_ollama_options(settings: dict) -> dict:
 
 def scale_num_predict(opts: dict, user_message: str) -> dict:
     user_tokens = count_tokens(user_message)
-    scaled = max(256, min(1024, user_tokens * 2))
+    scaled = max(1024, min(2048, user_tokens * 2))
     return {**opts, "num_predict": scaled}
 
 
