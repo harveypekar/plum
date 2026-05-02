@@ -100,12 +100,12 @@ class TestBuildOllamaOptions:
 class TestScaleNumPredict:
     def test_short_message(self):
         opts = scale_num_predict({"num_predict": 768}, "hi")
-        assert opts["num_predict"] == 256
+        assert opts["num_predict"] == 1024
 
     def test_long_message(self):
-        long_msg = "word " * 600
+        long_msg = "word " * 5000
         opts = scale_num_predict({"num_predict": 768}, long_msg)
-        assert opts["num_predict"] == 1024
+        assert opts["num_predict"] == 2048
 
     def test_preserves_other_keys(self):
         opts = scale_num_predict({"num_predict": 768, "temperature": 0.8}, "hello")
