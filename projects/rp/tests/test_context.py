@@ -180,6 +180,18 @@ class TestSummaryBuffer:
         # greeting is kept separately, msg1 should be filtered
         assert len(result) == 2  # summary + greeting
 
+    def test_stale_summary_ignored(self):
+        """Summary covering sequences beyond current messages is ignored."""
+        msgs = [
+            _seq_msg("assistant", "greeting", 1),
+            _seq_msg("user", "recent msg", 2),
+        ]
+        ctx = {"_summary": "Old summary from before reset.", "_summary_through_sequence": 11}
+        result = SummaryBuffer().fit(msgs, 10000, ctx=ctx)
+        contents = [m["content"] for m in result]
+        assert "recent msg" in contents
+        assert not any("[Story so far]" in c for c in contents)
+
 
 class TestGetStrategy:
     def test_returns_sliding_window(self):
