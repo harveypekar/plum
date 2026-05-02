@@ -441,6 +441,7 @@ int main() {
                 ImGui::MenuItem("Viewport", nullptr, &app.show_viewport);
                 ImGui::MenuItem("Node Preview", nullptr, &app.show_preview);
                 ImGui::MenuItem("Output Log", nullptr, &app.show_log);
+                ImGui::MenuItem("Graphs", nullptr, &app.show_graphs);
                 ImGui::EndMenu();
             }
             ImGui::EndMainMenuBar();
@@ -469,6 +470,7 @@ int main() {
             ImGuiID dock_right = ImGui::DockBuilderSplitNode(dock_main, ImGuiDir_Right, 0.55f, nullptr, &dock_main);
             ImGuiID dock_right_bottom = ImGui::DockBuilderSplitNode(dock_right, ImGuiDir_Down, 0.36f, nullptr, &dock_right);
 
+            ImGui::DockBuilderDockWindow("Graphs", dock_left);
             ImGui::DockBuilderDockWindow("Properties", dock_left);
             ImGui::DockBuilderDockWindow("Graph Tree", dock_left);
             ImGui::DockBuilderDockWindow("Code Editor", dock_main);
@@ -486,6 +488,7 @@ int main() {
         if (app.show_viewport) app.draw_viewport();
         if (app.show_preview) app.draw_preview();
         if (app.show_log) app.draw_log();
+        if (app.show_graphs) app.draw_graphs();
 
         ImGui::Render();
         ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmd);
