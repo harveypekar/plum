@@ -153,7 +153,9 @@ void Evaluator::evaluate() {
         *m_impl->pipelines,
         512, 512,
         m_impl->desc_pool,
-        m_impl->scene
+        m_impl->scene,
+        &m_impl->graph.ir().shader_defs,
+        {}
     };
 
     Interpreter interp(eval_ctx, m_impl->registry);

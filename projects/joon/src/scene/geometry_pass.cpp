@@ -94,15 +94,29 @@ void exec_pass(const Node& n, EvalContext& ctx) {
     scissor.extent = { ctx.default_width, ctx.default_height };
     vkCmdSetScissor(cmd, 0, 1, &scissor);
 
-    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, gp.pipeline);
-    vkCmdPushConstants(cmd, gp.layout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(pc), &pc);
-
     // Per-frame buffers — freed after submit.
     std::vector<GpuBuffer> per_frame_bufs;
     per_frame_bufs.reserve(ctx.scene.objects.size() * 3);
 
+    VkPipeline bound_pipeline = VK_NULL_HANDLE;
+
     for (const auto& obj : ctx.scene.objects) {
         if (obj.mesh.vertices.empty() || obj.mesh.indices.empty()) continue;
+
+        // Select pipeline: per-material if available, else default.
+        const GraphicsPipeline* cur_gp = &gp;
+        if (obj.material_node_id != UINT32_MAX) {
+            auto mat_it = ctx.material_pipelines.find(obj.material_node_id);
+            if (mat_it != ctx.material_pipelines.end())
+                cur_gp = mat_it->second;
+        }
+
+        if (cur_gp->pipeline != bound_pipeline) {
+            vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, cur_gp->pipeline);
+            bound_pipeline = cur_gp->pipeline;
+            if (cur_gp == &gp)
+                vkCmdPushConstants(cmd, gp.layout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(pc), &pc);
+        }
 
         auto vb = create_vertex_buffer(ctx.device,
                                         obj.mesh.vertices.data(),
@@ -121,7 +135,7 @@ void exec_pass(const Node& n, EvalContext& ctx) {
         dai.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
         dai.descriptorPool = ctx.desc_pool;
         dai.descriptorSetCount = 1;
-        dai.pSetLayouts = &gp.desc_layout;
+        dai.pSetLayouts = &cur_gp->desc_layout;
         VkDescriptorSet ds = VK_NULL_HANDLE;
         vkAllocateDescriptorSets(ctx.device.device, &dai, &ds);
 
@@ -139,7 +153,7 @@ void exec_pass(const Node& n, EvalContext& ctx) {
         wds.pBufferInfo = &dbi;
         vkUpdateDescriptorSets(ctx.device.device, 1, &wds, 0, nullptr);
 
-        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, gp.layout,
+        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, cur_gp->layout,
                                  0, 1, &ds, 0, nullptr);
 
         VkBuffer vb_handle = vb.buffer;

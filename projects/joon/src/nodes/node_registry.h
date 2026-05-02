@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ir/node.h"
+#include "ir/ir_graph.h"
 #include "vulkan/device.h"
 #include "vulkan/resource_pool.h"
 #include "vulkan/pipeline_cache.h"
@@ -20,6 +21,8 @@ struct EvalContext {
     uint32_t default_height;
     VkDescriptorPool desc_pool;
     SceneCollection& scene;
+    std::unordered_map<uint32_t, ShaderDef>* shader_defs = nullptr;
+    std::unordered_map<uint32_t, const GraphicsPipeline*> material_pipelines;
 };
 
 using NodeExecutor = std::function<void(const Node& node, EvalContext& ctx)>;
@@ -43,5 +46,6 @@ void register_image_ops(NodeRegistry& reg);
 void register_save(NodeRegistry& reg);
 void register_scene_nodes(NodeRegistry& reg);
 void register_geometry_pass(NodeRegistry& reg);
+void register_material_nodes(NodeRegistry& reg);
 
 } // namespace joon
