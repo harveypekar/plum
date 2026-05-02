@@ -104,6 +104,8 @@ async def build_pipeline_ctx(conv, messages, *, pipeline, template_path: Path):
     for m in messages:
         d = {"role": m["role"], "content": m["content"]}
         d["_sequence"] = m.get("sequence", 0)
+        if "id" in m:
+            d["_id"] = m["id"]
         msg_dicts.append(d)
 
     ctx = {
