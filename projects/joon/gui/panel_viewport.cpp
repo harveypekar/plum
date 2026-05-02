@@ -2,7 +2,7 @@
 #include <imgui.h>
 
 void App::draw_viewport() {
-    ImGui::Begin("Viewport");
+    ImGui::Begin("Viewport", &show_viewport);
 
     if (eval && !graph.has_errors() && !graph.ir().outputs.empty()) {
         auto result = eval->result("output");

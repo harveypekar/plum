@@ -2,7 +2,7 @@
 #include <imgui.h>
 
 void App::draw_tree() {
-    ImGui::Begin("Graph Tree");
+    ImGui::Begin("Graph Tree", &show_tree);
 
     if (!graph.has_errors()) {
         auto& ir = graph.ir();
