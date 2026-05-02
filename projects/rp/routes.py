@@ -11,7 +11,8 @@ from .cards import parse_card_png, export_card_png, extract_name
 from .models import (
     CardCreate, CardResponse, ScenarioCreate, ScenarioResponse,
     ConversationCreate, ConversationResponse, ConversationDetailResponse,
-    MessageResponse, SendMessageRequest, EditMessageRequest, SceneStateRequest,
+    MessageResponse, SendMessageRequest, SavePartialRequest, EditMessageRequest,
+    SceneStateRequest,
 )
 from .pipeline import create_default_pipeline
 from .budget import BudgetError, allocate_injections
@@ -31,7 +32,7 @@ from . import conv_log
 _PRI_INTERACTIVE = 0   # UI chat: /message, /continue, /regenerate, /auto-reply
 _PRI_BACKGROUND = 5    # card generation, scene state, summaries
 
-_log = logging.getLogger(__name__)
+_log = logging.getLogger("rp.routes")
 
 _ollama = None
 _pipeline = None
@@ -566,7 +567,7 @@ def setup(app: FastAPI, ollama, resolve_model=None):
             _ollama.generate(
                 model=model, prompt=full_prompt,
                 system=f"You are writing the opening narration for {char_name}. Stay in character.",
-                options={"temperature": 1.05, "num_predict": 768, "min_p": 0.1, "repeat_penalty": 1.08},
+                options={"temperature": 1.05, "num_predict": 768, "min_p": 0.1, "repeat_penalty": 1.08, "think": False},
             ),
             timeout=300,
         )
@@ -578,8 +579,6 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         elif clean.startswith(char_name + " "):
             clean = clean[len(char_name) + 1:].strip()
         return clean
-
-    _log = logging.getLogger("rp.routes")
 
     _scene_state_model = "q36"
 
@@ -642,7 +641,7 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         result = await _ollama.generate(
             model=summary_model, prompt=prompt,
             system="Output only the scene state summary. No thinking, no preamble.",
-            options={"temperature": 0.2, "num_predict": 800},
+            options={"temperature": 0.2, "num_predict": 800, "think": False},
         )
         clean = clean_scene_state_response(result)
         return validate_scene_state(clean, previous_state, messages)
@@ -831,7 +830,7 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         return StreamingResponse(stream(), media_type="application/x-ndjson")
 
     @app.post("/rp/conversations/{conv_id}/save-partial")
-    async def save_partial(conv_id: int, req: SendMessageRequest):
+    async def save_partial(conv_id: int, req: SavePartialRequest):
         """Save a partial response when the user hits Stop mid-stream."""
         conv = await db.get_conversation(conv_id)
         if not conv:
@@ -839,7 +838,8 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         content = req.content.strip()
         if not content:
             return {"ok": False}
-        await db.add_message(conv_id, "assistant", content)
+        role = req.role if req.role in ("assistant", "user") else "assistant"
+        await db.add_message(conv_id, role, content)
         return {"ok": True}
 
     @app.put("/rp/messages/{msg_id}", response_model=MessageResponse)

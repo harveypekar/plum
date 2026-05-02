@@ -11,7 +11,7 @@ from .tokenizer import count_tokens
 
 _log = logging.getLogger("rp.summarize")
 
-SUMMARY_MODEL = "q25"
+SUMMARY_MODEL = "q8"
 SUMMARY_THRESHOLD = 10  # unsummarized messages before triggering
 
 

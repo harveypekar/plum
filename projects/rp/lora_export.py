@@ -53,7 +53,7 @@ def _build_system_prompt(ai_card: dict, user_card: dict, scenario: dict) -> str:
         "char_pronouns": ai_data.get("pronouns", ""),
     }
 
-    system_part, post_part = _split_template(DEFAULT_PROMPT_TEMPLATE)
+    system_part, post_part, _, _ = _split_template(DEFAULT_PROMPT_TEMPLATE)
     system_prompt = render_template(system_part, values)
 
     # Apply variable substitution

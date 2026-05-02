@@ -2,6 +2,7 @@ import asyncio
 from unittest.mock import AsyncMock, patch
 
 from projects.rp.summarize import (
+    SUMMARY_MODEL,
     build_summary_prompt,
     clean_summary_response,
     maybe_generate_summary,
@@ -254,7 +255,7 @@ class TestMaybeGenerateSummary:
                 )
 
                 call_args = ollama.generate.call_args
-                assert call_args[1]["model"] == "resolved-q25"
+                assert call_args[1]["model"] == f"resolved-{SUMMARY_MODEL}"
         asyncio.run(run())
 
     def test_falls_back_to_conv_model_without_resolve(self):
