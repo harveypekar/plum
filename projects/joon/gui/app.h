@@ -5,8 +5,14 @@
 #include "vulkan/device.h"
 #include "vulkan/resource_pool.h"
 #include <string>
+#include <vector>
 #include <memory>
 #include <vulkan/vulkan.h>
+
+struct GraphEntry {
+    std::string name;
+    std::string source;
+};
 
 struct App {
     std::unique_ptr<joon::Context> ctx;
@@ -31,6 +37,10 @@ struct App {
     bool show_viewport = true;
     bool show_preview = true;
     bool show_log = true;
+    bool show_graphs = true;
+
+    std::vector<GraphEntry> graph_entries;
+    size_t active_graph_index = 0;
 
     void init();
     void shutdown();
@@ -44,4 +54,5 @@ struct App {
     void draw_viewport();
     void draw_preview();
     void draw_log();
+    void draw_graphs();
 };

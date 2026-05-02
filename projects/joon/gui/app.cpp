@@ -7,7 +7,8 @@ void App::init() {
     ctx = joon::Context::create();
     ctx->device().log_fn = joon_log::write;
 
-    dsl_source = R"(; Joon - 3D scene with materials
+    graph_entries = {
+        {"3D Scene", R"(; Joon - 3D scene with materials
 (def red_mat (shader
   :fragment (fn [normal uv] -> [albedo vec4]
     (set albedo [0.8 0.2 0.1 1]))))
@@ -19,7 +20,25 @@ void App::init() {
 (param contrast float 1.0 :min 0.0 :max 3.0)
 (def final (levels gbuf :contrast contrast))
 (output final)
-)";
+)"},
+        {"Noise + Invert", R"(; Simple noise pipeline
+(def a (noise :scale 4.0 :octaves 3))
+(def b (invert a))
+(output b)
+)"},
+        {"Levels", R"(; Parameterized levels
+(def base (noise :scale 4.0 :octaves 3))
+(param contrast float 1.0 :min 0.0 :max 3.0)
+(def result (levels base :contrast contrast))
+(output result)
+)"},
+        {"Constant", R"(; Constant output
+(output 0.5)
+)"},
+    };
+
+    active_graph_index = 0;
+    dsl_source = graph_entries[0].source;
 
     VkSamplerCreateInfo sampler_info{};
     sampler_info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
