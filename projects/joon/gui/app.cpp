@@ -7,8 +7,12 @@ void App::init() {
     ctx = joon::Context::create();
     ctx->device().log_fn = joon_log::write;
 
-    dsl_source = R"(; Joon - 3D scene
-(def c (cube :scale 1.0))
+    dsl_source = R"(; Joon - 3D scene with materials
+(def red_mat (shader
+  :fragment (fn [normal uv] -> [albedo vec4]
+    (set albedo [0.8 0.2 0.1 1]))))
+
+(def c (cube :scale 1.0 :material red_mat))
 (def cam (camera :fov 60))
 (def l (light :intensity 1.0))
 (def gbuf (pass))
