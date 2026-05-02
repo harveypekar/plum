@@ -977,7 +977,21 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         # Tell Ollama to load the model with its real context window
         ollama_options = {**ollama_options, "num_ctx": ctx["_num_ctx"]}
 
+        # For continue: use the last assistant message as priming prefix
+        # so the model continues mid-sentence instead of starting fresh.
+        prefix_text = ""
+        continue_msg_id = None
+        budgeted_msgs = ctx["messages"]
+        if budgeted_msgs and budgeted_msgs[-1].get("role") == "assistant":
+            last_asst = budgeted_msgs[-1]
+            prefix_text = last_asst.get("content", "")
+            continue_msg_id = last_asst.get("_id")
+            ctx["messages"] = budgeted_msgs[:-1]
+
         chat_messages = build_chat_messages(ctx)
+        if prefix_text:
+            chat_messages[-1] = {"role": "assistant", "content": prefix_text}
+
         user_name = get_user_name(ctx)
         conv_log.log_prompt(conv_id, "continue", model,
                             ctx["system_prompt"], ctx.get("post_prompt", ""),
@@ -1013,16 +1027,19 @@ def setup(app: FastAPI, ollama, resolve_model=None):
                 response_text = "".join(tokens)
                 post_ctx = {"response": response_text, "ai_name": get_ai_name(ctx), "_char_pronouns": get_ai_pronouns(ctx)}
                 post_ctx = await _pipeline.run_post(post_ctx)
-                await db.add_message(
-                    conv_id, "assistant", post_ctx["response"], raw_response=raw,
-                    system_prompt=ctx.get("system_prompt", ""),
-                    scene_state=conv.get("scene_state", ""),
-                    post_prompt=ctx.get("post_prompt", ""),
-                    budget_json=budget_to_json(ctx),
-                    prompt_json=chat_messages,
-                )
+                full_text = prefix_text + post_ctx["response"]
+                if continue_msg_id:
+                    await db.update_message(continue_msg_id, full_text)
+                else:
+                    await db.add_message(
+                        conv_id, "assistant", full_text, raw_response=raw,
+                        system_prompt=ctx.get("system_prompt", ""),
+                        scene_state=conv.get("scene_state", ""),
+                        post_prompt=ctx.get("post_prompt", ""),
+                        budget_json=budget_to_json(ctx),
+                        prompt_json=chat_messages,
+                    )
                 conv_log.log_response(conv_id, "assistant", post_ctx["response"], raw)
-                # Update scene state and maybe generate summary in background
                 asyncio.create_task(_auto_update_scene_state(conv_id, model,
                                                 get_ai_name(ctx), get_user_name(ctx), get_ai_personality(ctx)))
                 asyncio.create_task(_maybe_summarize(conv_id, model,
