@@ -65,6 +65,8 @@ struct ShaderFnIR {
     std::vector<ShaderExprPtr> body;
 };
 
+ShaderExprPtr clone_expr(const ShaderExpr& expr);
+
 enum class ShaderOpKind { INLINEABLE, PREPASS_REQUIRED, UNKNOWN };
 
 struct ShaderIR {
