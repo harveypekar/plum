@@ -67,5 +67,11 @@ void App::draw_viewport() {
         ImGui::TextDisabled("No output");
     }
 
+    ImVec2 pos = ImGui::GetWindowPos();
+    ImGui::GetWindowDrawList()->AddText(
+        ImVec2(pos.x + 8, pos.y + ImGui::GetFrameHeight() + 4),
+        IM_COL32(255, 255, 255, 180),
+        (std::to_string(static_cast<int>(ImGui::GetIO().Framerate)) + " fps").c_str());
+
     ImGui::End();
 }
