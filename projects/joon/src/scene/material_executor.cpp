@@ -46,8 +46,9 @@ void exec_shader(const Node& n, EvalContext& ctx) {
     }
 
     std::string key = "mat_" + std::to_string(n.id);
-    uint32_t num_outputs = ir.fragment
+    uint32_t user_outputs = ir.fragment
         ? static_cast<uint32_t>(ir.fragment->outputs.size()) : 1;
+    uint32_t num_outputs = user_outputs + 1;
 
     std::vector<VkFormat> formats(num_outputs, VK_FORMAT_R32G32B32A32_SFLOAT);
     auto rp = create_color_depth_renderpass(ctx.device, formats);
