@@ -187,9 +187,11 @@ const ComputePipeline& PipelineCache::get(const std::string& name,
 
 const GraphicsPipeline& PipelineCache::get_graphics(const std::string& name,
                                                      VkRenderPass render_pass,
-                                                     uint32_t push_constant_size) {
+                                                     uint32_t push_constant_size,
+                                                     uint32_t num_color_attachments) {
     std::string key = name + ":" + std::to_string(reinterpret_cast<uintptr_t>(render_pass))
-                    + ":" + std::to_string(push_constant_size);
+                    + ":" + std::to_string(push_constant_size)
+                    + ":" + std::to_string(num_color_attachments);
     auto it = m_graphics_pipelines.find(key);
     if (it != m_graphics_pipelines.end()) return it->second;
 
@@ -245,7 +247,7 @@ const GraphicsPipeline& PipelineCache::get_graphics(const std::string& name,
     if (vkCreatePipelineLayout(m_device.device, &layout_info, nullptr, &p.layout) != VK_SUCCESS)
         throw std::runtime_error("graphics: vkCreatePipelineLayout failed");
 
-    p.pipeline = build_graphics_pipeline(p.vert_module, p.frag_module, p.layout, render_pass, 1);
+    p.pipeline = build_graphics_pipeline(p.vert_module, p.frag_module, p.layout, render_pass, num_color_attachments);
 
     m_graphics_pipelines[key] = p;
     return m_graphics_pipelines[key];
@@ -461,7 +463,7 @@ const GraphicsPipeline& PipelineCache::get_fullscreen(const std::string& frag_na
     p.vert_module = make_module(vs_spirv, "fullscreen.vert");
     p.frag_module = make_module(fs_spirv, (frag_name + ".frag").c_str());
 
-    VkDescriptorSetLayoutBinding bindings[3]{};
+    VkDescriptorSetLayoutBinding bindings[4]{};
     bindings[0].binding = 0;
     bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
     bindings[0].descriptorCount = 1;
@@ -474,10 +476,14 @@ const GraphicsPipeline& PipelineCache::get_fullscreen(const std::string& frag_na
     bindings[2].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     bindings[2].descriptorCount = 1;
     bindings[2].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    bindings[3].binding = 3;
+    bindings[3].descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+    bindings[3].descriptorCount = 1;
+    bindings[3].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
     VkDescriptorSetLayoutCreateInfo desc_info{};
     desc_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    desc_info.bindingCount = 3;
+    desc_info.bindingCount = 4;
     desc_info.pBindings = bindings;
     if (vkCreateDescriptorSetLayout(m_device.device, &desc_info, nullptr, &p.desc_layout) != VK_SUCCESS)
         throw std::runtime_error("fullscreen: vkCreateDescriptorSetLayout failed");
@@ -600,7 +606,7 @@ const GraphicsPipeline& PipelineCache::get_fullscreen_from_source(
     p.vert_module = make_module(vs_spirv, "fullscreen.vert");
     p.frag_module = make_module(fs_spirv, (key + ".frag").c_str());
 
-    VkDescriptorSetLayoutBinding bindings[3]{};
+    VkDescriptorSetLayoutBinding bindings[4]{};
     bindings[0].binding = 0;
     bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
     bindings[0].descriptorCount = 1;
@@ -613,10 +619,14 @@ const GraphicsPipeline& PipelineCache::get_fullscreen_from_source(
     bindings[2].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     bindings[2].descriptorCount = 1;
     bindings[2].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    bindings[3].binding = 3;
+    bindings[3].descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+    bindings[3].descriptorCount = 1;
+    bindings[3].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
     VkDescriptorSetLayoutCreateInfo desc_info{};
     desc_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    desc_info.bindingCount = 3;
+    desc_info.bindingCount = 4;
     desc_info.pBindings = bindings;
     if (vkCreateDescriptorSetLayout(m_device.device, &desc_info, nullptr, &p.desc_layout) != VK_SUCCESS)
         throw std::runtime_error("fullscreen_from_source: vkCreateDescriptorSetLayout failed");
