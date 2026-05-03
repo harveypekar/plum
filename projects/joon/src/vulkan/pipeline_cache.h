@@ -38,7 +38,8 @@ public:
     // Push constants in `push_constant_size` bytes go to the FRAGMENT stage.
     const GraphicsPipeline& get_graphics(const std::string& name,
                                           VkRenderPass render_pass,
-                                          uint32_t push_constant_size = 0);
+                                          uint32_t push_constant_size = 0,
+                                          uint32_t num_color_attachments = 1);
 
     const GraphicsPipeline& get_graphics_from_source(
         const std::string& key,
@@ -50,7 +51,8 @@ public:
 
     // Fullscreen triangle pipeline — uses fullscreen.vert.hlsl + frag_name.frag.hlsl.
     // No vertex input, no depth test, no backface culling.
-    // Descriptor layout: binding 0 = SAMPLED_IMAGE, binding 1 = SAMPLER, binding 2 = UNIFORM_BUFFER.
+    // Descriptor layout: binding 0 = SAMPLED_IMAGE (albedo), binding 1 = SAMPLER,
+    //   binding 2 = UNIFORM_BUFFER, binding 3 = SAMPLED_IMAGE (normal).
     const GraphicsPipeline& get_fullscreen(const std::string& frag_name,
                                             VkRenderPass render_pass);
 

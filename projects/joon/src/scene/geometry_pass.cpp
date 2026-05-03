@@ -52,7 +52,8 @@ void exec_pass(const Node& n, EvalContext& ctx) {
     VkFramebuffer fb = create_framebuffer(ctx.device, rp, color_views, depth->view,
                                            ctx.default_width, ctx.default_height);
 
-    const auto& gp = ctx.pipelines.get_graphics("scene_basic", rp.pass, sizeof(PushLight));
+    uint32_t num_color = static_cast<uint32_t>(color_formats.size());
+    const auto& gp = ctx.pipelines.get_graphics("scene_basic", rp.pass, sizeof(PushLight), num_color);
 
     // Camera matrices — fall back to defaults if no camera was set.
     const auto& cam = ctx.scene.camera;
@@ -79,16 +80,21 @@ void exec_pass(const Node& n, EvalContext& ctx) {
 
     VkCommandBuffer cmd = ctx.device.begin_single_command();
 
-    VkClearValue clears[2];
+    VkClearValue clears[3]{};
     clears[0].color = {{ 0.0f, 0.0f, 0.0f, 1.0f }};
-    clears[1].depthStencil = { 1.0f, 0 };
+    clears[1].color = {{ 0.0f, 0.0f, 0.0f, 0.0f }};
+    clears[2].depthStencil = { 1.0f, 0 };
+    uint32_t clear_count = has_materials ? 3u : 2u;
+    if (!has_materials) {
+        clears[1].depthStencil = { 1.0f, 0 };
+    }
 
     VkRenderPassBeginInfo rpi{};
     rpi.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
     rpi.renderPass = rp.pass;
     rpi.framebuffer = fb;
     rpi.renderArea.extent = { ctx.default_width, ctx.default_height };
-    rpi.clearValueCount = 2;
+    rpi.clearValueCount = clear_count;
     rpi.pClearValues = clears;
 
     vkCmdBeginRenderPass(cmd, &rpi, VK_SUBPASS_CONTENTS_INLINE);
