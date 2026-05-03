@@ -401,7 +401,7 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         else:
             new_msgs = all_msgs
         if not new_msgs:
-            new_msgs = all_msgs
+            new_msgs = all_msgs[-10:]
         latest_msg_id = new_msgs[-1]["id"] if new_msgs else None
         msg_list = [{"role": m["role"], "content": m["content"]} for m in new_msgs]
         ai_card = await db.get_card(conv["ai_card_id"])
@@ -589,11 +589,15 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         from .scene_state import build_scene_state_prompt, clean_scene_state_response, validate_scene_state
         prompt = build_scene_state_prompt(messages, previous_state, ai_name, user_name, ai_personality, scenario_context)
         summary_model = _resolve_model(_scene_state_model) if _resolve_model else model
-        result = await _ollama.generate(
-            model=summary_model, prompt=prompt,
-            system="Output only the scene state summary. No thinking, no preamble.",
-            options={"temperature": 0.2, "num_predict": 800, "think": False},
-        )
+        try:
+            result = await _ollama.generate(
+                model=summary_model, prompt=prompt,
+                system="Output only the scene state summary. No thinking, no preamble.",
+                options={"temperature": 0.2, "num_predict": 800, "think": False},
+            )
+        except Exception as e:
+            _log.error("Scene state generation failed: %s", e)
+            return previous_state
         clean = clean_scene_state_response(result)
         return validate_scene_state(clean, previous_state, messages)
 
@@ -616,6 +620,8 @@ def setup(app: FastAPI, ollama, resolve_model=None):
                 new_msgs = [m for m in all_msgs if m["id"] > last_msg_id]
             else:
                 new_msgs = all_msgs
+            if not new_msgs:
+                new_msgs = all_msgs[-10:]
             if not new_msgs:
                 return
             latest_msg_id = new_msgs[-1]["id"]

@@ -162,6 +162,10 @@ def validate_scene_state(
         return previous_state
 
     new = parse_scene_state(new_state)
+    if not new:
+        _log.info("No valid categories in scene state response, keeping previous state")
+        return previous_state
+
     old = parse_scene_state(previous_state)
 
     msg_text = " ".join(m.get("content", "") for m in messages)

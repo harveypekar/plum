@@ -359,3 +359,10 @@ class TestValidateSceneState:
         msgs = _msgs(("user", "they walked"))
         result = validate_scene_state(new, old, msgs)
         assert "not described" not in result
+
+    def test_narrative_response_keeps_previous(self):
+        old = "Location: park\nClothing: sundress\nMood: happy"
+        narrative = "She looked up at the sky and smiled warmly at him."
+        msgs = _msgs(("user", "hello"))
+        result = validate_scene_state(narrative, old, msgs)
+        assert result == old
