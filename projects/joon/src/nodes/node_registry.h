@@ -6,6 +6,7 @@
 #include "vulkan/device.h"
 #include "vulkan/resource_pool.h"
 #include "vulkan/pipeline_cache.h"
+#include <joon/scene.h>
 #include <functional>
 #include <string>
 #include <unordered_map>
@@ -25,6 +26,7 @@ struct EvalContext {
     std::unordered_map<uint32_t, ShaderDef>* shader_defs = nullptr;
     std::unordered_map<uint32_t, const GraphicsPipeline*> material_pipelines;
     std::unordered_map<uint32_t, ShaderFnIR> material_brdfs;
+    const Camera* camera_override = nullptr;
 };
 
 using NodeExecutor = std::function<void(const Node& node, EvalContext& ctx)>;

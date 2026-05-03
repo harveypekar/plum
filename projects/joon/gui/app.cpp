@@ -1,7 +1,9 @@
 #include "app.h"
 #include "log.h"
+#include <joon/math.h>
 #include <imgui.h>
 #include <imgui_impl_vulkan.h>
+#include <cmath>
 
 void App::init() {
     ctx = joon::Context::create();
@@ -126,6 +128,7 @@ void App::reparse() {
         if (!graph.has_errors()) {
             eval = ctx->create_evaluator(graph);
             eval->evaluate();
+            init_camera_from_scene();
         } else {
             eval.reset();
         }
@@ -135,6 +138,41 @@ void App::reparse() {
         joon_log::write("[EVAL] %s\n", eval_error.c_str());
     }
     source_dirty = false;
+}
+
+void App::init_camera_from_scene() {
+    if (!eval) return;
+    const auto& cam = eval->scene_for_test().camera;
+    cam_pos = cam.position;
+    cam_fov = cam.fov_deg;
+    cam_near = cam.near_z;
+    cam_far = cam.far_z;
+    cam_roll = 0;
+    cam_active = false;
+
+    joon::vec3 dir = joon::vec3_normalize(cam.target - cam.position);
+    cam_pitch = std::asin(std::clamp(dir.y, -1.0f, 1.0f));
+    cam_yaw = std::atan2(dir.x, -dir.z);
+}
+
+void App::apply_camera() {
+    if (!eval) return;
+    using namespace joon;
+    mat4 rot = mul(rotate_y(cam_yaw), mul(rotate_x(cam_pitch), rotate_z(cam_roll)));
+    vec3 forward{-rot.m[8], -rot.m[9], -rot.m[10]};
+    vec3 up{rot.m[4], rot.m[5], rot.m[6]};
+
+    Camera cam;
+    cam.position = cam_pos;
+    cam.target = cam_pos + forward;
+    cam.up = up;
+    cam.fov_deg = cam_fov;
+    cam.near_z = cam_near;
+    cam.far_z = cam_far;
+
+    eval->set_camera(cam);
+    eval->evaluate();
+    viewport_dirty = true;
 }
 
 void App::update() {

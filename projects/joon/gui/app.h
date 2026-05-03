@@ -1,6 +1,7 @@
 #pragma once
 
 #include <joon/joon.h>
+#include <joon/math.h>
 #include "ir/ir_graph.h"
 #include "vulkan/device.h"
 #include "vulkan/resource_pool.h"
@@ -42,11 +43,24 @@ struct App {
     std::vector<GraphEntry> graph_entries;
     size_t active_graph_index = 0;
 
+    joon::vec3 cam_pos{0, 0, 5};
+    float cam_yaw = 0;
+    float cam_pitch = 0;
+    float cam_roll = 0;
+    float cam_speed = 200.0f;
+    float cam_mouse_sens = 0.003f;
+    float cam_fov = 60.0f;
+    float cam_near = 0.1f;
+    float cam_far = 100.0f;
+    bool cam_active = false;
+
     void init();
     void shutdown();
     void reparse();
     void bind_viewport();
     void update();
+    void init_camera_from_scene();
+    void apply_camera();
 
     void draw_tree();
     void draw_properties();
