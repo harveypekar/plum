@@ -1,6 +1,7 @@
 #include "app.h"
 #include <joon/math.h>
 #include <imgui.h>
+#include <algorithm>
 #include <cmath>
 
 void App::draw_viewport() {
