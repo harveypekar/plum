@@ -133,6 +133,8 @@ uint32_t IRGraph::resolve_expr(const AstNode& expr) {
             uint32_t input_slot = static_cast<uint32_t>(nodes[id].inputs.size());
             nodes[id].inputs.push_back(input_id);
             edges.push_back({ input_id, id, input_slot });
+            if (nodes[input_id].op == "string_constant")
+                nodes[id].string_arg = nodes[input_id].string_arg;
         }
 
         for (auto& kw : call->kwargs) {
