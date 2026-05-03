@@ -582,62 +582,13 @@ def setup(app: FastAPI, ollama, resolve_model=None):
 
     _scene_state_model = "q36"
 
-    def _build_scene_state_prompt(messages: list[dict], previous_state: str = "",
-                                   ai_name: str = "Character", user_name: str = "User",
-                                   ai_personality: str = "",
-                                   scenario_context: str = "") -> str:
-        history = "\n".join(f"{m['role']}: {m['content']}" for m in messages)
-        prev_section = ""
-        if previous_state.strip():
-            prev_section = (
-                "PREVIOUS SCENE STATE (carry forward anything not contradicted by new messages):\n"
-                f"{previous_state.strip()}\n\n"
-            )
-        personality_hint = ""
-        if ai_personality:
-            short = ai_personality[:200].rsplit(" ", 1)[0]
-            personality_hint = f"{ai_name}'s personality: {short}\n\n"
-        scenario_section = ""
-        if scenario_context.strip():
-            scenario_section = f"Scenario context: {scenario_context.strip()}\n\n"
-        initial = not previous_state.strip() and len(messages) <= 1
-        if initial:
-            instruction = (
-                "This is the opening of a new scene. Establish the INITIAL scene state "
-                "based on the scenario context and first message below.\n\n"
-            )
-        else:
-            instruction = (
-                "Below are the most recent messages. UPDATE the scene state based on what changed.\n"
-                "Keep everything from the previous state that still holds true. "
-                "Only change what the new messages contradict or add.\n\n"
-            )
-        return (
-            f"{prev_section}"
-            f"{personality_hint}"
-            f"{scenario_section}"
-            f"{instruction}"
-            f"Characters: {ai_name} (AI) and {user_name} (user).\n\n"
-            "Format — one short line per category:\n"
-            "Location: (where are they right now)\n"
-            f"Clothing: (what {ai_name} and {user_name} are currently wearing RIGHT NOW — track removals: if a character undressed, they are naked, not still wearing the old clothes. Write 'naked' or 'nude' when appropriate)\n"
-            "Restraints: (describe the specific tie/pattern AND what it practically limits — e.g. 'wrists behind back — no free hand use' — or 'none')\n"
-            "Position: (posture, who is where, physical contact)\n"
-            "Props: (objects currently in play)\n"
-            "Mood: (emotional atmosphere right now)\n"
-            "ONLY state facts explicitly shown or described in the messages. Do NOT invent or assume details not present.\n"
-            "If clothing is not mentioned, write 'not described' — do NOT guess.\n"
-            "No narration, no story, no explanation. Just the current facts.\n\n"
-            f"Recent messages:\n{history}"
-        )
-
     async def _generate_scene_state(model: str, messages: list[dict], previous_state: str = "",
                                      ai_name: str = "Character", user_name: str = "User",
                                      ai_personality: str = "",
                                      scenario_context: str = "") -> str:
-        prompt = _build_scene_state_prompt(messages, previous_state, ai_name, user_name, ai_personality, scenario_context)
+        from .scene_state import build_scene_state_prompt, clean_scene_state_response, validate_scene_state
+        prompt = build_scene_state_prompt(messages, previous_state, ai_name, user_name, ai_personality, scenario_context)
         summary_model = _resolve_model(_scene_state_model) if _resolve_model else model
-        from .scene_state import clean_scene_state_response, validate_scene_state
         result = await _ollama.generate(
             model=summary_model, prompt=prompt,
             system="Output only the scene state summary. No thinking, no preamble.",
@@ -675,6 +626,62 @@ def setup(app: FastAPI, ollama, resolve_model=None):
             conv_log.log_scene_state(conv_id, previous_state, clean)
         except Exception as e:
             _log.warning("Scene state auto-update failed: %s", e)
+
+    async def _stream_response(ctx, conv_id, conv, model, chat_messages,
+                                ollama_options, user_name,
+                                save_role="assistant", prefix_text="",
+                                continue_msg_id=None, extra_debug=None):
+        debug = {
+            "debug_prompt": ctx["system_prompt"],
+            "debug_user_prompt": ctx.get("post_prompt", ""),
+            "debug_messages": ctx["messages"],
+        }
+        if ctx.get("_summary"):
+            debug["debug_summary"] = ctx["_summary"]
+            debug["debug_summary_through"] = ctx.get("_summary_through_sequence", 0)
+        if extra_debug:
+            debug.update(extra_debug)
+        yield json.dumps(debug) + "\n"
+
+        tokens = []
+        raw = {}
+        try:
+            async for chunk in _ollama.chat_stream(
+                model=model, messages=chat_messages,
+                options=ollama_options, stop=[f"{user_name}:"],
+            ):
+                yield json.dumps(chunk) + "\n"
+                if chunk.get("done"):
+                    raw = chunk
+                elif not chunk.get("thinking"):
+                    tokens.append(chunk["token"])
+        except Exception as e:
+            yield json.dumps({"error": str(e), "done": True}) + "\n"
+            return
+
+        try:
+            response_text = "".join(tokens)
+            post_ctx = {"response": response_text, "ai_name": get_ai_name(ctx), "_char_pronouns": get_ai_pronouns(ctx)}
+            post_ctx = await _pipeline.run_post(post_ctx)
+            full_text = prefix_text + post_ctx["response"] if prefix_text else post_ctx["response"]
+            if continue_msg_id:
+                await db.update_message(continue_msg_id, full_text)
+            else:
+                await db.add_message(
+                    conv_id, save_role, full_text, raw_response=raw,
+                    system_prompt=ctx.get("system_prompt", ""),
+                    scene_state=conv.get("scene_state", ""),
+                    post_prompt=ctx.get("post_prompt", ""),
+                    budget_json=budget_to_json(ctx),
+                    prompt_json=chat_messages,
+                )
+            conv_log.log_response(conv_id, save_role, post_ctx["response"], raw)
+            asyncio.create_task(_auto_update_scene_state(conv_id, model,
+                                            get_ai_name(ctx), get_user_name(ctx), get_ai_personality(ctx)))
+            asyncio.create_task(_maybe_summarize(conv_id, model,
+                                            get_ai_name(ctx), get_user_name(ctx), get_ai_personality(ctx)))
+        except Exception as e:
+            yield json.dumps({"error": f"Failed to save response: {e}", "done": True}) + "\n"
 
     @app.post("/rp/conversations/{conv_id}/message")
     async def send_message(conv_id: int, req: SendMessageRequest):
@@ -897,54 +904,10 @@ def setup(app: FastAPI, ollama, resolve_model=None):
                             ctx["system_prompt"], ctx.get("post_prompt", ""),
                             ctx["messages"], ollama_options)
 
-        async def stream():
-            debug = {
-                "debug_prompt": ctx["system_prompt"],
-                "debug_user_prompt": ctx.get("post_prompt", ""),
-                "debug_messages": ctx["messages"],
-            }
-            if ctx.get("_summary"):
-                debug["debug_summary"] = ctx["_summary"]
-                debug["debug_summary_through"] = ctx.get("_summary_through_sequence", 0)
-            yield json.dumps(debug) + "\n"
-
-            tokens = []
-            raw = {}
-            try:
-                async for chunk in _ollama.chat_stream(
-                    model=model, messages=chat_messages,
-                    options=ollama_options, stop=[f"{user_name}:"],
-                ):
-                    yield json.dumps(chunk) + "\n"
-                    if chunk.get("done"):
-                        raw = chunk
-                    elif not chunk.get("thinking"):
-                        tokens.append(chunk["token"])
-            except Exception as e:
-                yield json.dumps({"error": str(e), "done": True}) + "\n"
-                return
-            try:
-                response_text = "".join(tokens)
-                post_ctx = {"response": response_text, "ai_name": get_ai_name(ctx), "_char_pronouns": get_ai_pronouns(ctx)}
-                post_ctx = await _pipeline.run_post(post_ctx)
-                await db.add_message(
-                    conv_id, "assistant", post_ctx["response"], raw_response=raw,
-                    system_prompt=ctx.get("system_prompt", ""),
-                    scene_state=conv.get("scene_state", ""),
-                    post_prompt=ctx.get("post_prompt", ""),
-                    budget_json=budget_to_json(ctx),
-                    prompt_json=chat_messages,
-                )
-                conv_log.log_response(conv_id, "assistant", post_ctx["response"], raw)
-                # Update scene state and maybe generate summary in background
-                asyncio.create_task(_auto_update_scene_state(conv_id, model,
-                                                get_ai_name(ctx), get_user_name(ctx), get_ai_personality(ctx)))
-                asyncio.create_task(_maybe_summarize(conv_id, model,
-                                                get_ai_name(ctx), get_user_name(ctx), get_ai_personality(ctx)))
-            except Exception as e:
-                yield json.dumps({"error": f"Failed to save response: {e}", "done": True}) + "\n"
-
-        return StreamingResponse(stream(), media_type="application/x-ndjson")
+        return StreamingResponse(
+            _stream_response(ctx, conv_id, conv, model, chat_messages,
+                              ollama_options, user_name),
+            media_type="application/x-ndjson")
 
     @app.post("/rp/conversations/{conv_id}/continue")
     async def continue_conversation(conv_id: int):
@@ -997,57 +960,12 @@ def setup(app: FastAPI, ollama, resolve_model=None):
                             ctx["system_prompt"], ctx.get("post_prompt", ""),
                             ctx["messages"], ollama_options)
 
-        async def stream():
-            debug = {
-                "debug_prompt": ctx["system_prompt"],
-                "debug_user_prompt": ctx.get("post_prompt", ""),
-                "debug_messages": ctx["messages"],
-            }
-            if ctx.get("_summary"):
-                debug["debug_summary"] = ctx["_summary"]
-                debug["debug_summary_through"] = ctx.get("_summary_through_sequence", 0)
-            yield json.dumps(debug) + "\n"
-
-            tokens = []
-            raw = {}
-            try:
-                async for chunk in _ollama.chat_stream(
-                    model=model, messages=chat_messages,
-                    options=ollama_options, stop=[f"{user_name}:"],
-                ):
-                    yield json.dumps(chunk) + "\n"
-                    if chunk.get("done"):
-                        raw = chunk
-                    elif not chunk.get("thinking"):
-                        tokens.append(chunk["token"])
-            except Exception as e:
-                yield json.dumps({"error": str(e), "done": True}) + "\n"
-                return
-            try:
-                response_text = "".join(tokens)
-                post_ctx = {"response": response_text, "ai_name": get_ai_name(ctx), "_char_pronouns": get_ai_pronouns(ctx)}
-                post_ctx = await _pipeline.run_post(post_ctx)
-                full_text = prefix_text + post_ctx["response"]
-                if continue_msg_id:
-                    await db.update_message(continue_msg_id, full_text)
-                else:
-                    await db.add_message(
-                        conv_id, "assistant", full_text, raw_response=raw,
-                        system_prompt=ctx.get("system_prompt", ""),
-                        scene_state=conv.get("scene_state", ""),
-                        post_prompt=ctx.get("post_prompt", ""),
-                        budget_json=budget_to_json(ctx),
-                        prompt_json=chat_messages,
-                    )
-                conv_log.log_response(conv_id, "assistant", post_ctx["response"], raw)
-                asyncio.create_task(_auto_update_scene_state(conv_id, model,
-                                                get_ai_name(ctx), get_user_name(ctx), get_ai_personality(ctx)))
-                asyncio.create_task(_maybe_summarize(conv_id, model,
-                                                get_ai_name(ctx), get_user_name(ctx), get_ai_personality(ctx)))
-            except Exception as e:
-                yield json.dumps({"error": f"Failed to save response: {e}", "done": True}) + "\n"
-
-        return StreamingResponse(stream(), media_type="application/x-ndjson")
+        return StreamingResponse(
+            _stream_response(ctx, conv_id, conv, model, chat_messages,
+                              ollama_options, user_name,
+                              prefix_text=prefix_text,
+                              continue_msg_id=continue_msg_id),
+            media_type="application/x-ndjson")
 
     @app.post("/rp/conversations/{conv_id}/auto-reply")
     async def auto_reply(conv_id: int):
@@ -1133,56 +1051,12 @@ def setup(app: FastAPI, ollama, resolve_model=None):
                             ctx["system_prompt"], ctx.get("post_prompt", ""),
                             ctx["messages"], ollama_options)
 
-        async def stream():
-            debug = {
-                "debug_prompt": ctx["system_prompt"],
-                "debug_user_prompt": ctx.get("post_prompt", ""),
-                "debug_messages": ctx["messages"],
-                "auto_role": save_role,
-            }
-            if ctx.get("_summary"):
-                debug["debug_summary"] = ctx["_summary"]
-                debug["debug_summary_through"] = ctx.get("_summary_through_sequence", 0)
-            yield json.dumps(debug) + "\n"
-
-            tokens = []
-            raw = {}
-            try:
-                async for chunk in _ollama.chat_stream(
-                    model=model, messages=chat_messages,
-                    options=ollama_options, stop=[f"{user_name}:"],
-                ):
-                    yield json.dumps(chunk) + "\n"
-                    if chunk.get("done"):
-                        raw = chunk
-                    elif not chunk.get("thinking"):
-                        tokens.append(chunk["token"])
-            except Exception as e:
-                yield json.dumps({"error": str(e), "done": True}) + "\n"
-                return
-
-            try:
-                response_text = "".join(tokens)
-                post_ctx = {"response": response_text, "ai_name": get_ai_name(ctx), "_char_pronouns": get_ai_pronouns(ctx)}
-                post_ctx = await _pipeline.run_post(post_ctx)
-                await db.add_message(
-                    conv_id, save_role, post_ctx["response"], raw_response=raw,
-                    system_prompt=ctx.get("system_prompt", ""),
-                    scene_state=conv.get("scene_state", ""),
-                    post_prompt=ctx.get("post_prompt", ""),
-                    budget_json=budget_to_json(ctx),
-                    prompt_json=chat_messages,
-                )
-                conv_log.log_response(conv_id, save_role, post_ctx["response"], raw)
-                # Update scene state and maybe generate summary in background
-                asyncio.create_task(_auto_update_scene_state(conv_id, model,
-                                                get_ai_name(ctx), get_user_name(ctx), get_ai_personality(ctx)))
-                asyncio.create_task(_maybe_summarize(conv_id, model,
-                                                get_ai_name(ctx), get_user_name(ctx), get_ai_personality(ctx)))
-            except Exception as e:
-                yield json.dumps({"error": f"Failed to save response: {e}", "done": True}) + "\n"
-
-        return StreamingResponse(stream(), media_type="application/x-ndjson")
+        return StreamingResponse(
+            _stream_response(ctx, conv_id, conv, model, chat_messages,
+                              ollama_options, user_name,
+                              save_role=save_role,
+                              extra_debug={"auto_role": save_role}),
+            media_type="application/x-ndjson")
 
     # -- Compare (A/B eval) --
     from .eval_routes import setup_eval_routes

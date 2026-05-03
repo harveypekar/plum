@@ -31,7 +31,10 @@ class FakeDB:
         self.scenarios: dict[int, dict] = {}
         self.conversations: dict[int, dict] = {}
         self.messages: dict[int, dict] = {}
-        self._next = {"card": 1, "scenario": 1, "conv": 1, "msg": 1}
+        self.eval_sets: dict[int, dict] = {}
+        self.eval_candidates: dict[int, dict] = {}
+        self._next = {"card": 1, "scenario": 1, "conv": 1, "msg": 1,
+                       "eval_set": 1, "eval_cand": 1}
 
     def _now(self) -> str:
         return datetime.now(timezone.utc).isoformat()
@@ -222,6 +225,65 @@ class FakeDB:
 
     async def list_summaries(self, conv_id: int) -> list[dict]:
         return []
+
+    # -- Eval sets --
+
+    async def create_eval_set(self, conv_id: int, sequence: int) -> dict:
+        eid = self._id("eval_set")
+        es = {
+            "id": eid, "conversation_id": conv_id, "sequence": sequence,
+            "selected_id": None, "preference_tags": [],
+            "created_at": self._now(),
+        }
+        self.eval_sets[eid] = es
+        return es
+
+    async def add_eval_candidate(self, eval_set_id: int, label: str,
+                                  model: str, config: dict,
+                                  prompt_json=None, budget_json=None,
+                                  content: str = "",
+                                  raw_response=None) -> dict:
+        cid = self._id("eval_cand")
+        cand = {
+            "id": cid, "eval_set_id": eval_set_id, "label": label,
+            "model": model, "config": config, "content": content,
+            "raw_response": raw_response, "prompt_json": prompt_json,
+            "budget_json": budget_json, "created_at": self._now(),
+        }
+        self.eval_candidates[cid] = cand
+        return cand
+
+    async def update_eval_candidate(self, candidate_id: int, content: str,
+                                     raw_response=None, prompt_json=None,
+                                     budget_json=None) -> dict:
+        cand = self.eval_candidates[candidate_id]
+        cand.update(content=content, raw_response=raw_response,
+                    prompt_json=prompt_json, budget_json=budget_json)
+        return cand
+
+    async def select_eval_candidate(self, eval_set_id: int, candidate_id: int,
+                                     preference_tags=None) -> dict:
+        es = self.eval_sets[eval_set_id]
+        es["selected_id"] = candidate_id
+        es["preference_tags"] = preference_tags or []
+        return es
+
+    async def get_eval_set(self, eval_set_id: int) -> dict | None:
+        return self.eval_sets.get(eval_set_id)
+
+    async def get_eval_candidates(self, eval_set_id: int) -> list[dict]:
+        return sorted(
+            [c for c in self.eval_candidates.values()
+             if c["eval_set_id"] == eval_set_id],
+            key=lambda c: c["id"],
+        )
+
+    async def get_eval_sets_for_conversation(self, conv_id: int) -> list[dict]:
+        return sorted(
+            [es for es in self.eval_sets.values()
+             if es["conversation_id"] == conv_id],
+            key=lambda es: es["sequence"],
+        )
 
     # -- First message cache (stubs) --
 

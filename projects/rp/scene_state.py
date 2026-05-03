@@ -26,7 +26,8 @@ _SKIP_VALIDATION = frozenset({"mood", "voice"})
 
 def build_scene_state_prompt(messages: list[dict], previous_state: str = "",
                               ai_name: str = "Character", user_name: str = "User",
-                              ai_personality: str = "") -> str:
+                              ai_personality: str = "",
+                              scenario_context: str = "") -> str:
     """Build the prompt sent to the LLM to generate/update scene state."""
     history = "\n".join(f"{m['role']}: {m['content']}" for m in messages)
     prev_section = ""
@@ -39,21 +40,36 @@ def build_scene_state_prompt(messages: list[dict], previous_state: str = "",
     if ai_personality:
         short = ai_personality[:200].rsplit(" ", 1)[0]
         personality_hint = f"{ai_name}'s personality: {short}\n\n"
+    scenario_section = ""
+    if scenario_context.strip():
+        scenario_section = f"Scenario context: {scenario_context.strip()}\n\n"
+    initial = not previous_state.strip() and len(messages) <= 1
+    if initial:
+        instruction = (
+            "This is the opening of a new scene. Establish the INITIAL scene state "
+            "based on the scenario context and first message below.\n\n"
+        )
+    else:
+        instruction = (
+            "Below are the most recent messages. UPDATE the scene state based on what changed.\n"
+            "Keep everything from the previous state that still holds true. "
+            "Only change what the new messages contradict or add.\n\n"
+        )
     return (
         f"{prev_section}"
         f"{personality_hint}"
-        "Below are the most recent messages. UPDATE the scene state based on what changed.\n"
-        "Keep everything from the previous state that still holds true. "
-        "Only change what the new messages contradict or add.\n\n"
+        f"{scenario_section}"
+        f"{instruction}"
         f"Characters: {ai_name} (AI) and {user_name} (user).\n\n"
         "Format — one short line per category:\n"
         "Location: (where are they right now)\n"
-        f"Clothing: (what {ai_name} and {user_name} are currently wearing — be specific, or 'fully naked' if they undressed)\n"
-        "Restraints: (describe the specific tie/pattern for each bound character — e.g. 'chest harness in red jute, wrists behind back' — or 'none')\n"
+        f"Clothing: (what {ai_name} and {user_name} are currently wearing RIGHT NOW — track removals: if a character undressed, they are naked, not still wearing the old clothes. Write 'naked' or 'nude' when appropriate)\n"
+        "Restraints: (describe the specific tie/pattern AND what it practically limits — e.g. 'wrists behind back — no free hand use' — or 'none')\n"
         "Position: (posture, who is where, physical contact)\n"
         "Props: (objects currently in play)\n"
         "Mood: (emotional atmosphere right now)\n"
-        f"Voice: (for each character: 1-2 words describing how they CURRENTLY sound — ground this in {ai_name}'s personality, not generic descriptors)\n\n"
+        "ONLY state facts explicitly shown or described in the messages. Do NOT invent or assume details not present.\n"
+        "If clothing is not mentioned, write 'not described' — do NOT guess.\n"
         "No narration, no story, no explanation. Just the current facts.\n\n"
         f"Recent messages:\n{history}"
     )

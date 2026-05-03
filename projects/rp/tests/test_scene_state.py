@@ -14,11 +14,42 @@ def _msgs(*pairs):
 
 
 class TestBuildSceneStatePrompt:
-    def test_update_instruction_always_present(self):
+    def test_update_instruction_for_multi_message(self):
         prompt = build_scene_state_prompt(
             messages=_msgs(("user", "I wave"), ("assistant", "She waves back")),
         )
         assert "UPDATE" in prompt
+        assert "INITIAL" not in prompt
+
+    def test_initial_instruction_for_single_message(self):
+        prompt = build_scene_state_prompt(
+            messages=_msgs(("user", "Hello")),
+            previous_state="",
+        )
+        assert "INITIAL" in prompt
+        assert "UPDATE" not in prompt
+
+    def test_update_instruction_when_previous_state_exists(self):
+        prompt = build_scene_state_prompt(
+            messages=_msgs(("user", "Hello")),
+            previous_state="Location: park",
+        )
+        assert "UPDATE" in prompt
+        assert "INITIAL" not in prompt
+
+    def test_scenario_context_included(self):
+        prompt = build_scene_state_prompt(
+            messages=_msgs(("user", "test")),
+            scenario_context="A fantasy tavern at midnight",
+        )
+        assert "Scenario context: A fantasy tavern at midnight" in prompt
+
+    def test_no_scenario_context_no_section(self):
+        prompt = build_scene_state_prompt(
+            messages=_msgs(("user", "test")),
+            scenario_context="",
+        )
+        assert "Scenario context:" not in prompt
 
     def test_previous_state_included(self):
         prompt = build_scene_state_prompt(
@@ -72,7 +103,7 @@ class TestBuildSceneStatePrompt:
 
     def test_format_categories_present(self):
         prompt = build_scene_state_prompt(messages=_msgs(("user", "test")))
-        for cat in ["Location:", "Clothing:", "Restraints:", "Position:", "Props:", "Mood:", "Voice:"]:
+        for cat in ["Location:", "Clothing:", "Restraints:", "Position:", "Props:", "Mood:"]:
             assert cat in prompt
 
 

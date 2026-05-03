@@ -561,10 +561,6 @@ async def save_summary(conv_id: int, summary: str, through_msg_id: int,
         conv_id, summary, through_msg_id, through_sequence,
         msg_count, token_estimate,
     )
-    await pool.execute(
-        "UPDATE rp_conversations SET summary_msg_id = $1 WHERE id = $2",
-        through_msg_id, conv_id,
-    )
     return dict(row)
 
 
