@@ -41,7 +41,7 @@ void App::init() {
     (set albedo [0.7 0.7 0.7 1]))))
 
 (def sponza (mesh "assets/scenes/sponza/sponza.obj" :material mat))
-(def cam (camera :fov 75 :position [0 5 0] :target [10 5 0] :near 0.1 :far 100))
+(def cam (camera :fov 75 :position [-500 400 0] :target [500 400 0] :near 1 :far 5000))
 (def sun (light :direction [-0.5 -1 -0.3] :intensity 1.5))
 (def gbuf (pass))
 (output gbuf)
