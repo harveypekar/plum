@@ -23,6 +23,11 @@ _STOPWORDS = frozenset({
 
 _SKIP_VALIDATION = frozenset({"mood", "voice"})
 
+_PLACEHOLDER_PATTERNS = frozenset({
+    "not described", "not mentioned", "not specified", "not stated",
+    "unknown", "unclear", "n/a", "none",
+})
+
 
 def build_scene_state_prompt(messages: list[dict], previous_state: str = "",
                               ai_name: str = "Character", user_name: str = "User",
@@ -55,6 +60,11 @@ def build_scene_state_prompt(messages: list[dict], previous_state: str = "",
             "Keep everything from the previous state that still holds true. "
             "Only change what the new messages contradict or add.\n\n"
         )
+    clothing_instruction = (
+        "If clothing is not mentioned, write 'not described' — do NOT guess.\n"
+        if initial else
+        "If clothing is not mentioned in the new messages, carry forward from the previous state unchanged.\n"
+    )
     return (
         f"{prev_section}"
         f"{personality_hint}"
@@ -69,7 +79,7 @@ def build_scene_state_prompt(messages: list[dict], previous_state: str = "",
         "Props: (objects currently in play)\n"
         "Mood: (emotional atmosphere right now)\n"
         "ONLY state facts explicitly shown or described in the messages. Do NOT invent or assume details not present.\n"
-        "If clothing is not mentioned, write 'not described' — do NOT guess.\n"
+        f"{clothing_instruction}"
         "No narration, no story, no explanation. Just the current facts.\n\n"
         f"Recent messages:\n{history}"
     )
@@ -170,6 +180,14 @@ def validate_scene_state(
 
         if new_val.lower() == old_val.lower():
             validated[cat] = new_val
+            continue
+
+        if old_val and new_val.lower().strip() in _PLACEHOLDER_PATTERNS:
+            _log.info(
+                "Reverted scene state [%s]: %r -> %r (placeholder regression)",
+                cat, old_val, new_val,
+            )
+            validated[cat] = old_val
             continue
 
         new_words = _extract_content_words(new_val)

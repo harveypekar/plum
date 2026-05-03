@@ -37,6 +37,20 @@ class TestBuildSceneStatePrompt:
         assert "UPDATE" in prompt
         assert "INITIAL" not in prompt
 
+    def test_initial_uses_not_described_instruction(self):
+        prompt = build_scene_state_prompt(
+            messages=_msgs(("user", "Hello")),
+            previous_state="",
+        )
+        assert "write 'not described'" in prompt.lower()
+
+    def test_update_uses_carry_forward_instruction(self):
+        prompt = build_scene_state_prompt(
+            messages=_msgs(("user", "I wave"), ("assistant", "She waves")),
+        )
+        assert "carry forward" in prompt.lower()
+        assert "write 'not described'" not in prompt.lower()
+
     def test_scenario_context_included(self):
         prompt = build_scene_state_prompt(
             messages=_msgs(("user", "test")),
@@ -310,3 +324,26 @@ class TestValidateSceneState:
         assert "sundress" in result
         assert "flirty" in result
         assert "bikini" not in result
+
+    def test_placeholder_regression_reverted(self):
+        old = "Location: park\nClothing: oversized t-shirt, dry socks"
+        new = "Location: park\nClothing: not described"
+        msgs = _msgs(("user", "she smiled at him"))
+        result = validate_scene_state(new, old, msgs)
+        assert "oversized t-shirt" in result
+        assert "not described" not in result
+
+    def test_placeholder_regression_variants(self):
+        for placeholder in ["not mentioned", "not specified", "unknown", "unclear", "n/a", "none"]:
+            old = "Clothing: red dress\nLocation: cafe"
+            new = f"Clothing: {placeholder}\nLocation: cafe"
+            msgs = _msgs(("user", "she sipped coffee"))
+            result = validate_scene_state(new, old, msgs)
+            assert "red dress" in result, f"Failed to revert placeholder '{placeholder}'"
+
+    def test_placeholder_without_previous_value_dropped(self):
+        old = "Location: park"
+        new = "Location: park\nClothing: not described"
+        msgs = _msgs(("user", "they walked"))
+        result = validate_scene_state(new, old, msgs)
+        assert "not described" not in result
