@@ -1,6 +1,7 @@
 #pragma once
 
 #include <joon/types.h>
+#include <joon/scene.h>
 #include <memory>
 #include <string>
 #include <vector>
@@ -57,9 +58,9 @@ public:
 
     const std::vector<Diagnostic>& diagnostics() const;
 
-    // Test-only accessor returning the most recent SceneCollection populated
-    // during evaluate(). Sub-project 2 exposes this so unit tests can verify
-    // scene-tier executors without going through the renderer.
+    void set_camera(const Camera& cam);
+    void clear_camera_override();
+
     const SceneCollection& scene_for_test() const;
 
 private:

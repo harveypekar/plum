@@ -94,6 +94,10 @@ void exec_light(const Node& n, EvalContext& ctx) {
 }
 
 void exec_camera(const Node& n, EvalContext& ctx) {
+    if (ctx.camera_override) {
+        ctx.scene.set_camera(*ctx.camera_override);
+        return;
+    }
     Camera c;
     c.fov_deg  = kwarg_float(n, "fov", 60.0f);
     c.position = kwarg_vec3(n, "position", {0, 0, 5});

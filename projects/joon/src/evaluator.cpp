@@ -104,6 +104,8 @@ struct Evaluator::Impl {
     std::unique_ptr<PipelineCache> pipelines;
     VkDescriptorPool desc_pool = VK_NULL_HANDLE;
     SceneCollection scene;
+    Camera camera_override_storage;
+    bool has_camera_override = false;
 
     Impl(Context& ctx, const Graph& source_graph)
         : ctx(ctx),
@@ -159,7 +161,9 @@ void Evaluator::evaluate() {
         m_impl->desc_pool,
         m_impl->scene,
         &m_impl->graph.ir().shader_defs,
-        {}
+        {},
+        {},
+        m_impl->has_camera_override ? &m_impl->camera_override_storage : nullptr
     };
 
     Interpreter interp(eval_ctx, m_impl->registry);
@@ -197,6 +201,15 @@ Result Evaluator::node_result(const std::string& name) {
 
 const std::vector<Diagnostic>& Evaluator::diagnostics() const {
     return m_impl->graph.ir().diagnostics;
+}
+
+void Evaluator::set_camera(const Camera& cam) {
+    m_impl->camera_override_storage = cam;
+    m_impl->has_camera_override = true;
+}
+
+void Evaluator::clear_camera_override() {
+    m_impl->has_camera_override = false;
 }
 
 const SceneCollection& Evaluator::scene_for_test() const {
