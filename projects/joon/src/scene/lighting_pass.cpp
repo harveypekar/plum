@@ -70,6 +70,10 @@ void dispatch_lighting_pass(const LightingPassConfig& cfg) {
     img_info.imageView = cfg.albedo_target->view;
     img_info.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 
+    VkDescriptorImageInfo normal_img_info{};
+    normal_img_info.imageView = cfg.normal_target->view;
+    normal_img_info.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+
     VkSamplerCreateInfo samp_info{};
     samp_info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
     samp_info.magFilter = VK_FILTER_LINEAR;
@@ -88,7 +92,7 @@ void dispatch_lighting_pass(const LightingPassConfig& cfg) {
     buf_info.offset = 0;
     buf_info.range = sizeof(LightUBO);
 
-    VkWriteDescriptorSet writes[3]{};
+    VkWriteDescriptorSet writes[4]{};
     writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     writes[0].dstSet = ds;
     writes[0].dstBinding = 0;
@@ -110,7 +114,14 @@ void dispatch_lighting_pass(const LightingPassConfig& cfg) {
     writes[2].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     writes[2].pBufferInfo = &buf_info;
 
-    vkUpdateDescriptorSets(cfg.device.device, 3, writes, 0, nullptr);
+    writes[3].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    writes[3].dstSet = ds;
+    writes[3].dstBinding = 3;
+    writes[3].descriptorCount = 1;
+    writes[3].descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+    writes[3].pImageInfo = &normal_img_info;
+
+    vkUpdateDescriptorSets(cfg.device.device, 4, writes, 0, nullptr);
 
     VkCommandBuffer cmd = cfg.device.begin_single_command();
 

@@ -16,6 +16,7 @@ struct LightingPassConfig {
     const SceneCollection& scene;
     uint32_t width, height;
     GpuImage* albedo_target;
+    GpuImage* normal_target;
     uint32_t output_node_id;
     const ShaderFnIR* brdf = nullptr;
 };

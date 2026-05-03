@@ -32,14 +32,24 @@ void exec_pass(const Node& n, EvalContext& ctx) {
     // When materials are active, G-buffer goes to an intermediate slot and
     // the lighting pass writes the final lit output to n.id.
     uint32_t color_id = has_materials ? (n.id ^ 0x40000000u) : n.id;
+    uint32_t normal_id = n.id ^ 0x20000000u;
     uint32_t depth_id = n.id ^ 0x80000000u;
 
     auto* albedo = ctx.pool.alloc_render_target(color_id, ctx.default_width, ctx.default_height);
     auto* depth  = ctx.pool.alloc_depth        (depth_id, ctx.default_width, ctx.default_height);
 
+    GpuImage* normal_buf = nullptr;
+    std::vector<VkFormat> color_formats = { albedo->format };
+    std::vector<VkImageView> color_views = { albedo->view };
+    if (has_materials) {
+        normal_buf = ctx.pool.alloc_render_target(normal_id, ctx.default_width, ctx.default_height);
+        color_formats.push_back(normal_buf->format);
+        color_views.push_back(normal_buf->view);
+    }
+
     // Render pass + framebuffer — created per-evaluate (caching is a follow-up).
-    RenderPass rp = create_color_depth_renderpass(ctx.device, { albedo->format });
-    VkFramebuffer fb = create_framebuffer(ctx.device, rp, { albedo->view }, depth->view,
+    RenderPass rp = create_color_depth_renderpass(ctx.device, color_formats);
+    VkFramebuffer fb = create_framebuffer(ctx.device, rp, color_views, depth->view,
                                            ctx.default_width, ctx.default_height);
 
     const auto& gp = ctx.pipelines.get_graphics("scene_basic", rp.pass, sizeof(PushLight));
@@ -172,23 +182,29 @@ void exec_pass(const Node& n, EvalContext& ctx) {
 
     // Transition color attachment from COLOR_ATTACHMENT_OPTIMAL → GENERAL so
     // downstream compute and the GUI viewport can read it.
-    VkImageMemoryBarrier barrier{};
-    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
-    barrier.image = albedo->image;
-    barrier.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
-    barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-    barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT
-                          | VK_ACCESS_TRANSFER_READ_BIT;
+    VkImageMemoryBarrier barriers[2]{};
+    uint32_t barrier_count = 1;
+    barriers[0].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    barriers[0].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barriers[0].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barriers[0].oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    barriers[0].newLayout = VK_IMAGE_LAYOUT_GENERAL;
+    barriers[0].image = albedo->image;
+    barriers[0].subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+    barriers[0].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    barriers[0].dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT
+                              | VK_ACCESS_TRANSFER_READ_BIT;
+    if (normal_buf) {
+        barriers[1] = barriers[0];
+        barriers[1].image = normal_buf->image;
+        barrier_count = 2;
+    }
     vkCmdPipelineBarrier(cmd,
                           VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
                           VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT
                               | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT
                               | VK_PIPELINE_STAGE_TRANSFER_BIT,
-                          0, 0, nullptr, 0, nullptr, 1, &barrier);
+                          0, 0, nullptr, 0, nullptr, barrier_count, barriers);
 
     ctx.device.end_single_command(cmd);
 
@@ -205,7 +221,7 @@ void exec_pass(const Node& n, EvalContext& ctx) {
         LightingPassConfig lcfg{
             ctx.device, ctx.pipelines, ctx.pool, ctx.desc_pool,
             ctx.scene, ctx.default_width, ctx.default_height,
-            albedo, n.id, brdf
+            albedo, normal_buf, n.id, brdf
         };
         dispatch_lighting_pass(lcfg);
     }

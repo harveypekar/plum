@@ -98,6 +98,7 @@ std::string HlslEmitter::emit_dot(const ShaderDotAccess& da) {
 std::string HlslEmitter::emit_fragment(const ShaderFnIR& fn, uint32_t prepass_count) {
     std::ostringstream ss;
 
+    uint32_t user_outputs = static_cast<uint32_t>(fn.outputs.size());
     ss << "struct PSOut {\n";
     for (size_t i = 0; i < fn.outputs.size(); i++) {
         std::string hlsl_type = (fn.outputs[i].type_name == "vec4") ? "float4" :
@@ -106,6 +107,7 @@ std::string HlslEmitter::emit_fragment(const ShaderFnIR& fn, uint32_t prepass_co
         ss << "    " << hlsl_type << " " << fn.outputs[i].name
            << " : SV_TARGET" << i << ";\n";
     }
+    ss << "    float4 gbuf_normal : SV_TARGET" << user_outputs << ";\n";
     ss << "};\n\n";
 
     ss << "struct PSIn {\n"
@@ -138,6 +140,7 @@ std::string HlslEmitter::emit_fragment(const ShaderFnIR& fn, uint32_t prepass_co
         ss << "    " << emit_expr(*stmt) << ";\n";
     }
 
+    ss << "    o.gbuf_normal = float4(normal * 0.5 + 0.5, 1.0);\n";
     ss << "    return o;\n";
     ss << "}\n";
     return ss.str();

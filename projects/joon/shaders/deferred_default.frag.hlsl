@@ -14,6 +14,7 @@ struct LightUBO {
 [[vk::binding(0, 0)]] Texture2D gbuf_albedo;
 [[vk::binding(1, 0)]] SamplerState samp;
 [[vk::binding(2, 0)]] ConstantBuffer<LightUBO> light_ubo;
+[[vk::binding(3, 0)]] Texture2D gbuf_normal;
 
 struct PSIn {
     float4 sv : SV_POSITION;
@@ -24,6 +25,7 @@ float4 main(PSIn i) : SV_TARGET {
     float4 albedo = gbuf_albedo.Sample(samp, i.uv);
     if (albedo.a < 0.01) discard;
 
+    float3 normal = gbuf_normal.Sample(samp, i.uv).xyz * 2.0 - 1.0;
     float3 result = albedo.rgb * 0.1;
 
     for (int li = 0; li < light_ubo.light_count; li++) {
@@ -37,7 +39,7 @@ float4 main(PSIn i) : SV_TARGET {
             light_dir = normalize(light_ubo.lights[li].position_type.xyz);
         }
 
-        float ndotl = saturate(dot(float3(0, 1, 0), light_dir));
+        float ndotl = saturate(dot(normal, light_dir));
         result += albedo.rgb * light_color * ndotl;
     }
 
