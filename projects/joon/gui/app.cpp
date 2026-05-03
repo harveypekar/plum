@@ -105,6 +105,18 @@ void App::bind_viewport() {
 
 void App::reparse() {
     eval_error.clear();
+    eval.reset();
+    if (viewport_desc) {
+        vkDeviceWaitIdle(ctx->device().device);
+        ImGui_ImplVulkan_RemoveTexture(viewport_desc);
+        viewport_desc = VK_NULL_HANDLE;
+    }
+    if (preview_desc) {
+        vkDeviceWaitIdle(ctx->device().device);
+        ImGui_ImplVulkan_RemoveTexture(preview_desc);
+        preview_desc = VK_NULL_HANDLE;
+    }
+    ctx->pool().clear();
     try {
         graph = ctx->parse_string(dsl_source.c_str());
         for (auto& d : graph.diagnostics()) {
