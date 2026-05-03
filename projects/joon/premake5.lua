@@ -38,8 +38,10 @@ workspace "Joon"
 
     -- LunarG layout differs between Windows (Include/Lib, vulkan-1.lib) and
     -- Linux (include/lib, libvulkan.so). Resolve once here and reuse below.
+    -- Use action target rather than os.host() so WSL can generate vs2022 projects.
     local vulkan_include, vulkan_libdir, vulkan_libname
-    if os.host() == "windows" then
+    local target_windows = os.host() == "windows" or _ACTION:find("vs")
+    if target_windows then
         vulkan_include = vulkan_sdk .. "/Include"
         vulkan_libdir  = vulkan_sdk .. "/Lib"
         vulkan_libname = "vulkan-1"
