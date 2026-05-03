@@ -157,6 +157,10 @@ def validate_scene_state(
     if not previous_state.strip():
         return new_state
 
+    if not new_state.strip():
+        _log.info("Empty scene state response, keeping previous state")
+        return previous_state
+
     new = parse_scene_state(new_state)
     old = parse_scene_state(previous_state)
 

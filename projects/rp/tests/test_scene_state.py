@@ -341,6 +341,18 @@ class TestValidateSceneState:
             result = validate_scene_state(new, old, msgs)
             assert "red dress" in result, f"Failed to revert placeholder '{placeholder}'"
 
+    def test_empty_new_state_keeps_previous(self):
+        old = "Location: park\nClothing: sundress\nMood: happy"
+        msgs = _msgs(("user", "hello"))
+        result = validate_scene_state("", old, msgs)
+        assert result == old
+
+    def test_whitespace_new_state_keeps_previous(self):
+        old = "Location: park\nClothing: sundress"
+        msgs = _msgs(("user", "hello"))
+        result = validate_scene_state("  \n  ", old, msgs)
+        assert result == old
+
     def test_placeholder_without_previous_value_dropped(self):
         old = "Location: park"
         new = "Location: park\nClothing: not described"
