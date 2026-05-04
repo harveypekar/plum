@@ -744,9 +744,6 @@
 
   // -- Compare (A/B eval) --
   $("compareBtn").addEventListener("click", compareMessage);
-  $("compareClose").addEventListener("click", () => {
-    $("compareModal").style.display = "none";
-  });
 
   async function compareMessage() {
     const input = $("chatInput");
@@ -761,76 +758,79 @@
 
     input.value = "";
     autoResizeInput();
+    isStreaming = true;
+    $("sendBtn").style.display = "none";
+    $("stopBtn").style.display = "none";
 
     const container = $("chatMessages");
     appendMessageBubble(container, { id: null, role: "user", content },
       currentConvDetail.user_card, currentConvDetail.ai_card);
+
+    var group = el("div", { className: "compare-group" });
+    var header = el("div", { className: "compare-group-header" });
+    header.appendChild(el("span", { textContent: "Generating candidates..." }));
+    var cancelBtn = el("button", { className: "compare-group-cancel", textContent: "Cancel" });
+    header.appendChild(cancelBtn);
+    group.appendChild(header);
+    container.appendChild(group);
     container.scrollTop = container.scrollHeight;
 
-    const modal = $("compareModal");
-    const candidatesDiv = $("compareCandidates");
-    candidatesDiv.textContent = "";
-    candidatesDiv.appendChild(el("div", {
-      textContent: "Generating candidates...",
-      style: { color: "#8b949e", textAlign: "center", padding: "40px" },
-    }));
-    modal.style.display = "";
+    cancelBtn.addEventListener("click", () => {
+      isStreaming = false;
+      $("sendBtn").style.display = "";
+      openConversation(currentConvId);
+    });
 
     try {
       const result = await api("POST", "/rp/conversations/" + currentConvId + "/compare", {
         content, configs,
       });
 
-      candidatesDiv.textContent = "";
+      header.querySelector("span").textContent = "Pick a response";
+
       for (const c of result.candidates) {
-        const card = el("div", {
-          style: {
-            border: "1px solid #30363d", borderRadius: "8px", padding: "16px",
-            marginBottom: "12px", background: "#0d1117",
-          },
-        });
-        const header = el("div", {
-          style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" },
-        });
-        header.appendChild(el("strong", {
-          textContent: c.label,
-          style: { color: "#58a6ff" },
-        }));
-        header.appendChild(el("span", {
-          textContent: c.model + " | " + JSON.stringify(c.config),
-          style: { color: "#8b949e", fontSize: "0.8em" },
-        }));
-        card.appendChild(header);
+        var candidate = el("div", { className: "compare-candidate" });
+        var avatar = el("img", { className: "message-avatar", alt: "" });
+        if (currentConvDetail) {
+          setAvatarSrc(avatar, currentConvDetail.ai_card.id, currentConvDetail.ai_card.has_avatar);
+        }
+        candidate.appendChild(avatar);
 
-        card.appendChild(el("div", {
-          textContent: c.content,
-          style: { color: "#c9d1d9", whiteSpace: "pre-wrap", fontSize: "0.9em", lineHeight: "1.5", marginBottom: "12px" },
-        }));
+        var col = el("div");
+        col.appendChild(el("div", { className: "compare-label", textContent: c.label }));
+        var bubble = el("div", { className: "message-bubble" });
+        renderDialogue(bubble, c.content, "assistant");
+        col.appendChild(bubble);
 
-        const pickBtn = el("button", {
-          textContent: "Pick this one",
-          style: { background: "#238636" },
-        });
-        pickBtn.addEventListener("click", async () => {
-          try {
-            await api("POST", "/rp/eval-sets/" + result.eval_set_id + "/select", {
-              candidate_id: c.id,
-            });
-            modal.style.display = "none";
-            openConversation(currentConvId);
-          } catch (e) {
-            alert("Failed to select: " + e.message);
-          }
-        });
-        card.appendChild(pickBtn);
-        candidatesDiv.appendChild(card);
+        var pickBtn = el("button", { className: "compare-pick", textContent: "Pick" });
+        pickBtn.addEventListener("click", (function(cId, setId) {
+          return async function() {
+            try {
+              await api("POST", "/rp/eval-sets/" + setId + "/select", {
+                candidate_id: cId,
+              });
+              isStreaming = false;
+              $("sendBtn").style.display = "";
+              openConversation(currentConvId);
+            } catch (e) {
+              alert("Failed to select: " + e.message);
+            }
+          };
+        })(c.id, result.eval_set_id));
+        col.appendChild(pickBtn);
+
+        candidate.appendChild(col);
+        group.appendChild(candidate);
       }
+      container.scrollTop = container.scrollHeight;
     } catch (e) {
-      candidatesDiv.textContent = "";
-      candidatesDiv.appendChild(el("div", {
+      header.querySelector("span").textContent = "";
+      group.appendChild(el("div", {
         textContent: "Error: " + e.message,
-        style: { color: "#f85149", padding: "20px" },
+        style: { color: "#f85149", fontSize: "0.85em", padding: "8px 0" },
       }));
+      isStreaming = false;
+      $("sendBtn").style.display = "";
     }
   }
   $("restartBtn").addEventListener("click", () => {
