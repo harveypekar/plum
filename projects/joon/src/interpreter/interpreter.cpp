@@ -72,4 +72,26 @@ void Interpreter::evaluate(IRGraph& graph) {
     }
 }
 
+void Interpreter::re_render(IRGraph& graph) {
+    auto order = graph.topological_order();
+
+    for (uint32_t id : order) {
+        auto& node = graph.nodes[id];
+        if (node.tier == Tier::SCENE || node.tier == Tier::MATERIAL) continue;
+
+        if (node.op == "constant" || node.op == "string_constant" ||
+            node.op == "param" || node.op == "error") {
+            continue;
+        }
+
+        for (auto& kw : node.kwargs) {
+            if (kw.source_node != UINT32_MAX && kw.source_node < graph.nodes.size())
+                kw.value = graph.nodes[kw.source_node].constant_value;
+        }
+
+        auto* executor = m_registry.find(node.op);
+        if (executor) (*executor)(node, m_ctx);
+    }
+}
+
 } // namespace joon
