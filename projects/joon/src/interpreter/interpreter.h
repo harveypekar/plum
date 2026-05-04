@@ -10,6 +10,7 @@ public:
     Interpreter(EvalContext& ctx, const NodeRegistry& registry);
 
     void evaluate(IRGraph& graph);
+    void re_render(IRGraph& graph);
 
 private:
     EvalContext& m_ctx;

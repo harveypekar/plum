@@ -172,7 +172,7 @@ void App::apply_camera() {
     cam.far_z = cam_far;
 
     eval->set_camera(cam);
-    eval->evaluate();
+    eval->re_render();
     viewport_dirty = true;
 }
 

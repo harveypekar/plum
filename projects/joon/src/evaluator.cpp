@@ -170,6 +170,29 @@ void Evaluator::evaluate() {
     interp.evaluate(m_impl->graph.ir());
 }
 
+void Evaluator::re_render() {
+    vkResetDescriptorPool(m_impl->ctx.device().device, m_impl->desc_pool, 0);
+
+    if (m_impl->has_camera_override)
+        m_impl->scene.set_camera(m_impl->camera_override_storage);
+
+    EvalContext eval_ctx{
+        m_impl->ctx.device(),
+        m_impl->ctx.pool(),
+        *m_impl->pipelines,
+        512, 512,
+        m_impl->desc_pool,
+        m_impl->scene,
+        &m_impl->graph.ir().shader_defs,
+        {},
+        {},
+        nullptr
+    };
+
+    Interpreter interp(eval_ctx, m_impl->registry);
+    interp.re_render(m_impl->graph.ir());
+}
+
 template<>
 Param<float> Evaluator::param(const std::string& name) {
     auto& ir = m_impl->graph.ir();
