@@ -61,9 +61,10 @@ def build_scene_state_prompt(messages: list[dict], previous_state: str = "",
             "Only change what the new messages contradict or add.\n\n"
         )
     clothing_instruction = (
-        "If clothing is not mentioned, write 'not described' — do NOT guess.\n"
+        "For EACH character's clothing: if that character's clothing is not explicitly described in the messages, write 'not described'. "
+        "Do NOT copy one character's clothing to the other. Do NOT guess.\n"
         if initial else
-        "If clothing is not mentioned in the new messages, carry forward from the previous state unchanged.\n"
+        "If a character's clothing is not mentioned in the new messages, carry forward from the previous state unchanged.\n"
     )
     return (
         f"{prev_section}"
