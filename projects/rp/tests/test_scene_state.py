@@ -117,8 +117,18 @@ class TestBuildSceneStatePrompt:
 
     def test_format_categories_present(self):
         prompt = build_scene_state_prompt(messages=_msgs(("user", "test")))
-        for cat in ["Location:", "Clothing:", "Restraints:", "Position:", "Props:", "Mood:"]:
+        for cat in ["Location:", "'s clothing:", "Restraints:", "Position:", "Props:", "Mood:"]:
             assert cat in prompt
+
+    def test_per_character_clothing_lines(self):
+        prompt = build_scene_state_prompt(
+            messages=_msgs(("user", "test")),
+            ai_name="Amber",
+            user_name="Val",
+        )
+        assert "Amber's clothing:" in prompt
+        assert "Val's clothing:" in prompt
+        assert "Clothing:" not in prompt.split("Format")[1].split("Restraints")[0].replace("Amber's clothing", "").replace("Val's clothing", "")
 
 
 class TestCleanSceneStateResponse:
