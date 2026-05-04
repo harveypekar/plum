@@ -170,7 +170,7 @@ void Evaluator::evaluate() {
     interp.evaluate(m_impl->graph.ir());
 }
 
-void Evaluator::re_render() {
+void Evaluator::render() {
     vkResetDescriptorPool(m_impl->ctx.device().device, m_impl->desc_pool, 0);
 
     if (m_impl->has_camera_override)
@@ -190,7 +190,7 @@ void Evaluator::re_render() {
     };
 
     Interpreter interp(eval_ctx, m_impl->registry);
-    interp.re_render(m_impl->graph.ir());
+    interp.render(m_impl->graph.ir());
 }
 
 template<>

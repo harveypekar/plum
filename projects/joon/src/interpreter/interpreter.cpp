@@ -72,7 +72,7 @@ void Interpreter::evaluate(IRGraph& graph) {
     }
 }
 
-void Interpreter::re_render(IRGraph& graph) {
+void Interpreter::render(IRGraph& graph) {
     auto order = graph.topological_order();
 
     for (uint32_t id : order) {
