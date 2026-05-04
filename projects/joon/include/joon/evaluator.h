@@ -49,7 +49,7 @@ public:
     ~Evaluator();
 
     void evaluate();
-    void re_render();
+    void render();
 
     template<typename T>
     Param<T> param(const std::string& name);
