@@ -395,11 +395,11 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         model = _resolve_model(conv["model"])
         previous_state = conv.get("scene_state", "")
         last_msg_id = conv.get("scene_state_msg_id")
-        # Use messages since last scene state generation
+        # Use messages since last scene state generation, capped at 10
         if last_msg_id is not None:
             new_msgs = [m for m in all_msgs if m["id"] > last_msg_id]
         else:
-            new_msgs = all_msgs
+            new_msgs = all_msgs[-10:]
         if not new_msgs:
             new_msgs = all_msgs[-10:]
         latest_msg_id = new_msgs[-1]["id"] if new_msgs else None
@@ -615,11 +615,11 @@ def setup(app: FastAPI, ollama, resolve_model=None):
             all_msgs = await db.get_messages(conv_id)
             if not all_msgs:
                 return
-            # Slice to only messages since last scene state generation
+            # Slice to only messages since last scene state generation, capped at 10
             if last_msg_id is not None:
                 new_msgs = [m for m in all_msgs if m["id"] > last_msg_id]
             else:
-                new_msgs = all_msgs
+                new_msgs = all_msgs[-10:]
             if not new_msgs:
                 new_msgs = all_msgs[-10:]
             if not new_msgs:

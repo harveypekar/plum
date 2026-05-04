@@ -376,3 +376,9 @@ class TestValidateSceneState:
         msgs = _msgs(("user", "hello"))
         result = validate_scene_state(narrative, old, msgs)
         assert result == old
+
+    def test_initial_narrative_returns_empty(self):
+        narrative = "She walked into the room and looked around nervously."
+        msgs = _msgs(("user", "hello"))
+        result = validate_scene_state(narrative, "", msgs)
+        assert result == ""

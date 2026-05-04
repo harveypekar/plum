@@ -147,15 +147,11 @@ def validate_scene_state(
     previous_state: str,
     messages: list[dict],
 ) -> str:
-    """Revert scene state categories that changed without evidence in messages.
-
-    For each category whose value differs from the previous state, checks
-    whether any new content words appear in the source messages.  Unsupported
-    changes are reverted to the previous value.  Interpretive categories
-    (mood, voice) are always kept as-is.  Initial generation (no previous
-    state) is returned unmodified since it's grounded in scenario context.
-    """
+    """Revert scene state categories that changed without evidence in messages."""
     if not previous_state.strip():
+        if not parse_scene_state(new_state):
+            _log.info("Initial scene state has no valid categories, returning empty")
+            return ""
         return new_state
 
     if not new_state.strip():
