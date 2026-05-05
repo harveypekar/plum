@@ -1,5 +1,6 @@
 #include "scene/geometry_pass.h"
 #include "scene/lighting_pass.h"
+#include "scene/texture_cache.h"
 #include "nodes/node_registry.h"
 #include "ir/node.h"
 #include "vulkan/buffer.h"
@@ -27,11 +28,18 @@ struct PushLight {
     float pad1;
 };
 
+bool has_textured_objects(const SceneCollection& scene) {
+    for (const auto& obj : scene.objects)
+        if (obj.albedo_texture) return true;
+    return false;
+}
+
 void exec_pass(const Node& n, EvalContext& ctx) {
     bool has_materials = !ctx.material_pipelines.empty();
-    // When materials are active, G-buffer goes to an intermediate slot and
-    // the lighting pass writes the final lit output to n.id.
-    uint32_t color_id = has_materials ? (n.id ^ 0x40000000u) : n.id;
+    bool has_textures = has_textured_objects(ctx.scene);
+    bool has_deferred = has_materials || has_textures;
+
+    uint32_t color_id = has_deferred ? (n.id ^ 0x40000000u) : n.id;
     uint32_t normal_id = n.id ^ 0x20000000u;
     uint32_t depth_id = n.id ^ 0x80000000u;
 
@@ -41,13 +49,12 @@ void exec_pass(const Node& n, EvalContext& ctx) {
     GpuImage* normal_buf = nullptr;
     std::vector<VkFormat> color_formats = { albedo->format };
     std::vector<VkImageView> color_views = { albedo->view };
-    if (has_materials) {
+    if (has_deferred) {
         normal_buf = ctx.pool.alloc_render_target(normal_id, ctx.default_width, ctx.default_height);
         color_formats.push_back(normal_buf->format);
         color_views.push_back(normal_buf->view);
     }
 
-    // Render pass + framebuffer — created per-evaluate (caching is a follow-up).
     RenderPass rp = create_color_depth_renderpass(ctx.device, color_formats);
     VkFramebuffer fb = create_framebuffer(ctx.device, rp, color_views, depth->view,
                                            ctx.default_width, ctx.default_height);
@@ -55,7 +62,10 @@ void exec_pass(const Node& n, EvalContext& ctx) {
     uint32_t num_color = static_cast<uint32_t>(color_formats.size());
     const auto& gp = ctx.pipelines.get_graphics("scene_basic", rp.pass, sizeof(PushLight), num_color);
 
-    // Camera matrices — fall back to defaults if no camera was set.
+    const GraphicsPipeline* tex_gp = nullptr;
+    if (has_textures)
+        tex_gp = &ctx.pipelines.get_graphics_textured("scene_textured", rp.pass, num_color);
+
     const auto& cam = ctx.scene.camera;
     mat4 view = look_at(cam.position, cam.target, cam.up);
     mat4 proj = perspective_vk(cam.fov_deg,
@@ -63,7 +73,6 @@ void exec_pass(const Node& n, EvalContext& ctx) {
                                     / static_cast<float>(ctx.default_height),
                                 cam.near_z, cam.far_z);
 
-    // Light push constant — first directional light or default.
     PushLight pc{};
     if (!ctx.scene.lights.empty()) {
         const auto& l = ctx.scene.lights[0];
@@ -84,8 +93,8 @@ void exec_pass(const Node& n, EvalContext& ctx) {
     clears[0].color = {{ 0.0f, 0.0f, 0.0f, 1.0f }};
     clears[1].color = {{ 0.0f, 0.0f, 0.0f, 0.0f }};
     clears[2].depthStencil = { 1.0f, 0 };
-    uint32_t clear_count = has_materials ? 3u : 2u;
-    if (!has_materials) {
+    uint32_t clear_count = has_deferred ? 3u : 2u;
+    if (!has_deferred) {
         clears[1].depthStencil = { 1.0f, 0 };
     }
 
@@ -111,7 +120,6 @@ void exec_pass(const Node& n, EvalContext& ctx) {
     scissor.extent = { ctx.default_width, ctx.default_height };
     vkCmdSetScissor(cmd, 0, 1, &scissor);
 
-    // Per-frame buffers — freed after submit.
     std::vector<GpuBuffer> per_frame_bufs;
     per_frame_bufs.reserve(ctx.scene.objects.size() * 3);
 
@@ -120,9 +128,12 @@ void exec_pass(const Node& n, EvalContext& ctx) {
     for (const auto& obj : ctx.scene.objects) {
         if (obj.mesh.vertices.empty() || obj.mesh.indices.empty()) continue;
 
-        // Select pipeline: per-material if available, else default.
+        bool use_textured = obj.albedo_texture && tex_gp;
+
         const GraphicsPipeline* cur_gp = &gp;
-        if (obj.material_node_id != UINT32_MAX) {
+        if (use_textured) {
+            cur_gp = tex_gp;
+        } else if (obj.material_node_id != UINT32_MAX) {
             auto mat_it = ctx.material_pipelines.find(obj.material_node_id);
             if (mat_it != ctx.material_pipelines.end())
                 cur_gp = mat_it->second;
@@ -161,14 +172,58 @@ void exec_pass(const Node& n, EvalContext& ctx) {
         dbi.offset = 0;
         dbi.range = sizeof(UBO);
 
-        VkWriteDescriptorSet wds{};
-        wds.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        wds.dstSet = ds;
-        wds.dstBinding = 0;
-        wds.descriptorCount = 1;
-        wds.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        wds.pBufferInfo = &dbi;
-        vkUpdateDescriptorSets(ctx.device.device, 1, &wds, 0, nullptr);
+        if (use_textured) {
+            VkDescriptorImageInfo albedo_info{};
+            albedo_info.imageView = obj.albedo_texture->view;
+            albedo_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+            VkDescriptorImageInfo samp_info{};
+            samp_info.sampler = ctx.texture_cache->sampler();
+
+            VkDescriptorImageInfo normal_info{};
+            normal_info.imageView = obj.normal_texture->view;
+            normal_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+            VkWriteDescriptorSet writes[4]{};
+            writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            writes[0].dstSet = ds;
+            writes[0].dstBinding = 0;
+            writes[0].descriptorCount = 1;
+            writes[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+            writes[0].pBufferInfo = &dbi;
+
+            writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            writes[1].dstSet = ds;
+            writes[1].dstBinding = 1;
+            writes[1].descriptorCount = 1;
+            writes[1].descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+            writes[1].pImageInfo = &albedo_info;
+
+            writes[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            writes[2].dstSet = ds;
+            writes[2].dstBinding = 2;
+            writes[2].descriptorCount = 1;
+            writes[2].descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
+            writes[2].pImageInfo = &samp_info;
+
+            writes[3].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            writes[3].dstSet = ds;
+            writes[3].dstBinding = 3;
+            writes[3].descriptorCount = 1;
+            writes[3].descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+            writes[3].pImageInfo = &normal_info;
+
+            vkUpdateDescriptorSets(ctx.device.device, 4, writes, 0, nullptr);
+        } else {
+            VkWriteDescriptorSet wds{};
+            wds.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            wds.dstSet = ds;
+            wds.dstBinding = 0;
+            wds.descriptorCount = 1;
+            wds.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+            wds.pBufferInfo = &dbi;
+            vkUpdateDescriptorSets(ctx.device.device, 1, &wds, 0, nullptr);
+        }
 
         vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, cur_gp->layout,
                                  0, 1, &ds, 0, nullptr);
@@ -186,8 +241,6 @@ void exec_pass(const Node& n, EvalContext& ctx) {
 
     vkCmdEndRenderPass(cmd);
 
-    // Transition color attachment from COLOR_ATTACHMENT_OPTIMAL → GENERAL so
-    // downstream compute and the GUI viewport can read it.
     VkImageMemoryBarrier barriers[2]{};
     uint32_t barrier_count = 1;
     barriers[0].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -218,7 +271,7 @@ void exec_pass(const Node& n, EvalContext& ctx) {
     vkDestroyFramebuffer(ctx.device.device, fb, nullptr);
     destroy_renderpass(ctx.device, rp);
 
-    if (!ctx.material_pipelines.empty()) {
+    if (has_deferred) {
         const ShaderFnIR* brdf = nullptr;
         for (auto& [mat_id, fn_ir] : ctx.material_brdfs) {
             brdf = &fn_ir;

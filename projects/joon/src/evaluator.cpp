@@ -5,6 +5,7 @@
 #include "ir/ir_graph.h"
 #include "interpreter/interpreter.h"
 #include "nodes/node_registry.h"
+#include "scene/texture_cache.h"
 #include "vulkan/device.h"
 #include "vulkan/resource_pool.h"
 #include "vulkan/pipeline_cache.h"
@@ -99,9 +100,10 @@ static std::string resolve_shader_dir() {
 
 struct Evaluator::Impl {
     Context& ctx;
-    Graph graph; // mutable copy for param updates
+    Graph graph;
     NodeRegistry registry;
     std::unique_ptr<PipelineCache> pipelines;
+    std::unique_ptr<TextureCache> textures;
     VkDescriptorPool desc_pool = VK_NULL_HANDLE;
     SceneCollection scene;
     Camera camera_override_storage;
@@ -110,25 +112,25 @@ struct Evaluator::Impl {
     Impl(Context& ctx, const Graph& source_graph)
         : ctx(ctx),
           registry(NodeRegistry::create_default()),
-          pipelines(std::make_unique<PipelineCache>(ctx.device(), resolve_shader_dir())) {
+          pipelines(std::make_unique<PipelineCache>(ctx.device(), resolve_shader_dir())),
+          textures(std::make_unique<TextureCache>(ctx.device())) {
 
-        // Copy the graph so we can mutate params
-        graph = ctx.parse_string(""); // placeholder
-        graph.ir() = source_graph.ir(); // copy IR
+        graph = ctx.parse_string("");
+        graph.ir() = source_graph.ir();
 
         VkDescriptorPoolSize pool_sizes[4]{};
         pool_sizes[0].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
         pool_sizes[0].descriptorCount = 256;
         pool_sizes[1].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        pool_sizes[1].descriptorCount = 256;
+        pool_sizes[1].descriptorCount = 512;
         pool_sizes[2].type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
-        pool_sizes[2].descriptorCount = 64;
+        pool_sizes[2].descriptorCount = 512;
         pool_sizes[3].type = VK_DESCRIPTOR_TYPE_SAMPLER;
-        pool_sizes[3].descriptorCount = 64;
+        pool_sizes[3].descriptorCount = 512;
 
         VkDescriptorPoolCreateInfo pool_info{};
         pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-        pool_info.maxSets = 256;
+        pool_info.maxSets = 512;
         pool_info.poolSizeCount = 4;
         pool_info.pPoolSizes = pool_sizes;
         pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
@@ -150,7 +152,6 @@ Evaluator::~Evaluator() = default;
 void Evaluator::evaluate() {
     vkResetDescriptorPool(m_impl->ctx.device().device, m_impl->desc_pool, 0);
 
-    // Drop any scene state from a previous evaluate so re-runs don't accumulate.
     m_impl->scene.clear();
 
     EvalContext eval_ctx{
@@ -163,7 +164,8 @@ void Evaluator::evaluate() {
         &m_impl->graph.ir().shader_defs,
         {},
         {},
-        m_impl->has_camera_override ? &m_impl->camera_override_storage : nullptr
+        m_impl->has_camera_override ? &m_impl->camera_override_storage : nullptr,
+        m_impl->textures.get()
     };
 
     Interpreter interp(eval_ctx, m_impl->registry);
@@ -186,7 +188,8 @@ void Evaluator::re_render() {
         &m_impl->graph.ir().shader_defs,
         {},
         {},
-        nullptr
+        nullptr,
+        m_impl->textures.get()
     };
 
     Interpreter interp(eval_ctx, m_impl->registry);

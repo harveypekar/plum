@@ -16,15 +16,16 @@ struct Mesh {
     std::vector<uint32_t> indices;
 };
 
+struct GpuImage;
+
 struct SceneObject {
     Mesh mesh;
     vec3 position{0, 0, 0};
     vec3 rotation{0, 0, 0};   // Euler XYZ, radians
     vec3 scale{1, 1, 1};
-    // Material wired by node id when fragment shading is per-object.
-    // Sub-project 2 uses a single hardcoded fragment, so this is unused for now.
-    // UINT32_MAX = unset; matches ResolvedKwarg::source_node convention in ir/node.h.
     uint32_t material_node_id = UINT32_MAX;
+    GpuImage* albedo_texture = nullptr;
+    GpuImage* normal_texture = nullptr;
 };
 
 enum class LightType { Directional, Point, Spot };

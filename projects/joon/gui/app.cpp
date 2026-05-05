@@ -38,12 +38,8 @@ void App::init() {
         {"Constant", R"(; Constant output
 (output 0.5)
 )"},
-        {"Sponza", R"(; Sponza atrium
-(def mat (shader
-  :fragment (fn [normal uv] -> [albedo vec4]
-    (set albedo [0.5 0.45 0.4 1]))))
-
-(def sponza (mesh "assets/scenes/sponza/sponza.obj" :material mat))
+        {"Sponza", R"(; Sponza atrium with textures
+(def sponza (mesh "assets/scenes/sponza/sponza.obj"))
 (def cam (camera :fov 75 :position [-500 400 0] :target [500 400 0] :near 1 :far 5000))
 (def sun (light :direction [-0.5 -1 -0.3] :intensity 0.7))
 (def gbuf (pass))

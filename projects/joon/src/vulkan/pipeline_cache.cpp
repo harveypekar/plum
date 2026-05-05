@@ -327,6 +327,81 @@ const GraphicsPipeline& PipelineCache::get_graphics_from_source(
     return m_graphics_pipelines[key];
 }
 
+const GraphicsPipeline& PipelineCache::get_graphics_textured(
+    const std::string& name, VkRenderPass render_pass,
+    uint32_t num_color_attachments) {
+    std::string key = "tex_" + name + ":" +
+                      std::to_string(reinterpret_cast<uintptr_t>(render_pass)) +
+                      ":" + std::to_string(num_color_attachments);
+    auto it = m_graphics_pipelines.find(key);
+    if (it != m_graphics_pipelines.end()) return it->second;
+
+    GraphicsPipeline p{};
+
+    auto vs_spirv = load_or_compile_stage(name, "vert", "vs_6_0");
+    auto fs_spirv = load_or_compile_stage(name, "frag", "ps_6_0");
+
+    auto make_module = [&](const std::vector<uint8_t>& spirv, const char* what) {
+        if (spirv.size() % 4 != 0)
+            throw std::runtime_error(
+                std::string("SPIR-V size not multiple of 4: ") + what);
+        VkShaderModuleCreateInfo info{};
+        info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+        info.codeSize = spirv.size();
+        info.pCode = reinterpret_cast<const uint32_t*>(spirv.data());
+        VkShaderModule mod = VK_NULL_HANDLE;
+        if (vkCreateShaderModule(m_device.device, &info, nullptr, &mod) !=
+            VK_SUCCESS)
+            throw std::runtime_error(
+                std::string("vkCreateShaderModule failed: ") + what);
+        return mod;
+    };
+    p.vert_module = make_module(vs_spirv, (name + ".vert").c_str());
+    p.frag_module = make_module(fs_spirv, (name + ".frag").c_str());
+
+    VkDescriptorSetLayoutBinding bindings[4]{};
+    bindings[0].binding = 0;
+    bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    bindings[0].descriptorCount = 1;
+    bindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    bindings[1].binding = 1;
+    bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+    bindings[1].descriptorCount = 1;
+    bindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    bindings[2].binding = 2;
+    bindings[2].descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
+    bindings[2].descriptorCount = 1;
+    bindings[2].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    bindings[3].binding = 3;
+    bindings[3].descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+    bindings[3].descriptorCount = 1;
+    bindings[3].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+    VkDescriptorSetLayoutCreateInfo desc_info{};
+    desc_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    desc_info.bindingCount = 4;
+    desc_info.pBindings = bindings;
+    if (vkCreateDescriptorSetLayout(m_device.device, &desc_info, nullptr,
+                                    &p.desc_layout) != VK_SUCCESS)
+        throw std::runtime_error(
+            "graphics_textured: vkCreateDescriptorSetLayout failed");
+
+    VkPipelineLayoutCreateInfo layout_info{};
+    layout_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    layout_info.setLayoutCount = 1;
+    layout_info.pSetLayouts = &p.desc_layout;
+    if (vkCreatePipelineLayout(m_device.device, &layout_info, nullptr,
+                               &p.layout) != VK_SUCCESS)
+        throw std::runtime_error(
+            "graphics_textured: vkCreatePipelineLayout failed");
+
+    p.pipeline = build_graphics_pipeline(p.vert_module, p.frag_module, p.layout,
+                                         render_pass, num_color_attachments);
+
+    m_graphics_pipelines[key] = p;
+    return m_graphics_pipelines[key];
+}
+
 VkPipeline PipelineCache::build_graphics_pipeline(VkShaderModule vert_module,
                                                     VkShaderModule frag_module,
                                                     VkPipelineLayout layout,

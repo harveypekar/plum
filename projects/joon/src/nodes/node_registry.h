@@ -14,6 +14,7 @@
 namespace joon {
 
 struct SceneCollection;
+class TextureCache;
 
 struct EvalContext {
     Device& device;
@@ -27,6 +28,7 @@ struct EvalContext {
     std::unordered_map<uint32_t, const GraphicsPipeline*> material_pipelines;
     std::unordered_map<uint32_t, ShaderFnIR> material_brdfs;
     const Camera* camera_override = nullptr;
+    TextureCache* texture_cache = nullptr;
 };
 
 using NodeExecutor = std::function<void(const Node& node, EvalContext& ctx)>;
