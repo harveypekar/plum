@@ -45,6 +45,10 @@ void App::init() {
 (def gbuf (pass))
 (output gbuf)
 )"},
+        {"Webcam", R"(; Live webcam feed
+(def feed (webcam))
+(output feed)
+)"},
     };
 
     active_graph_index = 0;

@@ -53,5 +53,6 @@ void register_save(NodeRegistry& reg);
 void register_scene_nodes(NodeRegistry& reg);
 void register_geometry_pass(NodeRegistry& reg);
 void register_material_nodes(NodeRegistry& reg);
+void register_webcam(NodeRegistry& reg);
 
 } // namespace joon
