@@ -23,6 +23,7 @@ NodeRegistry NodeRegistry::create_default() {
     register_scene_nodes(reg);
     register_geometry_pass(reg);
     register_material_nodes(reg);
+    register_webcam(reg);
     return reg;
 }
 
