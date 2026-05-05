@@ -172,6 +172,25 @@ class TestCleanSceneStateResponse:
         result = clean_scene_state_response(raw)
         assert "wrists behind back" in result
 
+    def test_strips_personality_line(self):
+        raw = "Location: park\nAmber's personality: warm and caring\nMood: calm"
+        result = clean_scene_state_response(raw)
+        assert "Location: park" in result
+        assert "Mood: calm" in result
+        assert "personality" not in result.lower()
+
+    def test_strips_character_and_description_lines(self):
+        raw = "Location: park\nCharacter: tall and strong\nDescription: blue eyes"
+        result = clean_scene_state_response(raw)
+        assert "Location: park" in result
+        assert "Character" not in result
+        assert "Description" not in result
+
+    def test_strips_background_line(self):
+        raw = "Location: park\nBackground: grew up in Italy"
+        result = clean_scene_state_response(raw)
+        assert "Background" not in result
+
 
 class TestParseSceneState:
     def test_basic_parsing(self):

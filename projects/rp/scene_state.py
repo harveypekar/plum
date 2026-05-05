@@ -23,6 +23,8 @@ _STOPWORDS = frozenset({
 
 _SKIP_VALIDATION = frozenset({"mood", "voice"})
 
+_STRIP_CATEGORIES = frozenset({"personality", "character", "background", "description"})
+
 _PLACEHOLDER_PATTERNS = frozenset({
     "not described", "not mentioned", "not specified", "not stated",
     "unknown", "unclear", "n/a", "none",
@@ -88,13 +90,18 @@ def build_scene_state_prompt(messages: list[dict], previous_state: str = "",
 
 
 def clean_scene_state_response(raw: str) -> str:
-    """Clean up LLM scene state output: strip think tags, remove empty/none lines."""
+    """Clean up LLM scene state output: strip think tags, remove empty/none lines,
+    and remove non-scene categories the LLM may parrot from the prompt."""
     clean = raw.strip()
     if "<think>" in clean:
         clean = clean.split("</think>")[-1].strip()
     lines = []
     for line in clean.splitlines():
         if ":" in line:
+            cat = line.split(":", 1)[0].strip()
+            cat_key = cat.lower().split("'s ")[-1] if "'s " in cat.lower() else cat.lower()
+            if cat_key in _STRIP_CATEGORIES:
+                continue
             value = line.split(":", 1)[1].strip().lower()
             if value and value != "none" and value != "n/a":
                 lines.append(line)
