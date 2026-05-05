@@ -18,6 +18,8 @@
   let allCards = [];
   let allScenarios = [];
   let allConversations = [];
+  let sceneStatePollTimer = null;
+  let lastKnownSceneStateMsgId = null;
 
   // ---------------------------------------------------------------------------
   // Helpers
@@ -296,6 +298,7 @@
   }
 
   async function openConversation(convId) {
+    stopSceneStatePoll();
     currentConvId = convId;
     try {
       const detail = await api("GET", "/rp/conversations/" + convId);
@@ -504,6 +507,9 @@
     appendMessageBubble(container, userMsg, currentConvDetail.user_card, currentConvDetail.ai_card);
     container.scrollTop = container.scrollHeight;
 
+    var preStreamMsgId = currentConvDetail ? currentConvDetail.conversation.scene_state_msg_id : null;
+    var preStreamState = currentConvDetail ? (currentConvDetail.conversation.scene_state || "") : "";
+
     // Stream AI response
     const hadError = await streamResponse("/rp/conversations/" + currentConvId + "/message", { content }, container);
 
@@ -511,8 +517,10 @@
     $("sendBtn").style.display = "";
     $("stopBtn").style.display = "none";
 
-    // Reload to sync state (skip on error so the error message stays visible)
-    if (!hadError) openConversation(currentConvId);
+    if (!hadError) {
+      await openConversation(currentConvId);
+      if (bubbleToggle.checked) startSceneStatePoll(currentConvId, preStreamMsgId, preStreamState);
+    }
   }
 
   async function continueConversation() {
@@ -521,6 +529,9 @@
     $("sendBtn").style.display = "none";
     $("stopBtn").style.display = "";
 
+    var preStreamMsgId = currentConvDetail ? currentConvDetail.conversation.scene_state_msg_id : null;
+    var preStreamState = currentConvDetail ? (currentConvDetail.conversation.scene_state || "") : "";
+
     const container = $("chatMessages");
     const hadError = await streamResponse("/rp/conversations/" + currentConvId + "/continue", undefined, container);
 
@@ -528,7 +539,10 @@
     $("sendBtn").style.display = "";
     $("stopBtn").style.display = "none";
 
-    if (!hadError) openConversation(currentConvId);
+    if (!hadError) {
+      await openConversation(currentConvId);
+      if (bubbleToggle.checked) startSceneStatePoll(currentConvId, preStreamMsgId, preStreamState);
+    }
   }
 
   async function regenerateResponse() {
@@ -536,6 +550,9 @@
     isStreaming = true;
     $("sendBtn").style.display = "none";
     $("stopBtn").style.display = "";
+
+    var preStreamMsgId = currentConvDetail ? currentConvDetail.conversation.scene_state_msg_id : null;
+    var preStreamState = currentConvDetail ? (currentConvDetail.conversation.scene_state || "") : "";
 
     // Remove last AI message bubble from DOM
     const container = $("chatMessages");
@@ -550,7 +567,10 @@
     $("sendBtn").style.display = "";
     $("stopBtn").style.display = "none";
 
-    if (!hadError) openConversation(currentConvId);
+    if (!hadError) {
+      await openConversation(currentConvId);
+      if (bubbleToggle.checked) startSceneStatePoll(currentConvId, preStreamMsgId, preStreamState);
+    }
   }
 
   async function streamResponse(url, body, container, forceRole) {
@@ -920,16 +940,70 @@
     if (!currentConvId) return;
     $("sceneStateRefresh").disabled = true;
     $("sceneStateRefresh").textContent = "Generating...";
-    // Trigger a refresh by sending current messages to generate scene state
     await api("POST", "/rp/conversations/" + currentConvId + "/refresh-scene-state");
-    // Reload conversation to get updated state
     await openConversation(currentConvId);
     $("sceneStateRefresh").disabled = false;
     $("sceneStateRefresh").textContent = "Auto-generate";
-    // Re-open the panel
     $("sceneStatePanel").style.display = "";
     $("sceneStateToggle").textContent = "Hide Scene State";
   });
+
+  // Scene state bubble toggle
+  var bubbleToggle = $("sceneStateBubbleToggle");
+  bubbleToggle.checked = localStorage.getItem("rp_scene_state_bubbles") === "1";
+  bubbleToggle.addEventListener("change", () => {
+    localStorage.setItem("rp_scene_state_bubbles", bubbleToggle.checked ? "1" : "0");
+  });
+
+  function stopSceneStatePoll() {
+    if (sceneStatePollTimer) {
+      clearInterval(sceneStatePollTimer);
+      sceneStatePollTimer = null;
+    }
+  }
+
+  function appendSceneStateBubble(state, previousState) {
+    var container = $("chatMessages");
+    var bubble = el("div", { className: "scene-state-bubble" });
+    bubble.appendChild(el("div", { className: "scene-state-bubble-label", textContent: "Scene State" }));
+    var lines = state.split("\n");
+    var oldLines = previousState ? previousState.split("\n") : [];
+    var oldSet = new Set(oldLines.map(function(l) { return l.trim().toLowerCase(); }));
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i];
+      var lineEl = el("div");
+      if (previousState && !oldSet.has(line.trim().toLowerCase())) {
+        lineEl.className = "scene-state-bubble-diff";
+      }
+      lineEl.textContent = line;
+      bubble.appendChild(lineEl);
+    }
+    container.appendChild(bubble);
+    container.scrollTop = container.scrollHeight;
+  }
+
+  function startSceneStatePoll(convId, previousMsgId, previousState) {
+    stopSceneStatePoll();
+    var attempts = 0;
+    sceneStatePollTimer = setInterval(async function() {
+      attempts++;
+      if (attempts > 15 || convId !== currentConvId) {
+        stopSceneStatePoll();
+        return;
+      }
+      try {
+        var conv = await api("GET", "/rp/conversations/" + convId);
+        var newMsgId = conv.conversation.scene_state_msg_id;
+        if (newMsgId && newMsgId !== previousMsgId) {
+          stopSceneStatePoll();
+          appendSceneStateBubble(conv.conversation.scene_state || "", previousState);
+          $("sceneStateEditor").value = conv.conversation.scene_state || "";
+        }
+      } catch (e) {
+        stopSceneStatePoll();
+      }
+    }, 2000);
+  }
 
   // Under the hood toggle
   $("underHoodToggle").addEventListener("click", () => {

@@ -347,6 +347,30 @@
     text-align: center;
   }
 
+  /* Scene state bubble */
+  .scene-state-bubble {
+    align-self: center;
+    max-width: 70%;
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 0.78em;
+    color: #8b949e;
+    white-space: pre-wrap;
+    line-height: 1.4;
+    margin: 4px 0;
+  }
+  .scene-state-bubble-label {
+    font-size: 0.85em;
+    font-weight: 600;
+    color: #58a6ff;
+    margin-bottom: 4px;
+  }
+  .scene-state-bubble-diff {
+    color: #3fb950;
+  }
+
   /* Under the hood panel */
   .under-hood {
     border-top: 1px solid #30363d;
@@ -942,9 +966,12 @@
       <div class="scene-state-toggle" id="sceneStateToggle" style="display:none">Scene State</div>
       <div class="scene-state-panel" id="sceneStatePanel" style="display:none">
         <textarea id="sceneStateEditor" placeholder="Location, clothing, physical state, props, mood..." rows="5" style="width:100%;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;border-radius:8px;padding:8px;font-family:inherit;font-size:0.85em;resize:vertical"></textarea>
-        <div style="display:flex;gap:8px;margin-top:6px">
+        <div style="display:flex;gap:8px;margin-top:6px;align-items:center">
           <button id="sceneStateSave" style="font-size:0.8em">Save</button>
           <button id="sceneStateRefresh" style="font-size:0.8em;background:#238636">Auto-generate</button>
+          <label style="margin-left:auto;font-size:0.75em;color:#8b949e;cursor:pointer;user-select:none">
+            <input type="checkbox" id="sceneStateBubbleToggle" style="margin-right:4px"> Show in chat
+          </label>
         </div>
       </div>
       <div class="under-hood-toggle" id="underHoodToggle" style="display:none">Under the Hood</div>
