@@ -56,7 +56,13 @@ public:
     const GraphicsPipeline& get_fullscreen(const std::string& frag_name,
                                             VkRenderPass render_pass);
 
-    // Like get_fullscreen but compiles frag from source string instead of file.
+    // Graphics pipeline with per-object texture bindings for textured meshes.
+    // Descriptor layout: binding 0 = UBO (vertex), binding 1 = SAMPLED_IMAGE (frag),
+    //   binding 2 = SAMPLER (frag), binding 3 = SAMPLED_IMAGE (frag).
+    const GraphicsPipeline& get_graphics_textured(const std::string& name,
+                                                   VkRenderPass render_pass,
+                                                   uint32_t num_color_attachments = 2);
+
     const GraphicsPipeline& get_fullscreen_from_source(
         const std::string& key,
         const std::string& frag_hlsl_source,

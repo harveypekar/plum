@@ -1,6 +1,7 @@
 #include "scene/scene_executors.h"
 #include "scene/primitives.h"
 #include "scene/obj_loader.h"
+#include "scene/texture_cache.h"
 #include "nodes/node_registry.h"
 #include "ir/node.h"
 #include <joon/scene.h>
@@ -72,12 +73,41 @@ void exec_cylinder(const Node& n, EvalContext& ctx) {
 }
 
 void exec_mesh(const Node& n, EvalContext& ctx) {
-    SceneObject o;
-    if (!n.string_arg.empty()) o.mesh = load_obj_file(n.string_arg);
-    o.position = kwarg_vec3(n, "position", {0, 0, 0});
-    o.rotation = kwarg_vec3(n, "rotation", {0, 0, 0});
-    o.material_node_id = kwarg_source_node(n, "material");
-    ctx.scene.add_object(std::move(o));
+    if (n.string_arg.empty()) {
+        ctx.scene.add_object(SceneObject{});
+        return;
+    }
+
+    vec3 pos = kwarg_vec3(n, "position", {0, 0, 0});
+    vec3 rot = kwarg_vec3(n, "rotation", {0, 0, 0});
+    uint32_t mat_id = kwarg_source_node(n, "material");
+
+    if (ctx.texture_cache) {
+        auto submeshes = load_obj_with_materials(n.string_arg);
+        for (auto& sm : submeshes) {
+            SceneObject o;
+            o.mesh = std::move(sm.mesh);
+            o.position = pos;
+            o.rotation = rot;
+            o.material_node_id = mat_id;
+            if (!sm.material.diffuse_tex.empty())
+                o.albedo_texture = ctx.texture_cache->load(sm.material.diffuse_tex);
+            if (!sm.material.normal_tex.empty())
+                o.normal_texture = ctx.texture_cache->load(sm.material.normal_tex);
+            if (!o.albedo_texture)
+                o.albedo_texture = ctx.texture_cache->default_albedo();
+            if (!o.normal_texture)
+                o.normal_texture = ctx.texture_cache->default_normal();
+            ctx.scene.add_object(std::move(o));
+        }
+    } else {
+        SceneObject o;
+        o.mesh = load_obj_file(n.string_arg);
+        o.position = pos;
+        o.rotation = rot;
+        o.material_node_id = mat_id;
+        ctx.scene.add_object(std::move(o));
+    }
 }
 
 void exec_light(const Node& n, EvalContext& ctx) {
