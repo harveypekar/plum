@@ -42,11 +42,14 @@ class SummaryBuffer(ContextStrategy):
 
     When a summary is available (via ctx["_summary"]), it is injected as a
     system message after the greeting. Messages already covered by the summary
-    are excluded. The summary gets a soft 25% budget cap; unused budget flows
-    to the recent message window.
+    are excluded, except for a style window of the most recent pre-summary
+    messages to maintain voice/style continuity. The summary gets a soft 25%
+    budget cap; unused budget flows to the recent message window.
 
     Falls back to SlidingWindow behavior when no summary exists.
     """
+
+    STYLE_WINDOW = 4
 
     def fit(self, messages: list[dict], max_tokens: int,
             token_counter=None, ctx: dict | None = None) -> list[dict]:
@@ -77,8 +80,15 @@ class SummaryBuffer(ContextStrategy):
                     "content": f"[Story so far]\n{summary}",
                 }
                 budget -= summary_tokens
-                rest = [m for m in rest
-                        if m.get("_sequence", 0) > summary_through]
+                post_summary = [m for m in rest
+                                if m.get("_sequence", 0) > summary_through]
+                if len(post_summary) < self.STYLE_WINDOW:
+                    pre_summary = [m for m in rest
+                                   if m.get("_sequence", 0) <= summary_through]
+                    need = self.STYLE_WINDOW - len(post_summary)
+                    rest = pre_summary[-need:] + post_summary
+                else:
+                    rest = post_summary
 
         # Fill recent messages newest-first (same as SlidingWindow)
         kept = []

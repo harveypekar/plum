@@ -104,13 +104,16 @@ class TestSummaryBuffer:
         assert result[1] == msgs[0]  # greeting
 
     def test_summary_filters_covered_messages(self):
-        """Messages with sequence <= summary_through_sequence are excluded."""
+        """Messages with sequence <= summary_through are excluded
+        when enough post-summary messages exist for the style window."""
         msgs = [
             _seq_msg("assistant", "greeting", 1),
             _seq_msg("user", "old1", 2),
             _seq_msg("assistant", "old2", 3),
             _seq_msg("user", "new1", 4),
             _seq_msg("assistant", "new2", 5),
+            _seq_msg("user", "new3", 6),
+            _seq_msg("assistant", "new4", 7),
         ]
         ctx = {"_summary": "Previous events.", "_summary_through_sequence": 3}
         result = SummaryBuffer().fit(msgs, 10000, ctx=ctx)
@@ -169,16 +172,70 @@ class TestSummaryBuffer:
         assert len(result) == 2
 
     def test_messages_without_sequence_not_filtered(self):
-        """Messages without _sequence field default to 0, not filtered if through=0."""
+        """Messages without _sequence default to 0; the style window pulls them in."""
         msgs = [
             _msg("assistant", "greeting"),
             _msg("user", "msg1"),
         ]
         ctx = {"_summary": "Summary.", "_summary_through_sequence": 0}
         result = SummaryBuffer().fit(msgs, 10000, ctx=ctx)
-        # _sequence defaults to 0, 0 > 0 is False, so messages are filtered
-        # greeting is kept separately, msg1 should be filtered
-        assert len(result) == 2  # summary + greeting
+        assert len(result) == 3  # summary + greeting + msg1 (style window)
+
+    def test_style_window_pulls_pre_summary_messages(self):
+        """When < STYLE_WINDOW post-summary messages exist, pre-summary messages
+        are pulled in so the model has recent style examples."""
+        msgs = [
+            _seq_msg("assistant", "greeting", 1),
+            _seq_msg("user", "old1", 2),
+            _seq_msg("assistant", "old2", 3),
+            _seq_msg("user", "old3", 4),
+            _seq_msg("assistant", "old4", 5),
+            _seq_msg("user", "new_only", 6),
+        ]
+        ctx = {"_summary": "Previous events.", "_summary_through_sequence": 5}
+        result = SummaryBuffer().fit(msgs, 10000, ctx=ctx)
+        contents = [m["content"] for m in result]
+        # 1 post-summary message, STYLE_WINDOW=4 → pull 3 from pre-summary
+        assert "new_only" in contents
+        assert "old4" in contents  # most recent pre-summary
+        assert "old3" in contents
+        assert "old2" in contents
+        assert "old1" not in contents  # too old, beyond style window
+
+    def test_style_window_not_needed_when_enough_post_summary(self):
+        """No pre-summary messages pulled in when post-summary count >= STYLE_WINDOW."""
+        msgs = [
+            _seq_msg("assistant", "greeting", 1),
+            _seq_msg("user", "old1", 2),
+            _seq_msg("assistant", "old2", 3),
+            _seq_msg("user", "new1", 4),
+            _seq_msg("assistant", "new2", 5),
+            _seq_msg("user", "new3", 6),
+            _seq_msg("assistant", "new4", 7),
+        ]
+        ctx = {"_summary": "Previous events.", "_summary_through_sequence": 3}
+        result = SummaryBuffer().fit(msgs, 10000, ctx=ctx)
+        contents = [m["content"] for m in result]
+        assert "old1" not in contents
+        assert "old2" not in contents
+        assert "new1" in contents
+
+    def test_style_window_respects_budget(self):
+        """Style window messages are still subject to token budget."""
+        msgs = [
+            _seq_msg("assistant", "greeting", 1),
+            _seq_msg("user", "A" * 400, 2),
+            _seq_msg("assistant", "B" * 400, 3),
+            _seq_msg("user", "C" * 400, 4),
+            _seq_msg("assistant", "D" * 400, 5),
+            _seq_msg("user", "recent", 6),
+        ]
+        ctx = {"_summary": "Short.", "_summary_through_sequence": 5}
+        # Tight budget: greeting + summary + recent + maybe one style msg
+        result = SummaryBuffer().fit(msgs, 30, token_counter=_char4, ctx=ctx)
+        assert result[-1]["content"] == "recent"
+        # Can't fit all 4 style window messages, budget limits it
+        assert len(result) < 7
 
     def test_stale_summary_ignored(self):
         """Summary covering sequences beyond current messages is ignored."""
