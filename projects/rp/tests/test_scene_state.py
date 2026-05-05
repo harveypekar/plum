@@ -14,11 +14,56 @@ def _msgs(*pairs):
 
 
 class TestBuildSceneStatePrompt:
-    def test_update_instruction_always_present(self):
+    def test_update_instruction_for_multi_message(self):
         prompt = build_scene_state_prompt(
             messages=_msgs(("user", "I wave"), ("assistant", "She waves back")),
         )
         assert "UPDATE" in prompt
+        assert "INITIAL" not in prompt
+
+    def test_initial_instruction_for_single_message(self):
+        prompt = build_scene_state_prompt(
+            messages=_msgs(("user", "Hello")),
+            previous_state="",
+        )
+        assert "INITIAL" in prompt
+        assert "UPDATE" not in prompt
+
+    def test_update_instruction_when_previous_state_exists(self):
+        prompt = build_scene_state_prompt(
+            messages=_msgs(("user", "Hello")),
+            previous_state="Location: park",
+        )
+        assert "UPDATE" in prompt
+        assert "INITIAL" not in prompt
+
+    def test_initial_uses_not_described_instruction(self):
+        prompt = build_scene_state_prompt(
+            messages=_msgs(("user", "Hello")),
+            previous_state="",
+        )
+        assert "write 'not described'" in prompt.lower()
+
+    def test_update_uses_carry_forward_instruction(self):
+        prompt = build_scene_state_prompt(
+            messages=_msgs(("user", "I wave"), ("assistant", "She waves")),
+        )
+        assert "carry forward" in prompt.lower()
+        assert "write 'not described'" not in prompt.lower()
+
+    def test_scenario_context_included(self):
+        prompt = build_scene_state_prompt(
+            messages=_msgs(("user", "test")),
+            scenario_context="A fantasy tavern at midnight",
+        )
+        assert "Scenario context: A fantasy tavern at midnight" in prompt
+
+    def test_no_scenario_context_no_section(self):
+        prompt = build_scene_state_prompt(
+            messages=_msgs(("user", "test")),
+            scenario_context="",
+        )
+        assert "Scenario context:" not in prompt
 
     def test_previous_state_included(self):
         prompt = build_scene_state_prompt(
@@ -72,8 +117,18 @@ class TestBuildSceneStatePrompt:
 
     def test_format_categories_present(self):
         prompt = build_scene_state_prompt(messages=_msgs(("user", "test")))
-        for cat in ["Location:", "Clothing:", "Restraints:", "Position:", "Props:", "Mood:", "Voice:"]:
+        for cat in ["Location:", "'s clothing:", "Restraints:", "Position:", "Props:", "Mood:"]:
             assert cat in prompt
+
+    def test_per_character_clothing_lines(self):
+        prompt = build_scene_state_prompt(
+            messages=_msgs(("user", "test")),
+            ai_name="Amber",
+            user_name="Val",
+        )
+        assert "Amber's clothing:" in prompt
+        assert "Val's clothing:" in prompt
+        assert "Clothing:" not in prompt.split("Format")[1].split("Restraints")[0].replace("Amber's clothing", "").replace("Val's clothing", "")
 
 
 class TestCleanSceneStateResponse:
@@ -279,3 +334,51 @@ class TestValidateSceneState:
         assert "sundress" in result
         assert "flirty" in result
         assert "bikini" not in result
+
+    def test_placeholder_regression_reverted(self):
+        old = "Location: park\nClothing: oversized t-shirt, dry socks"
+        new = "Location: park\nClothing: not described"
+        msgs = _msgs(("user", "she smiled at him"))
+        result = validate_scene_state(new, old, msgs)
+        assert "oversized t-shirt" in result
+        assert "not described" not in result
+
+    def test_placeholder_regression_variants(self):
+        for placeholder in ["not mentioned", "not specified", "unknown", "unclear", "n/a", "none"]:
+            old = "Clothing: red dress\nLocation: cafe"
+            new = f"Clothing: {placeholder}\nLocation: cafe"
+            msgs = _msgs(("user", "she sipped coffee"))
+            result = validate_scene_state(new, old, msgs)
+            assert "red dress" in result, f"Failed to revert placeholder '{placeholder}'"
+
+    def test_empty_new_state_keeps_previous(self):
+        old = "Location: park\nClothing: sundress\nMood: happy"
+        msgs = _msgs(("user", "hello"))
+        result = validate_scene_state("", old, msgs)
+        assert result == old
+
+    def test_whitespace_new_state_keeps_previous(self):
+        old = "Location: park\nClothing: sundress"
+        msgs = _msgs(("user", "hello"))
+        result = validate_scene_state("  \n  ", old, msgs)
+        assert result == old
+
+    def test_placeholder_without_previous_value_dropped(self):
+        old = "Location: park"
+        new = "Location: park\nClothing: not described"
+        msgs = _msgs(("user", "they walked"))
+        result = validate_scene_state(new, old, msgs)
+        assert "not described" not in result
+
+    def test_narrative_response_keeps_previous(self):
+        old = "Location: park\nClothing: sundress\nMood: happy"
+        narrative = "She looked up at the sky and smiled warmly at him."
+        msgs = _msgs(("user", "hello"))
+        result = validate_scene_state(narrative, old, msgs)
+        assert result == old
+
+    def test_initial_narrative_returns_empty(self):
+        narrative = "She walked into the room and looked around nervously."
+        msgs = _msgs(("user", "hello"))
+        result = validate_scene_state(narrative, "", msgs)
+        assert result == ""

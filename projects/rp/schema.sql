@@ -139,6 +139,8 @@ END $$;
 CREATE INDEX IF NOT EXISTS idx_rp_fewshot_embedding
     ON rp_fewshot_examples USING hnsw (embedding vector_cosine_ops)
     WHERE active;
+CREATE INDEX IF NOT EXISTS idx_rp_fewshot_card_id
+    ON rp_fewshot_examples(card_id);
 
 CREATE TABLE IF NOT EXISTS rp_conversation_summaries (
     id              SERIAL PRIMARY KEY,
@@ -180,12 +182,6 @@ CREATE INDEX IF NOT EXISTS idx_rp_eval_sets_conv
     ON rp_eval_sets(conversation_id, sequence);
 CREATE INDEX IF NOT EXISTS idx_rp_eval_candidates_set
     ON rp_eval_candidates(eval_set_id);
-
--- Migration: track which message the summary was last generated from
-DO $$ BEGIN
-    ALTER TABLE rp_conversations ADD COLUMN summary_msg_id INTEGER DEFAULT NULL;
-EXCEPTION WHEN duplicate_column THEN NULL;
-END $$;
 
 -- Migration: preference tags on eval selections
 DO $$ BEGIN

@@ -23,10 +23,16 @@ _STOPWORDS = frozenset({
 
 _SKIP_VALIDATION = frozenset({"mood", "voice"})
 
+_PLACEHOLDER_PATTERNS = frozenset({
+    "not described", "not mentioned", "not specified", "not stated",
+    "unknown", "unclear", "n/a", "none",
+})
+
 
 def build_scene_state_prompt(messages: list[dict], previous_state: str = "",
                               ai_name: str = "Character", user_name: str = "User",
-                              ai_personality: str = "") -> str:
+                              ai_personality: str = "",
+                              scenario_context: str = "") -> str:
     """Build the prompt sent to the LLM to generate/update scene state."""
     history = "\n".join(f"{m['role']}: {m['content']}" for m in messages)
     prev_section = ""
@@ -39,21 +45,43 @@ def build_scene_state_prompt(messages: list[dict], previous_state: str = "",
     if ai_personality:
         short = ai_personality[:200].rsplit(" ", 1)[0]
         personality_hint = f"{ai_name}'s personality: {short}\n\n"
+    scenario_section = ""
+    if scenario_context.strip():
+        scenario_section = f"Scenario context: {scenario_context.strip()}\n\n"
+    initial = not previous_state.strip() and len(messages) <= 1
+    if initial:
+        instruction = (
+            "This is the opening of a new scene. Establish the INITIAL scene state "
+            "based on the scenario context and first message below.\n\n"
+        )
+    else:
+        instruction = (
+            "Below are the most recent messages. UPDATE the scene state based on what changed.\n"
+            "Keep everything from the previous state that still holds true. "
+            "Only change what the new messages contradict or add.\n\n"
+        )
+    clothing_instruction = (
+        "For EACH character's clothing: if that character's clothing is not explicitly described in the messages, write 'not described'. "
+        "Do NOT copy one character's clothing to the other. Do NOT guess.\n"
+        if initial else
+        "If a character's clothing is not mentioned in the new messages, carry forward from the previous state unchanged.\n"
+    )
     return (
         f"{prev_section}"
         f"{personality_hint}"
-        "Below are the most recent messages. UPDATE the scene state based on what changed.\n"
-        "Keep everything from the previous state that still holds true. "
-        "Only change what the new messages contradict or add.\n\n"
+        f"{scenario_section}"
+        f"{instruction}"
         f"Characters: {ai_name} (AI) and {user_name} (user).\n\n"
         "Format — one short line per category:\n"
         "Location: (where are they right now)\n"
-        f"Clothing: (what {ai_name} and {user_name} are currently wearing — be specific, or 'fully naked' if they undressed)\n"
-        "Restraints: (describe the specific tie/pattern for each bound character — e.g. 'chest harness in red jute, wrists behind back' — or 'none')\n"
+        f"{ai_name}'s clothing: (what {ai_name} is wearing RIGHT NOW — track removals: if they undressed, write 'naked')\n"
+        f"{user_name}'s clothing: (what {user_name} is wearing RIGHT NOW — track removals: if they undressed, write 'naked')\n"
+        "Restraints: (describe the specific tie/pattern AND what it practically limits — e.g. 'wrists behind back — no free hand use' — or 'none')\n"
         "Position: (posture, who is where, physical contact)\n"
         "Props: (objects currently in play)\n"
         "Mood: (emotional atmosphere right now)\n"
-        f"Voice: (for each character: 1-2 words describing how they CURRENTLY sound — ground this in {ai_name}'s personality, not generic descriptors)\n\n"
+        "ONLY state facts explicitly shown or described in the messages. Do NOT invent or assume details not present.\n"
+        f"{clothing_instruction}"
         "No narration, no story, no explanation. Just the current facts.\n\n"
         f"Recent messages:\n{history}"
     )
@@ -120,18 +148,22 @@ def validate_scene_state(
     previous_state: str,
     messages: list[dict],
 ) -> str:
-    """Revert scene state categories that changed without evidence in messages.
-
-    For each category whose value differs from the previous state, checks
-    whether any new content words appear in the source messages.  Unsupported
-    changes are reverted to the previous value.  Interpretive categories
-    (mood, voice) are always kept as-is.  Initial generation (no previous
-    state) is returned unmodified since it's grounded in scenario context.
-    """
+    """Revert scene state categories that changed without evidence in messages."""
     if not previous_state.strip():
+        if not parse_scene_state(new_state):
+            _log.info("Initial scene state has no valid categories, returning empty")
+            return ""
         return new_state
 
+    if not new_state.strip():
+        _log.info("Empty scene state response, keeping previous state")
+        return previous_state
+
     new = parse_scene_state(new_state)
+    if not new:
+        _log.info("No valid categories in scene state response, keeping previous state")
+        return previous_state
+
     old = parse_scene_state(previous_state)
 
     msg_text = " ".join(m.get("content", "") for m in messages)
@@ -154,6 +186,14 @@ def validate_scene_state(
 
         if new_val.lower() == old_val.lower():
             validated[cat] = new_val
+            continue
+
+        if old_val and new_val.lower().strip() in _PLACEHOLDER_PATTERNS:
+            _log.info(
+                "Reverted scene state [%s]: %r -> %r (placeholder regression)",
+                cat, old_val, new_val,
+            )
+            validated[cat] = old_val
             continue
 
         new_words = _extract_content_words(new_val)

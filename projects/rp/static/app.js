@@ -18,6 +18,8 @@
   let allCards = [];
   let allScenarios = [];
   let allConversations = [];
+  let sceneStatePollTimer = null;
+  let lastKnownSceneStateMsgId = null;
 
   // ---------------------------------------------------------------------------
   // Helpers
@@ -296,6 +298,7 @@
   }
 
   async function openConversation(convId) {
+    stopSceneStatePoll();
     currentConvId = convId;
     try {
       const detail = await api("GET", "/rp/conversations/" + convId);
@@ -504,6 +507,9 @@
     appendMessageBubble(container, userMsg, currentConvDetail.user_card, currentConvDetail.ai_card);
     container.scrollTop = container.scrollHeight;
 
+    var preStreamMsgId = currentConvDetail ? currentConvDetail.conversation.scene_state_msg_id : null;
+    var preStreamState = currentConvDetail ? (currentConvDetail.conversation.scene_state || "") : "";
+
     // Stream AI response
     const hadError = await streamResponse("/rp/conversations/" + currentConvId + "/message", { content }, container);
 
@@ -511,8 +517,10 @@
     $("sendBtn").style.display = "";
     $("stopBtn").style.display = "none";
 
-    // Reload to sync state (skip on error so the error message stays visible)
-    if (!hadError) openConversation(currentConvId);
+    if (!hadError) {
+      await openConversation(currentConvId);
+      if (bubbleToggle.checked) startSceneStatePoll(currentConvId, preStreamMsgId, preStreamState);
+    }
   }
 
   async function continueConversation() {
@@ -521,6 +529,9 @@
     $("sendBtn").style.display = "none";
     $("stopBtn").style.display = "";
 
+    var preStreamMsgId = currentConvDetail ? currentConvDetail.conversation.scene_state_msg_id : null;
+    var preStreamState = currentConvDetail ? (currentConvDetail.conversation.scene_state || "") : "";
+
     const container = $("chatMessages");
     const hadError = await streamResponse("/rp/conversations/" + currentConvId + "/continue", undefined, container);
 
@@ -528,7 +539,10 @@
     $("sendBtn").style.display = "";
     $("stopBtn").style.display = "none";
 
-    if (!hadError) openConversation(currentConvId);
+    if (!hadError) {
+      await openConversation(currentConvId);
+      if (bubbleToggle.checked) startSceneStatePoll(currentConvId, preStreamMsgId, preStreamState);
+    }
   }
 
   async function regenerateResponse() {
@@ -536,6 +550,9 @@
     isStreaming = true;
     $("sendBtn").style.display = "none";
     $("stopBtn").style.display = "";
+
+    var preStreamMsgId = currentConvDetail ? currentConvDetail.conversation.scene_state_msg_id : null;
+    var preStreamState = currentConvDetail ? (currentConvDetail.conversation.scene_state || "") : "";
 
     // Remove last AI message bubble from DOM
     const container = $("chatMessages");
@@ -550,7 +567,10 @@
     $("sendBtn").style.display = "";
     $("stopBtn").style.display = "none";
 
-    if (!hadError) openConversation(currentConvId);
+    if (!hadError) {
+      await openConversation(currentConvId);
+      if (bubbleToggle.checked) startSceneStatePoll(currentConvId, preStreamMsgId, preStreamState);
+    }
   }
 
   async function streamResponse(url, body, container, forceRole) {
@@ -744,9 +764,6 @@
 
   // -- Compare (A/B eval) --
   $("compareBtn").addEventListener("click", compareMessage);
-  $("compareClose").addEventListener("click", () => {
-    $("compareModal").style.display = "none";
-  });
 
   async function compareMessage() {
     const input = $("chatInput");
@@ -761,76 +778,79 @@
 
     input.value = "";
     autoResizeInput();
+    isStreaming = true;
+    $("sendBtn").style.display = "none";
+    $("stopBtn").style.display = "none";
 
     const container = $("chatMessages");
     appendMessageBubble(container, { id: null, role: "user", content },
       currentConvDetail.user_card, currentConvDetail.ai_card);
+
+    var group = el("div", { className: "compare-group" });
+    var header = el("div", { className: "compare-group-header" });
+    header.appendChild(el("span", { textContent: "Generating candidates..." }));
+    var cancelBtn = el("button", { className: "compare-group-cancel", textContent: "Cancel" });
+    header.appendChild(cancelBtn);
+    group.appendChild(header);
+    container.appendChild(group);
     container.scrollTop = container.scrollHeight;
 
-    const modal = $("compareModal");
-    const candidatesDiv = $("compareCandidates");
-    candidatesDiv.textContent = "";
-    candidatesDiv.appendChild(el("div", {
-      textContent: "Generating candidates...",
-      style: { color: "#8b949e", textAlign: "center", padding: "40px" },
-    }));
-    modal.style.display = "";
+    cancelBtn.addEventListener("click", () => {
+      isStreaming = false;
+      $("sendBtn").style.display = "";
+      openConversation(currentConvId);
+    });
 
     try {
       const result = await api("POST", "/rp/conversations/" + currentConvId + "/compare", {
         content, configs,
       });
 
-      candidatesDiv.textContent = "";
+      header.querySelector("span").textContent = "Pick a response";
+
       for (const c of result.candidates) {
-        const card = el("div", {
-          style: {
-            border: "1px solid #30363d", borderRadius: "8px", padding: "16px",
-            marginBottom: "12px", background: "#0d1117",
-          },
-        });
-        const header = el("div", {
-          style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" },
-        });
-        header.appendChild(el("strong", {
-          textContent: c.label,
-          style: { color: "#58a6ff" },
-        }));
-        header.appendChild(el("span", {
-          textContent: c.model + " | " + JSON.stringify(c.config),
-          style: { color: "#8b949e", fontSize: "0.8em" },
-        }));
-        card.appendChild(header);
+        var candidate = el("div", { className: "compare-candidate" });
+        var avatar = el("img", { className: "message-avatar", alt: "" });
+        if (currentConvDetail) {
+          setAvatarSrc(avatar, currentConvDetail.ai_card.id, currentConvDetail.ai_card.has_avatar);
+        }
+        candidate.appendChild(avatar);
 
-        card.appendChild(el("div", {
-          textContent: c.content,
-          style: { color: "#c9d1d9", whiteSpace: "pre-wrap", fontSize: "0.9em", lineHeight: "1.5", marginBottom: "12px" },
-        }));
+        var col = el("div");
+        col.appendChild(el("div", { className: "compare-label", textContent: c.label }));
+        var bubble = el("div", { className: "message-bubble" });
+        renderDialogue(bubble, c.content, "assistant");
+        col.appendChild(bubble);
 
-        const pickBtn = el("button", {
-          textContent: "Pick this one",
-          style: { background: "#238636" },
-        });
-        pickBtn.addEventListener("click", async () => {
-          try {
-            await api("POST", "/rp/eval-sets/" + result.eval_set_id + "/select", {
-              candidate_id: c.id,
-            });
-            modal.style.display = "none";
-            openConversation(currentConvId);
-          } catch (e) {
-            alert("Failed to select: " + e.message);
-          }
-        });
-        card.appendChild(pickBtn);
-        candidatesDiv.appendChild(card);
+        var pickBtn = el("button", { className: "compare-pick", textContent: "Pick" });
+        pickBtn.addEventListener("click", (function(cId, setId) {
+          return async function() {
+            try {
+              await api("POST", "/rp/eval-sets/" + setId + "/select", {
+                candidate_id: cId,
+              });
+              isStreaming = false;
+              $("sendBtn").style.display = "";
+              openConversation(currentConvId);
+            } catch (e) {
+              alert("Failed to select: " + e.message);
+            }
+          };
+        })(c.id, result.eval_set_id));
+        col.appendChild(pickBtn);
+
+        candidate.appendChild(col);
+        group.appendChild(candidate);
       }
+      container.scrollTop = container.scrollHeight;
     } catch (e) {
-      candidatesDiv.textContent = "";
-      candidatesDiv.appendChild(el("div", {
+      header.querySelector("span").textContent = "";
+      group.appendChild(el("div", {
         textContent: "Error: " + e.message,
-        style: { color: "#f85149", padding: "20px" },
+        style: { color: "#f85149", fontSize: "0.85em", padding: "8px 0" },
       }));
+      isStreaming = false;
+      $("sendBtn").style.display = "";
     }
   }
   $("restartBtn").addEventListener("click", () => {
@@ -920,16 +940,70 @@
     if (!currentConvId) return;
     $("sceneStateRefresh").disabled = true;
     $("sceneStateRefresh").textContent = "Generating...";
-    // Trigger a refresh by sending current messages to generate scene state
     await api("POST", "/rp/conversations/" + currentConvId + "/refresh-scene-state");
-    // Reload conversation to get updated state
     await openConversation(currentConvId);
     $("sceneStateRefresh").disabled = false;
     $("sceneStateRefresh").textContent = "Auto-generate";
-    // Re-open the panel
     $("sceneStatePanel").style.display = "";
     $("sceneStateToggle").textContent = "Hide Scene State";
   });
+
+  // Scene state bubble toggle
+  var bubbleToggle = $("sceneStateBubbleToggle");
+  bubbleToggle.checked = localStorage.getItem("rp_scene_state_bubbles") === "1";
+  bubbleToggle.addEventListener("change", () => {
+    localStorage.setItem("rp_scene_state_bubbles", bubbleToggle.checked ? "1" : "0");
+  });
+
+  function stopSceneStatePoll() {
+    if (sceneStatePollTimer) {
+      clearInterval(sceneStatePollTimer);
+      sceneStatePollTimer = null;
+    }
+  }
+
+  function appendSceneStateBubble(state, previousState) {
+    var container = $("chatMessages");
+    var bubble = el("div", { className: "scene-state-bubble" });
+    bubble.appendChild(el("div", { className: "scene-state-bubble-label", textContent: "Scene State" }));
+    var lines = state.split("\n");
+    var oldLines = previousState ? previousState.split("\n") : [];
+    var oldSet = new Set(oldLines.map(function(l) { return l.trim().toLowerCase(); }));
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i];
+      var lineEl = el("div");
+      if (previousState && !oldSet.has(line.trim().toLowerCase())) {
+        lineEl.className = "scene-state-bubble-diff";
+      }
+      lineEl.textContent = line;
+      bubble.appendChild(lineEl);
+    }
+    container.appendChild(bubble);
+    container.scrollTop = container.scrollHeight;
+  }
+
+  function startSceneStatePoll(convId, previousMsgId, previousState) {
+    stopSceneStatePoll();
+    var attempts = 0;
+    sceneStatePollTimer = setInterval(async function() {
+      attempts++;
+      if (attempts > 15 || convId !== currentConvId) {
+        stopSceneStatePoll();
+        return;
+      }
+      try {
+        var conv = await api("GET", "/rp/conversations/" + convId);
+        var newMsgId = conv.conversation.scene_state_msg_id;
+        if (newMsgId && newMsgId !== previousMsgId) {
+          stopSceneStatePoll();
+          appendSceneStateBubble(conv.conversation.scene_state || "", previousState);
+          $("sceneStateEditor").value = conv.conversation.scene_state || "";
+        }
+      } catch (e) {
+        stopSceneStatePoll();
+      }
+    }, 2000);
+  }
 
   // Under the hood toggle
   $("underHoodToggle").addEventListener("click", () => {
