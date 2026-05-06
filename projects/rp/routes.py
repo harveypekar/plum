@@ -448,7 +448,7 @@ def setup(app: FastAPI, ollama, resolve_model=None):
             resolve_model=_resolve_model,
         )
         if result is None:
-            return {"ok": False, "reason": "not enough unsummarized messages"}
+            return {"ok": False, "reason": "no overflow — messages fit within budget"}
         return {"ok": True, "summary": result}
 
     # -- Chat --
@@ -463,14 +463,16 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         return await budget_ctx(ctx, model, ollama_options, ollama=_ollama)
 
     async def _maybe_summarize(conv_id: int, model: str,
-                               ai_name: str, user_name: str, ai_personality: str):
-        """Fire-and-forget summary generation if enough messages accumulated."""
+                               ai_name: str, user_name: str, ai_personality: str,
+                               messages_budget: int = 0):
+        """Fire-and-forget summary generation when messages exceed budget."""
         try:
             await maybe_generate_summary(
                 conv_id, _ollama, model,
                 char_name=ai_name, user_name=user_name,
                 ai_personality=ai_personality,
                 resolve_model=_resolve_model,
+                messages_budget=messages_budget,
             )
         except Exception as e:
             _log.warning("Summary generation failed for conv %d: %s", conv_id, e)
@@ -682,10 +684,13 @@ def setup(app: FastAPI, ollama, resolve_model=None):
                     prompt_json=chat_messages,
                 )
             conv_log.log_response(conv_id, save_role, post_ctx["response"], raw)
+            budget_report = ctx.get("_budget_report")
+            msg_budget = budget_report.messages_budget if budget_report else 0
             asyncio.create_task(_auto_update_scene_state(conv_id, model,
                                             get_ai_name(ctx), get_user_name(ctx), get_ai_personality(ctx)))
             asyncio.create_task(_maybe_summarize(conv_id, model,
-                                            get_ai_name(ctx), get_user_name(ctx), get_ai_personality(ctx)))
+                                            get_ai_name(ctx), get_user_name(ctx), get_ai_personality(ctx),
+                                            messages_budget=msg_budget))
         except Exception as e:
             yield json.dumps({"error": f"Failed to save response: {e}", "done": True}) + "\n"
 
@@ -833,10 +838,13 @@ def setup(app: FastAPI, ollama, resolve_model=None):
                 )
                 conv_log.log_response(conv_id, "assistant", post_ctx["response"], raw)
                 # Update scene state and maybe generate summary in background
+                budget_report = ctx.get("_budget_report")
+                msg_budget = budget_report.messages_budget if budget_report else 0
                 asyncio.create_task(_auto_update_scene_state(conv_id, model,
                                                 get_ai_name(ctx), get_user_name(ctx), get_ai_personality(ctx)))
                 asyncio.create_task(_maybe_summarize(conv_id, model,
-                                                get_ai_name(ctx), get_user_name(ctx), get_ai_personality(ctx)))
+                                                get_ai_name(ctx), get_user_name(ctx), get_ai_personality(ctx),
+                                                messages_budget=msg_budget))
             except Exception as e:
                 yield json.dumps({"error": f"Failed to save response: {e}", "done": True}) + "\n"
 

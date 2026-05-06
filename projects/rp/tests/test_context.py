@@ -124,20 +124,32 @@ class TestSummaryBuffer:
         assert "new2" in contents
         assert "greeting" in contents
 
-    def test_summary_budget_cap(self):
-        """Summary should not exceed 25% of budget."""
+    def test_summary_exceeding_budget_rejected(self):
+        """Summary larger than remaining budget after greeting is not injected."""
         huge_summary = "X" * 2000
         msgs = [
             _seq_msg("assistant", "greeting", 1),
             _seq_msg("user", "recent", 10),
         ]
         ctx = {"_summary": huge_summary, "_summary_through_sequence": 5}
+        # Budget of 100 tokens, greeting ~2 tokens, summary ~500 tokens → exceeds budget
         result = SummaryBuffer().fit(msgs, 100, token_counter=_char4, ctx=ctx)
         for m in result:
             assert "[Story so far]" not in m.get("content", "")
 
-    def test_summary_within_budget_cap(self):
-        """Small summary within 25% cap is injected."""
+    def test_large_summary_within_budget_injected(self):
+        """Large summary that fits within budget is injected (no fixed cap)."""
+        large_summary = "X" * 4000  # ~1000 tokens with _char4
+        msgs = [
+            _seq_msg("assistant", "greeting", 1),
+            _seq_msg("user", "recent", 10),
+        ]
+        ctx = {"_summary": large_summary, "_summary_through_sequence": 5}
+        result = SummaryBuffer().fit(msgs, 2000, token_counter=_char4, ctx=ctx)
+        assert any("[Story so far]" in m.get("content", "") for m in result)
+
+    def test_summary_within_budget_injected(self):
+        """Small summary is injected normally."""
         small_summary = "Short summary."
         msgs = [
             _seq_msg("assistant", "greeting", 1),

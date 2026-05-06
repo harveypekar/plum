@@ -54,7 +54,6 @@ class TestBuildSummaryPrompt:
             char_name="Sol",
         )
         assert "Sol's personality:" in prompt
-        # Truncated to ~200 chars
         hint_line = [line for line in prompt.split("\n") if "Sol's personality:" in line][0]
         assert len(hint_line) < 250
 
@@ -70,7 +69,15 @@ class TestBuildSummaryPrompt:
         assert "Emotional trajectory" in prompt
         assert "Relationship dynamics" in prompt
         assert "Character voice notes" in prompt
-        assert "under 400 words" in prompt
+
+    def test_target_tokens_scales_word_limit(self):
+        prompt_small = build_summary_prompt(
+            messages=_msgs(("user", "test")), target_tokens=600)
+        prompt_large = build_summary_prompt(
+            messages=_msgs(("user", "test")), target_tokens=4000)
+        # Extract the word targets
+        assert "420 words" in prompt_small
+        assert "2800 words" in prompt_large
 
     def test_present_tense_instruction(self):
         prompt = build_summary_prompt(messages=_msgs(("user", "test")))
@@ -118,26 +125,53 @@ def _make_messages(n):
     return msgs
 
 
+def _make_long_messages(n):
+    """Generate messages with varied content that tokenizes realistically."""
+    base = "The character walked through the scene and spoke with feeling about what happened. "
+    msgs = []
+    for i in range(n):
+        content = f"Turn {i}: " + base * 5 + f" End of turn {i}."
+        msgs.append(_db_msg("user", content, i * 2 + 1, i * 2 + 1))
+        msgs.append(_db_msg("assistant", content, i * 2 + 2, i * 2 + 2))
+    return msgs
+
+
 class TestMaybeGenerateSummary:
-    def test_skips_when_below_threshold(self):
-        """No summary generated when fewer than SUMMARY_THRESHOLD messages."""
+    def test_skips_when_below_min_unsummarized(self):
+        """No summary when fewer than MIN_UNSUMMARIZED new messages."""
         async def run():
-            few_msgs = _make_messages(3)  # 6 messages, below threshold of 10
+            few_msgs = _make_messages(1)  # 2 messages, below MIN_UNSUMMARIZED
             with patch("projects.rp.summarize.db") as mock_db:
                 mock_db.get_messages = AsyncMock(return_value=few_msgs)
                 mock_db.get_latest_summary = AsyncMock(return_value=None)
 
                 ollama = AsyncMock()
-                result = await maybe_generate_summary(1, ollama, "test-model")
-
+                result = await maybe_generate_summary(1, ollama, "test-model",
+                                                      messages_budget=100)
                 assert result is None
                 ollama.generate.assert_not_called()
         asyncio.run(run())
 
-    def test_generates_when_above_threshold(self):
-        """Summary generated when enough unsummarized messages exist."""
+    def test_skips_when_older_messages_fit(self):
+        """No summary when older messages fit within available budget."""
         async def run():
-            msgs = _make_messages(6)  # 12 messages, above threshold
+            msgs = _make_messages(8)  # 16 messages, recent_window=8 leaves 8 older
+            with patch("projects.rp.summarize.db") as mock_db:
+                mock_db.get_messages = AsyncMock(return_value=msgs)
+                mock_db.get_latest_summary = AsyncMock(return_value=None)
+
+                ollama = AsyncMock()
+                # Large budget — everything fits
+                result = await maybe_generate_summary(1, ollama, "test-model",
+                                                      messages_budget=120000)
+                assert result is None
+                ollama.generate.assert_not_called()
+        asyncio.run(run())
+
+    def test_generates_when_older_messages_overflow(self):
+        """Summary generated when older messages exceed available budget."""
+        async def run():
+            msgs = _make_long_messages(10)  # 20 long messages
             with patch("projects.rp.summarize.db") as mock_db:
                 mock_db.get_messages = AsyncMock(return_value=msgs)
                 mock_db.get_latest_summary = AsyncMock(return_value=None)
@@ -150,46 +184,45 @@ class TestMaybeGenerateSummary:
                 ollama = AsyncMock()
                 ollama.generate = AsyncMock(return_value="Test summary of conversation.")
 
+                # Small budget forces overflow
                 result = await maybe_generate_summary(1, ollama, "test-model",
-                                                      char_name="Amber", user_name="Val")
+                                                      char_name="Amber", user_name="Val",
+                                                      messages_budget=1200)
 
                 assert result is not None
                 ollama.generate.assert_called_once()
                 mock_db.save_summary.assert_called_once()
-                call_args = mock_db.save_summary.call_args
-                assert call_args[1]["through_msg_id"] == 12
-                assert call_args[1]["through_sequence"] == 12
-                assert call_args[1]["msg_count"] == 12
         asyncio.run(run())
 
-    def test_only_counts_unsummarized_messages(self):
-        """Only messages after the last summary count toward the threshold."""
+    def test_summarizes_only_older_messages(self):
+        """Summary covers messages before the recent window, not all messages."""
         async def run():
-            msgs = _make_messages(8)  # 16 messages total
-            existing_summary = {
-                "summary": "Previous summary text.",
-                "through_sequence": 10,  # summary covers through sequence 10
-                "through_msg_id": 10,
-            }
+            msgs = _make_long_messages(10)  # 20 messages
             with patch("projects.rp.summarize.db") as mock_db:
                 mock_db.get_messages = AsyncMock(return_value=msgs)
-                mock_db.get_latest_summary = AsyncMock(return_value=existing_summary)
+                mock_db.get_latest_summary = AsyncMock(return_value=None)
+                mock_db.save_summary = AsyncMock(return_value={"id": 1})
 
                 ollama = AsyncMock()
-                # 6 messages after sequence 10 (seqs 11-16), below threshold of 10
-                result = await maybe_generate_summary(1, ollama, "test-model")
+                ollama.generate = AsyncMock(return_value="Summary.")
 
-                assert result is None
-                ollama.generate.assert_not_called()
+                await maybe_generate_summary(1, ollama, "test-model",
+                                              messages_budget=1200)
+
+                call_args = mock_db.save_summary.call_args[1]
+                # 20 messages total, RECENT_WINDOW=8, older=12
+                # through_sequence should be the last older message
+                assert call_args["through_sequence"] == 12
+                assert call_args["msg_count"] == 12
         asyncio.run(run())
 
     def test_includes_previous_summary_in_prompt(self):
-        """When extending a summary, the previous summary text is passed to the prompt."""
+        """When extending a summary, the previous summary text is passed."""
         async def run():
-            msgs = _make_messages(10)  # 20 messages
+            msgs = _make_long_messages(10)
             existing_summary = {
                 "summary": "They met at the park.",
-                "through_sequence": 4,  # only covers first 4
+                "through_sequence": 4,
                 "through_msg_id": 4,
             }
             with patch("projects.rp.summarize.db") as mock_db:
@@ -200,17 +233,39 @@ class TestMaybeGenerateSummary:
                 ollama = AsyncMock()
                 ollama.generate = AsyncMock(return_value="Extended summary.")
 
-                await maybe_generate_summary(1, ollama, "test-model")
+                await maybe_generate_summary(1, ollama, "test-model",
+                                              messages_budget=1200)
 
-                # Check that the prompt included the previous summary
                 call_args = ollama.generate.call_args
                 assert "They met at the park" in call_args[1]["prompt"]
+        asyncio.run(run())
+
+    def test_target_tokens_scales_with_budget(self):
+        """num_predict scales to fill available budget space."""
+        async def run():
+            msgs = _make_long_messages(10)
+            with patch("projects.rp.summarize.db") as mock_db:
+                mock_db.get_messages = AsyncMock(return_value=msgs)
+                mock_db.get_latest_summary = AsyncMock(return_value=None)
+                mock_db.save_summary = AsyncMock(return_value={"id": 1})
+
+                ollama = AsyncMock()
+                ollama.generate = AsyncMock(return_value="Summary.")
+
+                # Budget 1500: available ~852, older ~972 → triggers
+                # target = min(852, 8000) = 852 > default 600
+                await maybe_generate_summary(1, ollama, "test-model",
+                                              messages_budget=1500)
+
+                call_args = ollama.generate.call_args
+                num_predict = call_args[1]["options"]["num_predict"]
+                assert num_predict > 600
         asyncio.run(run())
 
     def test_skips_on_empty_llm_response(self):
         """Don't save if the LLM returns empty."""
         async def run():
-            msgs = _make_messages(6)
+            msgs = _make_long_messages(10)
             with patch("projects.rp.summarize.db") as mock_db:
                 mock_db.get_messages = AsyncMock(return_value=msgs)
                 mock_db.get_latest_summary = AsyncMock(return_value=None)
@@ -218,7 +273,8 @@ class TestMaybeGenerateSummary:
                 ollama = AsyncMock()
                 ollama.generate = AsyncMock(return_value="<think>reasoning</think>")
 
-                result = await maybe_generate_summary(1, ollama, "test-model")
+                result = await maybe_generate_summary(1, ollama, "test-model",
+                                                      messages_budget=1200)
 
                 assert result is None
                 mock_db.save_summary.assert_not_called()
@@ -235,9 +291,9 @@ class TestMaybeGenerateSummary:
         asyncio.run(run())
 
     def test_uses_dedicated_model_when_resolve_model_provided(self):
-        """When resolve_model is given, uses SUMMARY_MODEL instead of conv model."""
+        """When resolve_model is given, uses SUMMARY_MODEL."""
         async def run():
-            msgs = _make_messages(6)
+            msgs = _make_long_messages(10)
             with patch("projects.rp.summarize.db") as mock_db:
                 mock_db.get_messages = AsyncMock(return_value=msgs)
                 mock_db.get_latest_summary = AsyncMock(return_value=None)
@@ -252,6 +308,7 @@ class TestMaybeGenerateSummary:
                 await maybe_generate_summary(
                     1, ollama, "conv-model",
                     resolve_model=fake_resolve,
+                    messages_budget=1200,
                 )
 
                 call_args = ollama.generate.call_args
@@ -261,7 +318,7 @@ class TestMaybeGenerateSummary:
     def test_falls_back_to_conv_model_without_resolve(self):
         """Without resolve_model, uses the conversation model directly."""
         async def run():
-            msgs = _make_messages(6)
+            msgs = _make_long_messages(10)
             with patch("projects.rp.summarize.db") as mock_db:
                 mock_db.get_messages = AsyncMock(return_value=msgs)
                 mock_db.get_latest_summary = AsyncMock(return_value=None)
@@ -270,7 +327,8 @@ class TestMaybeGenerateSummary:
                 ollama = AsyncMock()
                 ollama.generate = AsyncMock(return_value="Summary text.")
 
-                await maybe_generate_summary(1, ollama, "conv-model")
+                await maybe_generate_summary(1, ollama, "conv-model",
+                                              messages_budget=1200)
 
                 call_args = ollama.generate.call_args
                 assert call_args[1]["model"] == "conv-model"

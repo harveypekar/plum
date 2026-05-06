@@ -73,8 +73,7 @@ class SummaryBuffer(ContextStrategy):
             max_seq = max((m.get("_sequence", 0) for m in messages), default=0)
             stale = summary_through > 0 and summary_through >= max_seq
             summary_tokens = count(summary)
-            cap = int(max_tokens * 0.25)
-            if not stale and summary_tokens <= cap:
+            if not stale and summary_tokens < budget:
                 summary_msg = {
                     "role": "system",
                     "content": f"[Story so far]\n{summary}",
