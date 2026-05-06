@@ -1,7 +1,10 @@
-"""Conversation summary generation, prompt building, and response cleaning.
+"""Hierarchical conversation summary generation.
 
-Generates rolling summaries of conversation history so the SummaryBuffer
-context strategy can inject them instead of losing older messages entirely.
+Generates rolling summaries that fill available budget space. Instead of
+fixed-size 600-token summaries every 10 messages, summaries scale to fill
+the space that dropped messages would have occupied. On each overflow,
+the previous summary + newly-overflowing messages are re-summarized into
+a new summary of the same target size.
 """
 
 import logging
@@ -12,12 +15,19 @@ from .tokenizer import count_tokens
 _log = logging.getLogger("rp.summarize")
 
 SUMMARY_MODEL = "q8"
-SUMMARY_THRESHOLD = 10  # unsummarized messages before triggering
+RECENT_WINDOW = 8
+MIN_UNSUMMARIZED = 4
+
+
+def _target_words(target_tokens: int) -> int:
+    """Rough token→word conversion for the prompt instruction."""
+    return max(200, int(target_tokens * 0.7))
 
 
 def build_summary_prompt(messages: list[dict], previous_summary: str = "",
                          char_name: str = "Character", user_name: str = "User",
-                         ai_personality: str = "") -> str:
+                         ai_personality: str = "",
+                         target_tokens: int = 600) -> str:
     """Build the prompt sent to the LLM to generate/update a rolling conversation summary."""
     history = "\n".join(f"{m['role']}: {m['content']}" for m in messages)
     prev_section = ""
@@ -31,6 +41,7 @@ def build_summary_prompt(messages: list[dict], previous_summary: str = "",
     if ai_personality:
         short = ai_personality[:200].rsplit(" ", 1)[0]
         personality_hint = f"{char_name}'s personality: {short}\n\n"
+    word_limit = _target_words(target_tokens)
     return (
         f"{prev_section}"
         f"{personality_hint}"
@@ -46,7 +57,7 @@ def build_summary_prompt(messages: list[dict], previous_summary: str = "",
         "- Present tense\n"
         "- Be specific — quote distinctive phrases when they matter\n"
         "- Track the emotional arc, not just events\n"
-        "- Keep under 400 words\n"
+        f"- Target approximately {word_limit} words\n"
         "- Do NOT narrate or continue the story — just summarize what happened\n\n"
         f"New messages:\n{history}"
     )
@@ -68,13 +79,15 @@ async def maybe_generate_summary(
     user_name: str = "User",
     ai_personality: str = "",
     resolve_model=None,
+    messages_budget: int = 0,
 ) -> dict | None:
-    """Generate a summary if enough unsummarized messages have accumulated.
+    """Generate a summary when conversation messages exceed available budget.
 
-    Uses SUMMARY_MODEL (a lighter model) for generation, falling back to
-    the conversation model if resolve_model is not provided.
+    Trigger: when unsummarized messages outside the recent window exceed
+    the space remaining after the recent window is accounted for.
 
-    Returns the saved summary row, or None if no summary was needed.
+    The summary targets filling the available space so the model always
+    operates with a full context window.
     """
     messages = await db.get_messages(conv_id)
     if not messages:
@@ -89,39 +102,69 @@ async def maybe_generate_summary(
         prev_through_seq = existing["through_sequence"]
 
     new_msgs = [m for m in messages if m["sequence"] > prev_through_seq]
-    if len(new_msgs) < SUMMARY_THRESHOLD:
+    if len(new_msgs) < MIN_UNSUMMARIZED:
         return None
 
+    recent = messages[-RECENT_WINDOW:] if len(messages) > RECENT_WINDOW else messages
+    recent_tokens = sum(count_tokens(m["content"]) for m in recent)
+
+    if messages_budget <= 0:
+        messages_budget = 13000
+
+    available_for_summary = messages_budget - recent_tokens
+    if available_for_summary < 400:
+        return None
+
+    older = messages[:-RECENT_WINDOW] if len(messages) > RECENT_WINDOW else []
+    unsummarized_older = [m for m in older if m["sequence"] > prev_through_seq]
+
+    if not unsummarized_older and not prev_summary:
+        return None
+
+    unsummarized_tokens = sum(count_tokens(m["content"]) for m in unsummarized_older)
+    prev_summary_tokens = count_tokens(prev_summary) if prev_summary else 0
+    total_older_content = unsummarized_tokens + prev_summary_tokens
+
+    if total_older_content <= available_for_summary:
+        return None
+
+    target_tokens = min(available_for_summary, 8000)
+    target_tokens = max(target_tokens, 400)
+
     prompt = build_summary_prompt(
-        [{"role": m["role"], "content": m["content"]} for m in new_msgs],
+        [{"role": m["role"], "content": m["content"]} for m in unsummarized_older],
         previous_summary=prev_summary,
         char_name=char_name,
         user_name=user_name,
         ai_personality=ai_personality,
+        target_tokens=target_tokens,
     )
 
     summary_model = resolve_model(SUMMARY_MODEL) if resolve_model else model
     raw = await ollama.generate(
         model=summary_model, prompt=prompt,
         system="Output only the summary. No thinking, no preamble.",
-        options={"temperature": 0.3, "num_predict": 600, "think": False},
+        options={"temperature": 0.3, "num_predict": target_tokens, "think": False},
     )
     summary = clean_summary_response(raw)
     if not summary:
         _log.warning("Empty summary generated for conv %d", conv_id)
         return None
 
-    last_msg = new_msgs[-1]
+    last_summarized = unsummarized_older[-1] if unsummarized_older else messages[-RECENT_WINDOW - 1]
     token_estimate = count_tokens(summary)
 
     saved = await db.save_summary(
         conv_id,
         summary=summary,
-        through_msg_id=last_msg["id"],
-        through_sequence=last_msg["sequence"],
-        msg_count=len(new_msgs),
+        through_msg_id=last_summarized["id"],
+        through_sequence=last_summarized["sequence"],
+        msg_count=len(unsummarized_older),
         token_estimate=token_estimate,
     )
-    _log.info("Generated summary for conv %d (through seq %d, %d msgs, ~%d tokens, model=%s)",
-              conv_id, last_msg["sequence"], len(new_msgs), token_estimate, summary_model)
+    _log.info(
+        "Generated summary for conv %d (through seq %d, %d msgs, ~%d tokens, target=%d, model=%s)",
+        conv_id, last_summarized["sequence"], len(unsummarized_older),
+        token_estimate, target_tokens, summary_model,
+    )
     return saved

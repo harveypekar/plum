@@ -23,6 +23,8 @@ _STOPWORDS = frozenset({
 
 _SKIP_VALIDATION = frozenset({"mood", "voice"})
 
+_STRIP_CATEGORIES = frozenset({"personality", "character", "background", "description"})
+
 _PLACEHOLDER_PATTERNS = frozenset({
     "not described", "not mentioned", "not specified", "not stated",
     "unknown", "unclear", "n/a", "none",
@@ -88,13 +90,18 @@ def build_scene_state_prompt(messages: list[dict], previous_state: str = "",
 
 
 def clean_scene_state_response(raw: str) -> str:
-    """Clean up LLM scene state output: strip think tags, remove empty/none lines."""
+    """Clean up LLM scene state output: strip think tags, remove empty/none lines,
+    and remove non-scene categories the LLM may parrot from the prompt."""
     clean = raw.strip()
     if "<think>" in clean:
         clean = clean.split("</think>")[-1].strip()
     lines = []
     for line in clean.splitlines():
         if ":" in line:
+            cat = line.split(":", 1)[0].strip()
+            cat_key = cat.lower().split("'s ")[-1] if "'s " in cat.lower() else cat.lower()
+            if cat_key in _STRIP_CATEGORIES:
+                continue
             value = line.split(":", 1)[1].strip().lower()
             if value and value != "none" and value != "n/a":
                 lines.append(line)
@@ -210,4 +217,44 @@ def validate_scene_state(
             if old_val:
                 validated[cat] = old_val
 
+    _fix_discarded_clothing(validated)
     return "\n".join(f"{cat}: {val}" for cat, val in validated.items())
+
+
+def _fix_discarded_clothing(state: dict[str, str]) -> None:
+    """Remove items from clothing lines if they appear as 'discarded' in props."""
+    props_val = ""
+    for cat, val in state.items():
+        if cat.lower() == "props":
+            props_val = val.lower()
+            break
+    if not props_val:
+        return
+
+    discarded = set()
+    for part in re.findall(r"discarded\s+([a-z][a-z\s]*?)(?:,|$)", props_val):
+        discarded.update(w for w in part.strip().split() if len(w) >= 3)
+
+    if not discarded:
+        return
+
+    for cat in list(state.keys()):
+        if "clothing" not in cat.lower():
+            continue
+        val = state[cat]
+        val_lower = val.lower()
+        if any(d in val_lower for d in discarded):
+            cleaned_parts = []
+            for item in re.split(r",\s*|;\s*|\s+and\s+", val):
+                item_lower = item.strip().lower()
+                if not any(d in item_lower for d in discarded):
+                    cleaned_parts.append(item.strip())
+            if cleaned_parts:
+                state[cat] = ", ".join(cleaned_parts)
+            else:
+                state[cat] = "naked"
+            if state[cat].lower() != val_lower:
+                _log.info(
+                    "Fixed clothing [%s]: %r -> %r (items listed as discarded in props)",
+                    cat, val, state[cat],
+                )
