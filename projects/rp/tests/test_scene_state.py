@@ -4,6 +4,7 @@ from projects.rp.scene_state import (
     parse_scene_state,
     validate_scene_state,
     _extract_content_words,
+    _fix_discarded_clothing,
     _has_evidence,
 )
 
@@ -401,3 +402,42 @@ class TestValidateSceneState:
         msgs = _msgs(("user", "hello"))
         result = validate_scene_state(narrative, "", msgs)
         assert result == ""
+
+    def test_discarded_items_removed_from_clothing(self):
+        old = "Amber's clothing: tank top\nProps: discarded tank top"
+        new = "Amber's clothing: tank top and jeans\nProps: discarded tank top, discarded jeans"
+        msgs = _msgs(("user", "she took off her jeans"))
+        result = validate_scene_state(new, old, msgs)
+        assert "jeans" not in result.split("clothing")[1].split("\n")[0]
+        assert "Props" in result
+
+    def test_all_items_discarded_becomes_naked(self):
+        state = {
+            "Amber's clothing": "tank top and jeans",
+            "Props": "discarded tank top, discarded jeans",
+        }
+        _fix_discarded_clothing(state)
+        assert state["Amber's clothing"] == "naked"
+
+    def test_partial_discard_keeps_remaining(self):
+        state = {
+            "Amber's clothing": "tank top, jeans, boots",
+            "Props": "discarded jeans",
+        }
+        _fix_discarded_clothing(state)
+        assert "jeans" not in state["Amber's clothing"]
+        assert "tank top" in state["Amber's clothing"]
+        assert "boots" in state["Amber's clothing"]
+
+    def test_no_props_no_change(self):
+        state = {"Amber's clothing": "tank top and jeans"}
+        _fix_discarded_clothing(state)
+        assert state["Amber's clothing"] == "tank top and jeans"
+
+    def test_no_discarded_no_change(self):
+        state = {
+            "Amber's clothing": "tank top",
+            "Props": "candles, rope",
+        }
+        _fix_discarded_clothing(state)
+        assert state["Amber's clothing"] == "tank top"

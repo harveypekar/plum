@@ -217,4 +217,44 @@ def validate_scene_state(
             if old_val:
                 validated[cat] = old_val
 
+    _fix_discarded_clothing(validated)
     return "\n".join(f"{cat}: {val}" for cat, val in validated.items())
+
+
+def _fix_discarded_clothing(state: dict[str, str]) -> None:
+    """Remove items from clothing lines if they appear as 'discarded' in props."""
+    props_val = ""
+    for cat, val in state.items():
+        if cat.lower() == "props":
+            props_val = val.lower()
+            break
+    if not props_val:
+        return
+
+    discarded = set()
+    for part in re.findall(r"discarded\s+([a-z][a-z\s]*?)(?:,|$)", props_val):
+        discarded.update(w for w in part.strip().split() if len(w) >= 3)
+
+    if not discarded:
+        return
+
+    for cat in list(state.keys()):
+        if "clothing" not in cat.lower():
+            continue
+        val = state[cat]
+        val_lower = val.lower()
+        if any(d in val_lower for d in discarded):
+            cleaned_parts = []
+            for item in re.split(r",\s*|;\s*|\s+and\s+", val):
+                item_lower = item.strip().lower()
+                if not any(d in item_lower for d in discarded):
+                    cleaned_parts.append(item.strip())
+            if cleaned_parts:
+                state[cat] = ", ".join(cleaned_parts)
+            else:
+                state[cat] = "naked"
+            if state[cat].lower() != val_lower:
+                _log.info(
+                    "Fixed clothing [%s]: %r -> %r (items listed as discarded in props)",
+                    cat, val, state[cat],
+                )
