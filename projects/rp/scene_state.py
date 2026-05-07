@@ -31,9 +31,22 @@ _PLACEHOLDER_PATTERNS = frozenset({
 })
 
 
+def _first_sentence(text: str) -> str:
+    """Extract the first sentence from a description, capped at 120 chars."""
+    if not text:
+        return ""
+    end = text.find(". ")
+    if end == -1:
+        end = text.find(".\n")
+    if end == -1:
+        end = len(text)
+    return text[:min(end + 1, 120)].strip()
+
+
 def build_scene_state_prompt(messages: list[dict], previous_state: str = "",
                               ai_name: str = "Character", user_name: str = "User",
                               ai_personality: str = "",
+                              user_description: str = "",
                               scenario_context: str = "") -> str:
     """Build the prompt sent to the LLM to generate/update scene state."""
     history = "\n".join(f"{m['role']}: {m['content']}" for m in messages)
@@ -43,10 +56,14 @@ def build_scene_state_prompt(messages: list[dict], previous_state: str = "",
             "PREVIOUS SCENE STATE (carry forward anything not contradicted by new messages):\n"
             f"{previous_state.strip()}\n\n"
         )
-    personality_hint = ""
+    char_hints = []
     if ai_personality:
-        short = ai_personality[:200].rsplit(" ", 1)[0]
-        personality_hint = f"{ai_name}'s personality: {short}\n\n"
+        char_hints.append(f"{ai_name}: {_first_sentence(ai_personality)}")
+    if user_description:
+        char_hints.append(f"{user_name}: {_first_sentence(user_description)}")
+    char_section = ""
+    if char_hints:
+        char_section = "\n".join(char_hints) + "\n\n"
     scenario_section = ""
     if scenario_context.strip():
         scenario_section = f"Scenario context: {scenario_context.strip()}\n\n"
@@ -70,7 +87,7 @@ def build_scene_state_prompt(messages: list[dict], previous_state: str = "",
     )
     return (
         f"{prev_section}"
-        f"{personality_hint}"
+        f"{char_section}"
         f"{scenario_section}"
         f"{instruction}"
         f"Characters: {ai_name} (AI) and {user_name} (user).\n\n"

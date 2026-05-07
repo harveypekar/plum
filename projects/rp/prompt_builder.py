@@ -49,6 +49,12 @@ def get_ai_personality(ctx: dict) -> str:
     return ai_data.get("description", "")
 
 
+def get_user_description(ctx: dict) -> str:
+    user_data = ctx.get("user_card", {}).get("card_data", {}).get(
+        "data", ctx.get("user_card", {}).get("card_data", {}))
+    return user_data.get("description", "")
+
+
 def build_ollama_options(settings: dict) -> dict:
     opts = dict(CHAT_DEFAULTS)
     for k, v in settings.items():

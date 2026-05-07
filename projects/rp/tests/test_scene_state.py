@@ -88,17 +88,37 @@ class TestBuildSceneStatePrompt:
             ai_personality=long_personality,
             ai_name="Sol",
         )
-        assert "Sol's personality:" in prompt
-        assert len(prompt.split("Sol's personality:")[1].split("\n")[0]) <= 210
+        assert "Sol:" in prompt
+        sol_line = [ln for ln in prompt.splitlines() if ln.startswith("Sol:")][0]
+        assert len(sol_line) <= 130
 
     def test_no_personality_no_hint(self):
         prompt = build_scene_state_prompt(
             messages=_msgs(("user", "test")),
             ai_personality="",
         )
-        # "personality" should not appear before the format section
         before_format = prompt.split("Format")[0]
-        assert "personality:" not in before_format.lower()
+        assert "Characters:" not in before_format or "AI" in before_format
+
+    def test_user_description_included(self):
+        prompt = build_scene_state_prompt(
+            messages=_msgs(("user", "test")),
+            user_name="Valentina",
+            user_description="Valentina is a short woman in her early thirties. She has dark skin.",
+        )
+        assert "Valentina:" in prompt
+        assert "short woman" in prompt
+
+    def test_both_descriptions_included(self):
+        prompt = build_scene_state_prompt(
+            messages=_msgs(("user", "test")),
+            ai_name="Amber",
+            ai_personality="Amber has long wavy chestnut hair. She is warm.",
+            user_name="Val",
+            user_description="Val is a short woman. She has piercings.",
+        )
+        assert "Amber:" in prompt
+        assert "Val:" in prompt
 
     def test_character_names_in_prompt(self):
         prompt = build_scene_state_prompt(
