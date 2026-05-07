@@ -22,8 +22,8 @@ from .fewshot import get_fewshot_messages
 from .summarize import maybe_generate_summary
 from .prompt_builder import (
     get_ai_name, get_user_name, get_ai_personality, get_ai_pronouns,
-    build_chat_messages, build_ollama_options, scale_num_predict,
-    budget_to_json, build_pipeline_ctx, budget_ctx,
+    get_user_description, build_chat_messages, build_ollama_options,
+    scale_num_predict, budget_to_json, build_pipeline_ctx, budget_ctx,
 )
 from . import conv_log
 
@@ -328,7 +328,9 @@ def setup(app: FastAPI, ollama, resolve_model=None):
             asyncio.create_task(_auto_update_scene_state(
                 result["id"], model,
                 ai_data.get("name", "Character"), user_data.get("name", "User"),
-                ai_data.get("description", ""), scenario_desc))
+                ai_data.get("description", ""),
+                user_description=user_data.get("description", ""),
+                scenario_context=scenario_desc))
         return result
 
     @app.get("/rp/conversations/{conv_id}", response_model=ConversationDetailResponse)
@@ -377,7 +379,9 @@ def setup(app: FastAPI, ollama, resolve_model=None):
             asyncio.create_task(_auto_update_scene_state(
                 conv_id, model,
                 ai_data.get("name", "Character"), user_data.get("name", "User"),
-                ai_data.get("description", ""), scenario_desc))
+                ai_data.get("description", ""),
+                user_description=user_data.get("description", ""),
+                scenario_context=scenario_desc))
         return {"ok": True}
 
     @app.put("/rp/conversations/{conv_id}/scene-state")
@@ -445,6 +449,7 @@ def setup(app: FastAPI, ollama, resolve_model=None):
             char_name=ai_data.get("name", "Character"),
             user_name=user_data.get("name", "User"),
             ai_personality=ai_data.get("description", ""),
+            user_description=user_data.get("description", ""),
             resolve_model=_resolve_model,
         )
         if result is None:
@@ -464,6 +469,7 @@ def setup(app: FastAPI, ollama, resolve_model=None):
 
     async def _maybe_summarize(conv_id: int, model: str,
                                ai_name: str, user_name: str, ai_personality: str,
+                               user_description: str = "",
                                messages_budget: int = 0):
         """Fire-and-forget summary generation when messages exceed budget."""
         try:
@@ -471,6 +477,7 @@ def setup(app: FastAPI, ollama, resolve_model=None):
                 conv_id, _ollama, model,
                 char_name=ai_name, user_name=user_name,
                 ai_personality=ai_personality,
+                user_description=user_description,
                 resolve_model=_resolve_model,
                 messages_budget=messages_budget,
             )
@@ -587,9 +594,12 @@ def setup(app: FastAPI, ollama, resolve_model=None):
     async def _generate_scene_state(model: str, messages: list[dict], previous_state: str = "",
                                      ai_name: str = "Character", user_name: str = "User",
                                      ai_personality: str = "",
+                                     user_description: str = "",
                                      scenario_context: str = "") -> str:
         from .scene_state import build_scene_state_prompt, clean_scene_state_response, validate_scene_state
-        prompt = build_scene_state_prompt(messages, previous_state, ai_name, user_name, ai_personality, scenario_context)
+        prompt = build_scene_state_prompt(messages, previous_state, ai_name, user_name,
+                                          ai_personality, user_description=user_description,
+                                          scenario_context=scenario_context)
         summary_model = _resolve_model(_scene_state_model) if _resolve_model else model
         try:
             result = await _ollama.generate(
@@ -606,6 +616,7 @@ def setup(app: FastAPI, ollama, resolve_model=None):
     async def _auto_update_scene_state(conv_id: int, model: str,
                                         ai_name: str = "Character", user_name: str = "User",
                                         ai_personality: str = "",
+                                        user_description: str = "",
                                         scenario_context: str = ""):
         """Background task: generate scene state from previous state + new messages."""
         try:
@@ -629,7 +640,9 @@ def setup(app: FastAPI, ollama, resolve_model=None):
             latest_msg_id = new_msgs[-1]["id"]
             msg_list = [{"role": m["role"], "content": m["content"]} for m in new_msgs]
             clean = await _generate_scene_state(model, msg_list, previous_state,
-                                                ai_name, user_name, ai_personality, scenario_context)
+                                                ai_name, user_name, ai_personality,
+                                                user_description=user_description,
+                                                scenario_context=scenario_context)
             await db.update_scene_state(conv_id, clean, latest_msg_id)
             conv_log.log_scene_state(conv_id, previous_state, clean)
         except Exception as e:
@@ -687,9 +700,11 @@ def setup(app: FastAPI, ollama, resolve_model=None):
             budget_report = ctx.get("_budget_report")
             msg_budget = budget_report.messages_budget if budget_report else 0
             asyncio.create_task(_auto_update_scene_state(conv_id, model,
-                                            get_ai_name(ctx), get_user_name(ctx), get_ai_personality(ctx)))
+                                            get_ai_name(ctx), get_user_name(ctx), get_ai_personality(ctx),
+                                            user_description=get_user_description(ctx)))
             asyncio.create_task(_maybe_summarize(conv_id, model,
                                             get_ai_name(ctx), get_user_name(ctx), get_ai_personality(ctx),
+                                            user_description=get_user_description(ctx),
                                             messages_budget=msg_budget))
         except Exception as e:
             yield json.dumps({"error": f"Failed to save response: {e}", "done": True}) + "\n"
@@ -841,9 +856,11 @@ def setup(app: FastAPI, ollama, resolve_model=None):
                 budget_report = ctx.get("_budget_report")
                 msg_budget = budget_report.messages_budget if budget_report else 0
                 asyncio.create_task(_auto_update_scene_state(conv_id, model,
-                                                get_ai_name(ctx), get_user_name(ctx), get_ai_personality(ctx)))
+                                                get_ai_name(ctx), get_user_name(ctx), get_ai_personality(ctx),
+                                                user_description=get_user_description(ctx)))
                 asyncio.create_task(_maybe_summarize(conv_id, model,
                                                 get_ai_name(ctx), get_user_name(ctx), get_ai_personality(ctx),
+                                                user_description=get_user_description(ctx),
                                                 messages_budget=msg_budget))
             except Exception as e:
                 yield json.dumps({"error": f"Failed to save response: {e}", "done": True}) + "\n"

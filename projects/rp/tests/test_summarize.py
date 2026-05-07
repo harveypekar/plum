@@ -53,16 +53,37 @@ class TestBuildSummaryPrompt:
             ai_personality=long_personality,
             char_name="Sol",
         )
-        assert "Sol's personality:" in prompt
-        hint_line = [line for line in prompt.split("\n") if "Sol's personality:" in line][0]
-        assert len(hint_line) < 250
+        assert "Sol:" in prompt
+        sol_line = [ln for ln in prompt.splitlines() if ln.startswith("Sol:")][0]
+        assert len(sol_line) <= 130
 
     def test_no_personality_no_hint(self):
         prompt = build_summary_prompt(
             messages=_msgs(("user", "test")),
             ai_personality="",
         )
-        assert "personality:" not in prompt.split("Update")[0].lower()
+        assert "Characters:" not in prompt.split("Update")[0]
+
+    def test_user_description_included(self):
+        prompt = build_summary_prompt(
+            messages=_msgs(("user", "test")),
+            user_name="Valentina",
+            user_description="Valentina is a short woman in her early thirties. She has dark skin.",
+        )
+        assert "Valentina:" in prompt
+        assert "short woman" in prompt
+
+    def test_both_descriptions_with_pronouns_rule(self):
+        prompt = build_summary_prompt(
+            messages=_msgs(("user", "test")),
+            char_name="Amber",
+            ai_personality="Amber has long chestnut hair. She is warm.",
+            user_name="Val",
+            user_description="Val is a short woman. She has piercings.",
+        )
+        assert "Amber:" in prompt
+        assert "Val:" in prompt
+        assert "correct pronouns" in prompt
 
     def test_preservation_rules_present(self):
         prompt = build_summary_prompt(messages=_msgs(("user", "test")))
