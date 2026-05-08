@@ -19,8 +19,12 @@ std::string BrdfEmitter::emit_lighting_shader(const ShaderFnIR& brdf) {
     ss << "struct PSIn { float4 sv : SV_POSITION; float2 uv : TEXCOORD0; };\n\n";
 
     ss << "float4 main(PSIn i) : SV_TARGET {\n";
-    ss << "    float4 albedo = gbuf_albedo.Sample(samp, i.uv);\n";
-    ss << "    if (albedo.a < 0.01) discard;\n\n";
+    ss << "    float4 albedo_raw = gbuf_albedo.Sample(samp, i.uv);\n";
+    ss << "    if (albedo_raw.r < 0.001 && albedo_raw.g < 0.001 && albedo_raw.b < 0.001) discard;\n\n";
+
+    ss << "    float3 albedo = albedo_raw.rgb;\n";
+    ss << "    float roughness = albedo_raw.a;\n";
+    ss << "    float metallic = gbuf_normal.Sample(samp, i.uv).a;\n\n";
 
     ss << "    float3 normal = gbuf_normal.Sample(samp, i.uv).xyz * 2.0 - 1.0;\n";
     ss << "    float3 view_dir = normalize(light_ubo.camera_pos);\n";
