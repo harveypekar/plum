@@ -38,7 +38,28 @@ void App::init() {
         {"Constant", R"(; Constant output
 (output 0.5)
 )"},
-        {"Sponza", R"(; Sponza atrium with textures
+        {"Sponza", R"(; Sponza atrium with PBR lighting
+(def pbr (shader
+  :brdf (fn [normal light_dir view_dir albedo]
+    (set n_dot_l (max (dot normal light_dir) 0.0))
+    (set h (normalize (+ light_dir view_dir)))
+    (set n_dot_h (max (dot normal h) 0.0))
+    (set n_dot_v (max (dot normal view_dir) 0.001))
+    (set a2 (* roughness roughness))
+    (set denom_inner (+ (* (* n_dot_h n_dot_h) (- a2 1.0)) 1.0))
+    (set d (/ a2 (* 3.14159 (* denom_inner denom_inner))))
+    (set f0 (lerp [0.04 0.04 0.04] albedo metallic))
+    (set h_dot_v (max (dot h view_dir) 0.0))
+    (set f (+ f0 (* (- 1.0 f0) (pow (- 1.0 h_dot_v) 5.0))))
+    (set r1 (+ roughness 1.0))
+    (set k (/ (* r1 r1) 8.0))
+    (set g1 (/ n_dot_v (+ (* n_dot_v (- 1.0 k)) k)))
+    (set g2 (/ n_dot_l (+ (* n_dot_l (- 1.0 k)) k)))
+    (set spec (/ (* (* d f) (* g1 g2)) (+ (* (* 4.0 n_dot_v) n_dot_l) 0.001)))
+    (set kd (* (- 1.0 metallic) (/ (- 1.0 f) 3.14159)))
+    (set diffuse (* kd albedo))
+    (* (+ diffuse spec) n_dot_l))))
+
 (def sponza (mesh "assets/scenes/sponza/sponza.obj"))
 (def cam (camera :fov 75 :position [-500 400 0] :target [500 400 0] :near 1 :far 5000))
 (def sun (light :direction [-0.5 -1 -0.3] :intensity 0.7))
