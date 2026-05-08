@@ -24,9 +24,22 @@ def _target_words(target_tokens: int) -> int:
     return max(200, int(target_tokens * 0.7))
 
 
+def _first_sentence(text: str) -> str:
+    """Extract the first sentence (up to first period) from a description, capped at 120 chars."""
+    if not text:
+        return ""
+    end = text.find(". ")
+    if end == -1:
+        end = text.find(".\n")
+    if end == -1:
+        end = len(text)
+    return text[:min(end + 1, 120)].strip()
+
+
 def build_summary_prompt(messages: list[dict], previous_summary: str = "",
                          char_name: str = "Character", user_name: str = "User",
                          ai_personality: str = "",
+                         user_description: str = "",
                          target_tokens: int = 600) -> str:
     """Build the prompt sent to the LLM to generate/update a rolling conversation summary."""
     history = "\n".join(f"{m['role']}: {m['content']}" for m in messages)
@@ -37,14 +50,19 @@ def build_summary_prompt(messages: list[dict], previous_summary: str = "",
             "revise anything the new messages change):\n"
             f"{previous_summary.strip()}\n\n"
         )
-    personality_hint = ""
+    char_hints = []
     if ai_personality:
         short = ai_personality[:200].rsplit(" ", 1)[0]
-        personality_hint = f"{char_name}'s personality: {short}\n\n"
+        char_hints.append(f"{char_name}: {_first_sentence(short)}")
+    if user_description:
+        char_hints.append(f"{user_name}: {_first_sentence(user_description)}")
+    char_section = ""
+    if char_hints:
+        char_section = "Characters:\n" + "\n".join(char_hints) + "\n\n"
     word_limit = _target_words(target_tokens)
     return (
         f"{prev_section}"
-        f"{personality_hint}"
+        f"{char_section}"
         "Update the story summary based on the new messages below. Preserve:\n"
         "- Key plot events and decisions (what actually happened)\n"
         f"- Emotional trajectory (how {char_name}'s feelings evolved, not just current mood)\n"
@@ -57,6 +75,7 @@ def build_summary_prompt(messages: list[dict], previous_summary: str = "",
         "- Present tense\n"
         "- Be specific — quote distinctive phrases when they matter\n"
         "- Track the emotional arc, not just events\n"
+        "- Use each character's correct pronouns based on their description above\n"
         f"- Target approximately {word_limit} words\n"
         "- Do NOT narrate or continue the story — just summarize what happened\n\n"
         f"New messages:\n{history}"
@@ -78,6 +97,7 @@ async def maybe_generate_summary(
     char_name: str = "Character",
     user_name: str = "User",
     ai_personality: str = "",
+    user_description: str = "",
     resolve_model=None,
     messages_budget: int = 0,
 ) -> dict | None:
@@ -137,6 +157,7 @@ async def maybe_generate_summary(
         char_name=char_name,
         user_name=user_name,
         ai_personality=ai_personality,
+        user_description=user_description,
         target_tokens=target_tokens,
     )
 
