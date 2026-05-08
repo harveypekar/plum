@@ -2,9 +2,10 @@ import pytest  # noqa: F401
 from projects.rp.pipeline import assemble_prompt, expand_variables, render_template
 
 
-def _make_ctx(template="", scenario_desc="", ai_desc="", ai_personality="", ai_name="Char", user_name="User", messages=None):
+def _make_ctx(template="", scenario_desc="", ai_desc="", ai_personality="",
+              ai_name="Char", user_name="User", user_desc="", messages=None):
     return {
-        "user_card": {"card_data": {"data": {"name": user_name}}},
+        "user_card": {"card_data": {"data": {"name": user_name, "description": user_desc}}},
         "ai_card": {"card_data": {"data": {
             "name": ai_name,
             "description": ai_desc,
@@ -83,6 +84,7 @@ from projects.rp.pipeline import (  # noqa: E402
     _match_scene_condition, select_style, clean_response,
     check_stock_phrases, enforce_pronouns, Pipeline, STYLE_ITEMS_PER_TURN,
 )
+from projects.rp.prompt_builder import infer_pronouns  # noqa: E402
 import asyncio  # noqa: E402
 
 
@@ -627,6 +629,91 @@ class TestEnforcePronouns:
         assert "_pronoun_corrections" not in result
 
 
+class TestInferPronouns:
+    def test_woman_infers_she_her(self):
+        assert infer_pronouns("Valentina is a short woman in her early thirties.") == "she/her"
+
+    def test_man_infers_he_him(self):
+        assert infer_pronouns("Marcus is a tall man with broad shoulders.") == "he/him"
+
+    def test_female_signals(self):
+        assert infer_pronouns("A girl from the countryside, she grew up on a farm.") == "she/her"
+
+    def test_male_signals(self):
+        assert infer_pronouns("The boy had always dreamed of adventure. He left home at 16.") == "he/him"
+
+    def test_no_signal_returns_empty(self):
+        assert infer_pronouns("A mysterious figure cloaked in shadow.") == ""
+
+    def test_empty_description(self):
+        assert infer_pronouns("") == ""
+
+    def test_only_first_200_chars(self):
+        desc = "A mysterious figure. " * 20 + "She is actually a woman."
+        assert infer_pronouns(desc) == ""
+
+    def test_mixed_signals_majority_wins(self):
+        assert infer_pronouns("She is a woman, daughter of a king and wife of a prince.") == "she/her"
+
+
+class TestEnforcePronounsUserCharacter:
+    def test_fixes_user_character_they_to_she(self):
+        ctx = {
+            "response": "I looked up at Valentina. Their eyes were red from crying.",
+            "ai_name": "Amber",
+            "_char_pronouns": "she/her",
+            "_user_name": "Valentina",
+            "_user_pronouns": "she/her",
+        }
+        result = enforce_pronouns(ctx)
+        assert "Her eyes were red" in result["response"]
+
+    def test_fixes_user_character_them_to_her(self):
+        ctx = {
+            "response": "Valentina pulled me close. I leaned into them gratefully.",
+            "ai_name": "Amber",
+            "_char_pronouns": "she/her",
+            "_user_name": "Valentina",
+            "_user_pronouns": "she/her",
+        }
+        result = enforce_pronouns(ctx)
+        assert "leaned into her" in result["response"]
+
+    def test_no_fix_without_user_pronouns(self):
+        ctx = {
+            "response": "Valentina smiled. They waved.",
+            "ai_name": "Amber",
+            "_char_pronouns": "she/her",
+            "_user_name": "Valentina",
+            "_user_pronouns": "",
+        }
+        result = enforce_pronouns(ctx)
+        assert "They waved" in result["response"]
+
+    def test_both_characters_fixed(self):
+        ctx = {
+            "response": "Amber sighed. They looked at Valentina. They smiled back.",
+            "ai_name": "Amber",
+            "_char_pronouns": "she/her",
+            "_user_name": "Valentina",
+            "_user_pronouns": "she/her",
+        }
+        result = enforce_pronouns(ctx)
+        assert "She looked at Valentina" in result["response"]
+        assert "She smiled back" in result["response"]
+
+    def test_skips_plural_for_user_character(self):
+        ctx = {
+            "response": "Valentina and I looked at each other. They both laughed.",
+            "ai_name": "Amber",
+            "_char_pronouns": "she/her",
+            "_user_name": "Valentina",
+            "_user_pronouns": "she/her",
+        }
+        result = enforce_pronouns(ctx)
+        assert "They both" in result["response"]
+
+
 class TestDefaultTemplate:
     def test_default_template_renders_with_full_card(self):
         ctx = _make_ctx(
@@ -649,6 +736,17 @@ class TestDefaultTemplate:
         ctx = _make_ctx(template="", ai_name="Sol", ai_desc="", scenario_desc="")
         result = assemble_prompt(ctx)
         assert "Scenario:" not in result["system_prompt"]
+
+    def test_inferred_pronouns_appear_in_system_prompt(self):
+        ctx = _make_ctx(
+            template="",
+            ai_name="Amber",
+            ai_desc="Amber is a tall woman with red hair.",
+            user_name="Val",
+            user_desc="Val is a short woman with dark curly hair.",
+        )
+        result = assemble_prompt(ctx)
+        assert "she/her" in result["system_prompt"]
 
 
 class TestPipelineClass:

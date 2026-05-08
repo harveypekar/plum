@@ -141,6 +141,12 @@ class TestBuildSceneStatePrompt:
         for cat in ["Location:", "'s clothing:", "Restraints:", "Position:", "Props:", "Mood:"]:
             assert cat in prompt
 
+    def test_mood_line_warns_against_sexual_terms(self):
+        prompt = build_scene_state_prompt(messages=_msgs(("user", "test")))
+        mood_line = [ln for ln in prompt.splitlines() if ln.startswith("Mood:")][0]
+        assert "neutral" in mood_line.lower()
+        assert "charged" in mood_line.lower()
+
     def test_per_character_clothing_lines(self):
         prompt = build_scene_state_prompt(
             messages=_msgs(("user", "test")),
