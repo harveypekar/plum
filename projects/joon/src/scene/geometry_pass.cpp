@@ -28,6 +28,11 @@ struct PushLight {
     float pad1;
 };
 
+struct TexturedPC {
+    float roughness;
+    float metallic;
+};
+
 bool has_textured_objects(const SceneCollection& scene) {
     for (const auto& obj : scene.objects)
         if (obj.albedo_texture) return true;
@@ -64,7 +69,8 @@ void exec_pass(const Node& n, EvalContext& ctx) {
 
     const GraphicsPipeline* tex_gp = nullptr;
     if (has_textures)
-        tex_gp = &ctx.pipelines.get_graphics_textured("scene_textured", rp.pass, num_color);
+        tex_gp = &ctx.pipelines.get_graphics_textured(
+            "scene_textured", rp.pass, num_color, sizeof(TexturedPC));
 
     const auto& cam = ctx.scene.camera;
     mat4 view = look_at(cam.position, cam.target, cam.up);
@@ -144,6 +150,12 @@ void exec_pass(const Node& n, EvalContext& ctx) {
             bound_pipeline = cur_gp->pipeline;
             if (cur_gp == &gp)
                 vkCmdPushConstants(cmd, gp.layout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(pc), &pc);
+        }
+
+        if (use_textured) {
+            TexturedPC tpc{ obj.roughness, obj.metallic };
+            vkCmdPushConstants(cmd, cur_gp->layout, VK_SHADER_STAGE_FRAGMENT_BIT,
+                               0, sizeof(TexturedPC), &tpc);
         }
 
         auto vb = create_vertex_buffer(ctx.device,

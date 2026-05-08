@@ -329,10 +329,11 @@ const GraphicsPipeline& PipelineCache::get_graphics_from_source(
 
 const GraphicsPipeline& PipelineCache::get_graphics_textured(
     const std::string& name, VkRenderPass render_pass,
-    uint32_t num_color_attachments) {
+    uint32_t num_color_attachments, uint32_t push_constant_size) {
     std::string key = "tex_" + name + ":" +
                       std::to_string(reinterpret_cast<uintptr_t>(render_pass)) +
-                      ":" + std::to_string(num_color_attachments);
+                      ":" + std::to_string(num_color_attachments) +
+                      ":" + std::to_string(push_constant_size);
     auto it = m_graphics_pipelines.find(key);
     if (it != m_graphics_pipelines.end()) return it->second;
 
@@ -390,6 +391,15 @@ const GraphicsPipeline& PipelineCache::get_graphics_textured(
     layout_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     layout_info.setLayoutCount = 1;
     layout_info.pSetLayouts = &p.desc_layout;
+
+    VkPushConstantRange push_range{};
+    if (push_constant_size > 0) {
+        push_range.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+        push_range.offset = 0;
+        push_range.size = push_constant_size;
+        layout_info.pushConstantRangeCount = 1;
+        layout_info.pPushConstantRanges = &push_range;
+    }
     if (vkCreatePipelineLayout(m_device.device, &layout_info, nullptr,
                                &p.layout) != VK_SUCCESS)
         throw std::runtime_error(

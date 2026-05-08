@@ -61,7 +61,8 @@ public:
     //   binding 2 = SAMPLER (frag), binding 3 = SAMPLED_IMAGE (frag).
     const GraphicsPipeline& get_graphics_textured(const std::string& name,
                                                    VkRenderPass render_pass,
-                                                   uint32_t num_color_attachments = 2);
+                                                   uint32_t num_color_attachments = 2,
+                                                   uint32_t push_constant_size = 0);
 
     const GraphicsPipeline& get_fullscreen_from_source(
         const std::string& key,
