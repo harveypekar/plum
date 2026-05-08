@@ -9,7 +9,7 @@ See `projects/joon/CLAUDE.md` for build instructions, coding standards, and proj
 
 ## Debugging
 
-- **Log file:** runtime output goes to `log.txt` in the working directory. Always read this file before asking the user about errors or behavior.
+- **Log file:** runtime output goes to `joon-gui.log` next to the executable (e.g. `projects/joon/build/bin/Debug/joon-gui.log` or `build/bin/Release/joon-gui.log`). Always read this file before asking the user about errors or behavior.
 - **Validation errors:** Vulkan validation messages route through `joon_log`. If you don't see expected errors, check that validation layers are enabled and logging is not filtered.
 - **Viewport not updating:** the most common cause is the eval→dispatch→present pipeline not being fully triggered. Before patching, trace the full path: parameter change → dirty flag → re-eval → descriptor rebind → dispatch → barrier → present. Identify which step is broken.
 - **Cross-queue sync:** compute and graphics may use different queue families. Barriers must match the queue ownership. Read the existing barrier code before adding new ones.
