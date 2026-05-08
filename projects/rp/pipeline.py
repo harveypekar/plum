@@ -3,6 +3,7 @@ import logging
 import re
 from typing import Callable
 from .mcp_client import get_router
+from .prompt_builder import infer_pronouns
 
 _log = logging.getLogger(__name__)
 
@@ -210,8 +211,8 @@ def assemble_prompt(ctx: dict) -> dict:
         "char": ai_data.get("name", "Character"),
         "user": user_data.get("name", "User"),
         "user_description": user_data.get("description", ""),
-        "user_pronouns": user_data.get("pronouns", ""),
-        "char_pronouns": ai_data.get("pronouns", ""),
+        "user_pronouns": user_data.get("pronouns", "") or infer_pronouns(user_data.get("description", "")),
+        "char_pronouns": ai_data.get("pronouns", "") or infer_pronouns(ai_data.get("description", "")),
     }
 
     system_part, post_part, style_part, scene_style_part = _split_template(template)
@@ -291,27 +292,18 @@ def _fix_pronouns_in_sentence(sentence: str, mapping: dict) -> str:
     return result
 
 
-def enforce_pronouns(ctx: dict) -> dict:
-    """Fix they/them → she/her or he/him when the character has explicit pronouns."""
-    pronouns = ctx.get("_char_pronouns", "")
-    if not pronouns:
-        return ctx
-
+def _fix_character_pronouns(response: str, char_name: str, pronouns: str) -> tuple[str, int]:
+    """Fix they/them → correct pronouns for a named character in the response."""
     mapping = _PRONOUN_MAP.get(pronouns.lower().strip())
-    if not mapping:
-        return ctx
-
-    ai_name = ctx.get("ai_name", "")
-    response = ctx.get("response", "")
-    if not ai_name or not response:
-        return ctx
+    if not mapping or not char_name:
+        return response, 0
 
     sentences = re.split(r'(?<=[.!?…"])\s+', response)
     fixed = []
     name_recent = False
     corrections = 0
     for sent in sentences:
-        has_name = ai_name.lower() in sent.lower()
+        has_name = char_name.lower() in sent.lower()
         has_plural = bool(_PLURAL_SIGNALS.search(sent))
         has_they = bool(re.search(r'\b[Tt]he(?:y|m|ir|msel(?:f|ves))\b', sent))
 
@@ -328,10 +320,36 @@ def enforce_pronouns(ctx: dict) -> dict:
         elif re.search(r'\b[A-Z][a-z]+\b', sent) and not has_name:
             name_recent = False
 
-    if corrections:
-        ctx["response"] = " ".join(fixed)
-        ctx["_pronoun_corrections"] = corrections
-        _log.info("Fixed %d pronoun(s) for %s (%s)", corrections, ai_name, pronouns)
+    return " ".join(fixed), corrections
+
+
+def enforce_pronouns(ctx: dict) -> dict:
+    """Fix they/them → she/her or he/him for both AI and user characters."""
+    response = ctx.get("response", "")
+    if not response:
+        return ctx
+
+    total = 0
+
+    ai_pronouns = ctx.get("_char_pronouns", "")
+    ai_name = ctx.get("ai_name", "")
+    if ai_pronouns and ai_name:
+        response, n = _fix_character_pronouns(response, ai_name, ai_pronouns)
+        if n:
+            _log.info("Fixed %d pronoun(s) for AI %s (%s)", n, ai_name, ai_pronouns)
+        total += n
+
+    user_pronouns = ctx.get("_user_pronouns", "")
+    user_name = ctx.get("_user_name", "")
+    if user_pronouns and user_name:
+        response, n = _fix_character_pronouns(response, user_name, user_pronouns)
+        if n:
+            _log.info("Fixed %d pronoun(s) for user %s (%s)", n, user_name, user_pronouns)
+        total += n
+
+    if total:
+        ctx["response"] = response
+        ctx["_pronoun_corrections"] = total
     return ctx
 
 

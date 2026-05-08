@@ -6,6 +6,7 @@ preparing the pipeline context. Functions that need external services
 """
 
 import logging
+import re
 from dataclasses import asdict
 from pathlib import Path
 
@@ -37,10 +38,38 @@ def get_user_name(ctx: dict) -> str:
     return user_data.get("name", "User")
 
 
+_FEMALE_SIGNALS = re.compile(
+    r'\b(woman|female|girl|lady|she|daughter|mother|wife|girlfriend|sister)\b',
+    re.IGNORECASE,
+)
+_MALE_SIGNALS = re.compile(
+    r'\b(man|male|boy|guy|he|son|father|husband|boyfriend|brother)\b',
+    re.IGNORECASE,
+)
+
+
+def infer_pronouns(description: str) -> str:
+    """Infer she/her or he/him from the first 200 chars of a card description."""
+    text = description[:200]
+    female = len(_FEMALE_SIGNALS.findall(text))
+    male = len(_MALE_SIGNALS.findall(text))
+    if female > male:
+        return "she/her"
+    if male > female:
+        return "he/him"
+    return ""
+
+
 def get_ai_pronouns(ctx: dict) -> str:
     ai_data = ctx.get("ai_card", {}).get("card_data", {}).get(
         "data", ctx.get("ai_card", {}).get("card_data", {}))
-    return ai_data.get("pronouns", "")
+    return ai_data.get("pronouns", "") or infer_pronouns(ai_data.get("description", ""))
+
+
+def get_user_pronouns(ctx: dict) -> str:
+    user_data = ctx.get("user_card", {}).get("card_data", {}).get(
+        "data", ctx.get("user_card", {}).get("card_data", {}))
+    return user_data.get("pronouns", "") or infer_pronouns(user_data.get("description", ""))
 
 
 def get_ai_personality(ctx: dict) -> str:

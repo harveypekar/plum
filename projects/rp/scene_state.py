@@ -98,7 +98,7 @@ def build_scene_state_prompt(messages: list[dict], previous_state: str = "",
         "Restraints: (describe the specific tie/pattern AND what it practically limits — e.g. 'wrists behind back — no free hand use' — or 'none')\n"
         "Position: (posture, who is where, physical contact)\n"
         "Props: (objects currently in play)\n"
-        "Mood: (emotional atmosphere right now)\n"
+        "Mood: (what characters feel right now — use neutral terms; avoid sexually-charged words like 'charged' or 'electric' unless characters are explicitly intimate)\n"
         "ONLY state facts explicitly shown or described in the messages. Do NOT invent or assume details not present.\n"
         f"{clothing_instruction}"
         "No narration, no story, no explanation. Just the current facts.\n\n"
