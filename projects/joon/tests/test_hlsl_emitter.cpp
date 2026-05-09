@@ -1,5 +1,6 @@
 #include "catch_amalgamated.hpp"
 #include "shader/hlsl_emitter.h"
+#include "shader/brdf_emitter.h"
 #include "shader/shader_ir.h"
 #include "vulkan/pipeline_cache.h"
 #include "vulkan/render_pass.h"
@@ -151,4 +152,23 @@ PSOut main(PSIn i) {
     auto& gp = cache.get_graphics_from_source("test_gen", vert_src, frag_src, rp.pass, 0);
     CHECK(gp.pipeline != VK_NULL_HANDLE);
     destroy_renderpass(ctx->device(), rp);
+}
+
+TEST_CASE("BRDF emitter injects roughness and metallic", "[shader][brdf]") {
+    BrdfEmitter emitter;
+
+    ShaderFnIR brdf;
+    brdf.params = {"normal", "light_dir", "view_dir", "albedo"};
+
+    ShaderCall mul_call;
+    mul_call.op = "*";
+    mul_call.args.push_back(std::make_unique<ShaderExpr>(ShaderVar{"roughness"}));
+    mul_call.args.push_back(std::make_unique<ShaderExpr>(ShaderVar{"metallic"}));
+    brdf.body.push_back(std::make_unique<ShaderExpr>(std::move(mul_call)));
+
+    auto hlsl = emitter.emit_lighting_shader(brdf);
+
+    CHECK(hlsl.find("float roughness") != std::string::npos);
+    CHECK(hlsl.find("float metallic") != std::string::npos);
+    CHECK(hlsl.find("float3 albedo") != std::string::npos);
 }

@@ -82,7 +82,8 @@ def test_default_template_has_system_and_post():
 from projects.rp.pipeline import (  # noqa: E402
     _split_template, _parse_style_items, _parse_scene_style_items,
     _match_scene_condition, select_style, clean_response,
-    check_stock_phrases, enforce_pronouns, Pipeline, STYLE_ITEMS_PER_TURN,
+    check_stock_phrases, enforce_pronouns, detect_pov, _detect_pov_signal,
+    Pipeline, STYLE_ITEMS_PER_TURN,
 )
 from projects.rp.prompt_builder import infer_pronouns  # noqa: E402
 import asyncio  # noqa: E402
@@ -712,6 +713,105 @@ class TestEnforcePronounsUserCharacter:
         }
         result = enforce_pronouns(ctx)
         assert "They both" in result["response"]
+
+
+class TestDetectPovSignal:
+    def test_first_person_I_start(self):
+        assert _detect_pov_signal("I looked up at Valentina.", "Amber") == "first"
+
+    def test_first_person_asterisk_I(self):
+        assert _detect_pov_signal("*I sighed heavily.*", "Amber") == "first"
+
+    def test_third_person_name_start(self):
+        assert _detect_pov_signal("Amber sighed heavily.", "Amber") == "third"
+
+    def test_third_person_asterisk_name(self):
+        assert _detect_pov_signal("*Amber sighed heavily.*", "Amber") == "third"
+
+    def test_ambiguous_returns_none(self):
+        assert _detect_pov_signal("The room was dark.", "Amber") is None
+
+    def test_first_person_by_count(self):
+        assert _detect_pov_signal("Well, I think I should go. I'm tired.", "Amber") == "first"
+
+    def test_third_person_by_count(self):
+        assert _detect_pov_signal("\"Hello,\" Amber said. Amber looked away.", "Amber") == "third"
+
+
+class TestDetectPov:
+    def _make_pov_ctx(self, messages, ai_name="Amber"):
+        return {
+            "ai_card": {"card_data": {"data": {"name": ai_name}}},
+            "messages": messages,
+            "post_prompt": "Write next response.",
+        }
+
+    def test_detects_first_person(self):
+        msgs = [
+            {"role": "assistant", "content": "I looked at her."},
+            {"role": "user", "content": "Hi"},
+            {"role": "assistant", "content": "I smiled back."},
+            {"role": "user", "content": "How are you?"},
+            {"role": "assistant", "content": "*I shrugged.* 'Fine.'"},
+        ]
+        ctx = self._make_pov_ctx(msgs)
+        result = detect_pov(ctx)
+        assert result["_detected_pov"] == "first"
+        assert "first person" in result["post_prompt"]
+
+    def test_detects_third_person(self):
+        msgs = [
+            {"role": "assistant", "content": "*Amber looked at her.*"},
+            {"role": "user", "content": "Hi"},
+            {"role": "assistant", "content": "*Amber smiled back.*"},
+            {"role": "user", "content": "How are you?"},
+            {"role": "assistant", "content": "Amber shrugged. 'Fine.'"},
+        ]
+        ctx = self._make_pov_ctx(msgs)
+        result = detect_pov(ctx)
+        assert result["_detected_pov"] == "third"
+        assert "third person" in result["post_prompt"]
+
+    def test_no_detection_on_tie(self):
+        msgs = [
+            {"role": "assistant", "content": "I sighed."},
+            {"role": "user", "content": "Hi"},
+            {"role": "assistant", "content": "*Amber looked up.*"},
+        ]
+        ctx = self._make_pov_ctx(msgs)
+        result = detect_pov(ctx)
+        assert "_detected_pov" not in result
+
+    def test_no_detection_with_few_messages(self):
+        msgs = [
+            {"role": "assistant", "content": "I sighed."},
+        ]
+        ctx = self._make_pov_ctx(msgs)
+        result = detect_pov(ctx)
+        assert "_detected_pov" not in result
+
+    def test_no_detection_without_ai_name(self):
+        ctx = {
+            "ai_card": {"card_data": {"data": {}}},
+            "messages": [
+                {"role": "assistant", "content": "I sighed."},
+                {"role": "assistant", "content": "I looked up."},
+            ],
+            "post_prompt": "",
+        }
+        result = detect_pov(ctx)
+        assert "_detected_pov" not in result
+
+    def test_only_counts_assistant_messages(self):
+        msgs = [
+            {"role": "user", "content": "Amber walked in."},
+            {"role": "assistant", "content": "I sighed."},
+            {"role": "user", "content": "Amber sat down."},
+            {"role": "assistant", "content": "*I looked up.*"},
+        ]
+        ctx = self._make_pov_ctx(msgs)
+        result = detect_pov(ctx)
+        assert result["_detected_pov"] == "first"
 
 
 class TestDefaultTemplate:

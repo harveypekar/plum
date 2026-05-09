@@ -11,6 +11,8 @@ Mesh load_obj_file(const std::string& path);
 struct MaterialInfo {
     std::string diffuse_tex;
     std::string normal_tex;
+    float roughness = 0.5f;
+    float metallic  = 0.0f;
 };
 
 struct SubMesh {

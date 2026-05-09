@@ -3,6 +3,8 @@
 
 #include "scene/obj_loader.h"
 
+#include <algorithm>
+#include <cmath>
 #include <filesystem>
 #include <sstream>
 #include <stdexcept>
@@ -157,6 +159,14 @@ std::vector<SubMesh> load_obj_with_materials(const std::string& path) {
                 sm.material.normal_tex = mtl_dir + m.displacement_texname;
             else if (!m.bump_texname.empty())
                 sm.material.normal_tex = mtl_dir + m.bump_texname;
+
+            float ns = std::clamp(m.shininess, 0.0f, 1000.0f);
+            sm.material.roughness = std::clamp(
+                1.0f - std::sqrt(ns / 1000.0f), 0.04f, 1.0f);
+            float ks_lum = 0.2126f * m.specular[0]
+                         + 0.7152f * m.specular[1]
+                         + 0.0722f * m.specular[2];
+            sm.material.metallic = ks_lum > 0.5f ? 1.0f : 0.0f;
         }
         result.push_back(std::move(sm));
     }

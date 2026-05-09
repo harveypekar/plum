@@ -2,6 +2,12 @@
 [[vk::binding(2, 0)]] SamplerState samp;
 [[vk::binding(3, 0)]] Texture2D normal_tex;
 
+[[vk::push_constant]]
+struct PushConstants {
+    float roughness;
+    float metallic;
+} pc;
+
 struct PSIn {
     float4 sv        : SV_POSITION;
     float3 normal    : NORMAL;
@@ -16,11 +22,11 @@ struct PSOut {
 
 PSOut main(PSIn i) {
     PSOut o;
-    o.albedo = albedo_tex.Sample(samp, i.uv);
+    float4 tex_color = albedo_tex.Sample(samp, i.uv);
+    o.albedo = float4(tex_color.rgb, pc.roughness);
 
     float3 N = normalize(i.normal);
 
-    // Cotangent-frame TBN from screen-space derivatives
     float3 dp1 = ddx(i.world_pos);
     float3 dp2 = ddy(i.world_pos);
     float2 duv1 = ddx(i.uv);
@@ -33,6 +39,6 @@ PSOut main(PSIn i) {
     float3 ts = normal_tex.Sample(samp, i.uv).xyz * 2.0 - 1.0;
     float3 mapped = normalize(T * ts.x + B * ts.y + N * ts.z);
 
-    o.normal_out = float4(mapped * 0.5 + 0.5, 1.0);
+    o.normal_out = float4(mapped * 0.5 + 0.5, pc.metallic);
     return o;
 }

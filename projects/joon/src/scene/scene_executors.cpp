@@ -98,6 +98,8 @@ void exec_mesh(const Node& n, EvalContext& ctx) {
                 o.albedo_texture = ctx.texture_cache->default_albedo();
             if (!o.normal_texture)
                 o.normal_texture = ctx.texture_cache->default_normal();
+            o.roughness = sm.material.roughness;
+            o.metallic  = sm.material.metallic;
             ctx.scene.add_object(std::move(o));
         }
     } else {

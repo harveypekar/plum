@@ -26,6 +26,8 @@ struct SceneObject {
     uint32_t material_node_id = UINT32_MAX;
     GpuImage* albedo_texture = nullptr;
     GpuImage* normal_texture = nullptr;
+    float roughness = 0.5f;
+    float metallic  = 0.0f;
 };
 
 enum class LightType { Directional, Point, Spot };
