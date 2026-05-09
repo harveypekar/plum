@@ -396,6 +396,60 @@ def select_style(ctx: dict) -> dict:
     return ctx
 
 
+def _detect_pov_signal(content: str, ai_name: str) -> str | None:
+    """Classify a single message as 'first' or 'third' person, or None."""
+    stripped = content.lstrip("*").strip()
+    if stripped.startswith("I ") or stripped.startswith("I'") or stripped.startswith("I\n"):
+        return "first"
+    if stripped.startswith(ai_name):
+        return "third"
+    snippet = content[:200]
+    first_count = len(re.findall(r'\bI\b', snippet))
+    third_count = len(re.findall(re.escape(ai_name), snippet))
+    if first_count > third_count + 1:
+        return "first"
+    if third_count > 0 and third_count >= first_count:
+        return "third"
+    return None
+
+
+_MIN_POV_MESSAGES = 2
+
+
+def detect_pov(ctx: dict) -> dict:
+    """Detect POV from recent AI messages and add a consistency instruction."""
+    messages = ctx.get("messages", [])
+    ai_data = ctx.get("ai_card", {}).get("card_data", {}).get(
+        "data", ctx.get("ai_card", {}).get("card_data", {}))
+    ai_name = ai_data.get("name", "")
+    if not ai_name:
+        return ctx
+
+    recent = [m for m in messages if m.get("role") == "assistant"][-3:]
+    if len(recent) < _MIN_POV_MESSAGES:
+        return ctx
+
+    votes = [_detect_pov_signal(m["content"], ai_name) for m in recent]
+    first = sum(1 for v in votes if v == "first")
+    third = sum(1 for v in votes if v == "third")
+
+    if first > third:
+        pov = "first"
+    elif third > first:
+        pov = "third"
+    else:
+        return ctx
+
+    if pov == "first":
+        instruction = "Narrate in first person (I/me), not third person."
+    else:
+        instruction = f"Narrate in third person ({ai_name}/she/he), not first person (I/me)."
+
+    ctx["post_prompt"] += "\n" + instruction
+    ctx["_detected_pov"] = pov
+    return ctx
+
+
 def inject_tools(ctx: dict) -> dict:
     """Add tool descriptions to the system prompt if MCP tools are available."""
     router = get_router()
@@ -416,6 +470,7 @@ def create_default_pipeline() -> Pipeline:
     p.add_pre(assemble_prompt)
     p.add_pre(expand_variables)
     p.add_pre(select_style)
+    p.add_pre(detect_pov)
     p.add_pre(inject_tools)
     p.add_post(clean_response)
     p.add_post(enforce_pronouns)
