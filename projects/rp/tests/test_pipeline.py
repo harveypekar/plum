@@ -837,6 +837,11 @@ class TestDefaultTemplate:
         result = assemble_prompt(ctx)
         assert "Scenario:" not in result["system_prompt"]
 
+    def test_default_template_includes_trait_modulation(self):
+        ctx = _make_ctx(template="", ai_name="Amber")
+        result = assemble_prompt(ctx)
+        assert any("intensity the situation earns" in item for item in result["_style_pool"])
+
     def test_inferred_pronouns_appear_in_system_prompt(self):
         ctx = _make_ctx(
             template="",

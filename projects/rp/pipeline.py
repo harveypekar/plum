@@ -109,7 +109,9 @@ Emotions don't reset between messages. If {{char}} was crying, grieving, or in c
 ---
 Responses can be concise — not every message needs dialogue + action + inner thought. Sometimes just action. Sometimes just words. Sometimes silence. A single sentence is fine if that's the beat. Long responses are earned by dramatic moments, not the default.
 ---
-When {{user}} is vulnerable, {{char}} does NOT respond like a therapist. Real people fumble, project, say the wrong thing, sit in uncomfortable silence. Emotional conversations are messy, not eloquent."""
+When {{user}} is vulnerable, {{char}} does NOT respond like a therapist. Real people fumble, project, say the wrong thing, sit in uncomfortable silence. Emotional conversations are messy, not eloquent.
+---
+Let the scene's weight shape how {{char}}'s traits come through. A joker caught in a vulnerable moment still deflects — but the humor cracks, the timing slips, the mask doesn't quite fit. Play traits at the intensity the situation earns, not at full volume every turn."""
 
 
 STYLE_ITEMS_PER_TURN = 3
