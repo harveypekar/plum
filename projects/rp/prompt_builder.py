@@ -22,6 +22,7 @@ CHAT_DEFAULTS = {
     "num_ctx": 16384,
     "temperature": 1.05,
     "repeat_penalty": 1.08,
+    "repeat_last_n": 512,
     "min_p": 0.1,
 }
 
