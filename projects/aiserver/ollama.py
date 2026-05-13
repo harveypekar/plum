@@ -211,6 +211,7 @@ class OllamaClient:
         messages: list[dict],
         tools: list[dict] | None = None,
         think: bool | None = None,
+        options: dict | None = None,
     ) -> dict:
         """Non-streaming chat call. Returns the full Ollama response dict.
 
@@ -225,6 +226,8 @@ class OllamaClient:
             body["tools"] = tools
         if think is not None:
             body["think"] = think
+        if options:
+            body["options"] = options
         try:
             async with httpx.AsyncClient(timeout=120.0) as client:
                 resp = await client.post(f"{self.base_url}/api/chat", json=body)

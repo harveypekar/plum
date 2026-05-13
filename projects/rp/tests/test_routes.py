@@ -309,7 +309,7 @@ class IntegrationStubOllama:
     async def get_num_ctx(self, model: str) -> int:
         return self._num_ctx
 
-    async def chat(self, model, messages, tools=None, think=False):
+    async def chat(self, model, messages, tools=None, think=False, options=None):
         return {
             "message": {"role": "assistant", "content": ""},
             "done": True,
