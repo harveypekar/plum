@@ -161,7 +161,8 @@ async def _ollama_count_messages(
     Returns 0 if Ollama doesn't surface the field — caller decides
     how to handle a missing value.
     """
-    result = await ollama.chat(model=model, messages=messages)
+    result = await ollama.chat(model=model, messages=messages,
+                               options={"num_predict": 1})
     return int(result.get("prompt_eval_count", 0) or 0)
 
 

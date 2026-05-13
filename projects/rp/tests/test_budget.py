@@ -405,7 +405,7 @@ class TestFitPromptGroundTruth:
                 self.counts = [2000, 400]  # decreasing per call
                 self.call_idx = 0
 
-            async def chat(self, model, messages, tools=None, think=False):
+            async def chat(self, model, messages, tools=None, think=False, options=None):
                 self.chat_calls += 1
                 idx = min(self.call_idx, len(self.counts) - 1)
                 self.call_idx += 1
@@ -436,7 +436,7 @@ class TestFitPromptGroundTruth:
                     default_count=1000,  # always over
                 )
 
-            async def chat(self, model, messages, tools=None, think=False):
+            async def chat(self, model, messages, tools=None, think=False, options=None):
                 self.chat_calls += 1
                 return {"done": True, "prompt_eval_count": 1000}
 

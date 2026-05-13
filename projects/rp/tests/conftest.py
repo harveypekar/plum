@@ -37,7 +37,7 @@ class StubOllama:
             raise OllamaError(f"stub has no num_ctx for model {model!r}")
         return self.num_ctx_map[model]
 
-    async def chat(self, model: str, messages, tools=None, think=False):
+    async def chat(self, model: str, messages, tools=None, think=False, options=None):
         """Stub /api/chat that returns a prompt_eval_count.
 
         Ground-truth counting calls this with num_predict=0 in options;
