@@ -539,13 +539,21 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         description = ai_data.get("description", "")
         personality = ai_data.get("personality", "")
 
+        def _expand_vars(text: str) -> str:
+            return (text
+                    .replace("{{user}}", user_name)
+                    .replace("{{char}}", char_name)
+                    .replace("{{character}}", char_name)
+                    .replace("${user}", user_name)
+                    .replace("${char}", char_name))
+
         prompt_parts = []
         if system_prompt:
-            prompt_parts.append(system_prompt)
+            prompt_parts.append(_expand_vars(system_prompt))
         if description:
-            prompt_parts.append(f"Character: {description}")
+            prompt_parts.append(f"Character: {_expand_vars(description)}")
         if personality:
-            prompt_parts.append(f"Personality: {personality}")
+            prompt_parts.append(f"Personality: {_expand_vars(personality)}")
 
         prompt_parts.append(
             f"\nWrite the opening scene for a roleplay conversation. "
@@ -553,16 +561,14 @@ def setup(app: FastAPI, ollama, resolve_model=None):
             f"Match the voice and style demonstrated below."
         )
         if scenario_desc:
-            prompt_parts.append(f"\nScenario to set up:\n{scenario_desc}")
+            prompt_parts.append(f"\nScenario to set up:\n{_expand_vars(scenario_desc)}")
         else:
             prompt_parts.append(f"\nSet up a natural opening scene where {char_name} and {user_name} encounter each other.")
 
         if style_reference:
-            # Replace template vars in the reference
-            ref = style_reference.replace("{{user}}", user_name).replace("{{char}}", char_name)
             prompt_parts.append(
                 f"\nStyle reference (match this prose register, voice, and level of detail — "
-                f"do NOT copy the content, write a NEW scene for the scenario above):\n{ref}"
+                f"do NOT copy the content, write a NEW scene for the scenario above):\n{_expand_vars(style_reference)}"
             )
 
         prompt_parts.append(
