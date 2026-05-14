@@ -854,6 +854,36 @@ class TestDefaultTemplate:
         assert "she/her" in result["system_prompt"]
 
 
+class TestCheckRepetition:
+    def test_flags_verbatim_duplication(self):
+        from rp.pipeline import check_repetition
+        prev = "She sighs and leans against the wall, picking at a thread on her sleeve."
+        ctx = {
+            "response": prev,
+            "_recent_assistant_messages": [prev],
+        }
+        result = check_repetition(ctx)
+        assert result.get("_repetition_detected") is True
+        assert result["_repetition_overlap"] >= 0.85
+
+    def test_ignores_dissimilar_responses(self):
+        from rp.pipeline import check_repetition
+        ctx = {
+            "response": "She laughed and grabbed the beer off the counter.",
+            "_recent_assistant_messages": [
+                "The rain hammered against the window as she stared outside.",
+            ],
+        }
+        result = check_repetition(ctx)
+        assert "_repetition_detected" not in result
+
+    def test_no_crash_without_recent_messages(self):
+        from rp.pipeline import check_repetition
+        ctx = {"response": "Hello world."}
+        result = check_repetition(ctx)
+        assert "_repetition_detected" not in result
+
+
 class TestPipelineClass:
     def test_pre_hooks_run_in_order(self):
         p = Pipeline()

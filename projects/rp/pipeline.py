@@ -367,6 +367,29 @@ def check_stock_phrases(ctx: dict) -> dict:
     return ctx
 
 
+REPETITION_OVERLAP_THRESHOLD = 0.85
+
+
+def check_repetition(ctx: dict) -> dict:
+    """Detect near-verbatim duplication of recent assistant messages."""
+    from .lora_curate import _trigram_overlap
+    response = ctx.get("response", "")
+    recent = ctx.get("_recent_assistant_messages", [])
+    if not response or not recent:
+        return ctx
+    for i, prev in enumerate(recent):
+        overlap = _trigram_overlap(response, [prev])
+        if overlap >= REPETITION_OVERLAP_THRESHOLD:
+            ctx["_repetition_detected"] = True
+            ctx["_repetition_overlap"] = overlap
+            _log.warning(
+                "Repetition detected: %.0f%% trigram overlap with assistant message %d turns back",
+                overlap * 100, i + 1,
+            )
+            break
+    return ctx
+
+
 def select_style(ctx: dict) -> dict:
     """Pick style instructions: scene-state conditionals + rotating general items."""
     from .scene_state import parse_scene_state
@@ -477,4 +500,5 @@ def create_default_pipeline() -> Pipeline:
     p.add_post(clean_response)
     p.add_post(enforce_pronouns)
     p.add_post(check_stock_phrases)
+    p.add_post(check_repetition)
     return p
