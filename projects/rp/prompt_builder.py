@@ -23,6 +23,7 @@ CHAT_DEFAULTS = {
     "temperature": 1.05,
     "repeat_penalty": 1.08,
     "repeat_last_n": 512,
+    "frequency_penalty": 0.1,
     "min_p": 0.1,
 }
 
