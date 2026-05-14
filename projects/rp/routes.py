@@ -759,9 +759,19 @@ def setup(app: FastAPI, ollama, resolve_model=None):
             )
 
         if fewshot_msgs and ctx["messages"] and alloc.keep_fewshot:
-            _log.info("Injecting %d fewshot examples (vector-matched)", len(fewshot_msgs) // 2)
-            conv_log.log_fewshot(conv_id, len(fewshot_msgs) // 2, fewshot_msgs)
-            ctx["messages"] = [ctx["messages"][0]] + fewshot_msgs + ctx["messages"][1:]
+            n_examples = len(fewshot_msgs) // 2
+            _log.info("Injecting %d fewshot examples (vector-matched, system prompt)", n_examples)
+            conv_log.log_fewshot(conv_id, n_examples, fewshot_msgs)
+            ref_parts = []
+            for i in range(0, len(fewshot_msgs), 2):
+                user_msg = fewshot_msgs[i]["content"]
+                asst_msg = fewshot_msgs[i + 1]["content"]
+                ref_parts.append(f"User: {user_msg}\n{get_ai_name(ctx)}: {asst_msg}")
+            ctx["system_prompt"] += (
+                "\n\nVoice reference (match this tone and style, NOT the scene content"
+                " — these are from different scenes):\n"
+                + "\n---\n".join(ref_parts)
+            )
 
         ctx["_injection_alloc"] = alloc
 
