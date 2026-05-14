@@ -326,6 +326,7 @@ class IntegrationStubOllama:
         }
 
     async def generate(self, model, prompt, system=None, options=None):
+        self.last_generate_prompt = prompt
         return self.generate_response
 
     async def count_generate_prompt(self, model, prompt, system=None):
@@ -612,6 +613,40 @@ class TestConversations:
         resp = await client.get("/rp/conversations")
         assert resp.status_code == 200
         assert len(resp.json()) >= 1
+
+    @pytest.mark.asyncio
+    async def test_greeting_prompt_excludes_card_system_prompt(
+        self, client, fake_db, stub_ollama,
+    ):
+        card_system = "You are writing a roleplay where you are Alice. SYSTEM_SENTINEL"
+        scenario_text = "Alice visits Bob's apartment. Alice rings the doorbell."
+        user = await fake_db.create_card("Bob", {"data": {"name": "Bob"}})
+        ai = await fake_db.create_card("Alice", {
+            "data": {
+                "name": "Alice",
+                "description": "A test character",
+                "personality": "Friendly",
+                "system_prompt": card_system,
+                "first_mes": "",
+                "mes_example": "",
+            }
+        })
+        scenario = await fake_db.create_scenario(
+            "Test", scenario_text, {}, first_message="",
+        )
+        stub_ollama.generate_response = "Alice stood at the door."
+
+        await client.post("/rp/conversations", json={
+            "user_card_id": user["id"],
+            "ai_card_id": ai["id"],
+            "scenario_id": scenario["id"],
+            "model": "test-model",
+        })
+
+        prompt = stub_ollama.last_generate_prompt
+        assert "SYSTEM_SENTINEL" not in prompt
+        assert scenario_text in prompt
+        assert "EXACTLY" in prompt
 
 
 # ---------------------------------------------------------------------------
