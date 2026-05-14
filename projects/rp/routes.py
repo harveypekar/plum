@@ -532,10 +532,8 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         char_name = ai_data.get("name", "Character")
         user_name = user_data.get("name", "User")
 
-        # Build the generation prompt
         scenario_desc = (scenario or {}).get("description", "")
         style_reference = ai_data.get("first_mes", "")
-        system_prompt = ai_data.get("system_prompt", "")
         description = ai_data.get("description", "")
         personality = ai_data.get("personality", "")
 
@@ -548,33 +546,38 @@ def setup(app: FastAPI, ollama, resolve_model=None):
                     .replace("${char}", char_name))
 
         prompt_parts = []
-        if system_prompt:
-            prompt_parts.append(_expand_vars(system_prompt))
         if description:
             prompt_parts.append(f"Character: {_expand_vars(description)}")
         if personality:
             prompt_parts.append(f"Personality: {_expand_vars(personality)}")
 
-        prompt_parts.append(
-            f"\nWrite the opening scene for a roleplay conversation. "
-            f"Write as {char_name} in third person (e.g. \"{char_name} stepped forward\", not \"I stepped forward\"). "
-            f"Match the voice and style demonstrated below."
-        )
         if scenario_desc:
-            prompt_parts.append(f"\nScenario to set up:\n{_expand_vars(scenario_desc)}")
-        else:
-            prompt_parts.append(f"\nSet up a natural opening scene where {char_name} and {user_name} encounter each other.")
-
-        if style_reference:
             prompt_parts.append(
-                f"\nStyle reference (match this prose register, voice, and level of detail — "
-                f"do NOT copy the content, write a NEW scene for the scenario above):\n{_expand_vars(style_reference)}"
+                f"Scenario (follow this EXACTLY — who is where, who arrives, "
+                f"who is already present):\n{_expand_vars(scenario_desc)}"
+            )
+            prompt_parts.append(
+                f"Write the opening scene that sets up this scenario. "
+                f"Write as {char_name} in third person (e.g. \"{char_name} stepped forward\", "
+                f"not \"I stepped forward\")."
+            )
+        else:
+            prompt_parts.append(
+                f"Write a natural opening scene where {char_name} and {user_name} encounter each other. "
+                f"Write as {char_name} in third person (e.g. \"{char_name} stepped forward\", "
+                f"not \"I stepped forward\")."
             )
 
         prompt_parts.append(
-            f"\nWrite ONLY {char_name}'s opening. Do not write {user_name}'s actions or dialogue. "
-            f"300-500 words."
+            f"Write ONLY {char_name}'s actions, thoughts, and dialogue. "
+            f"Do not write {user_name}'s actions or dialogue. 300-500 words."
         )
+
+        if style_reference:
+            prompt_parts.append(
+                f"Style reference (match this prose register, voice, and level of detail — "
+                f"do NOT copy the content, write a NEW scene for the scenario above):\n{_expand_vars(style_reference)}"
+            )
 
         full_prompt = "\n\n".join(prompt_parts)
         model = _resolve_model(conv["model"])
