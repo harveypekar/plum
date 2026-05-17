@@ -599,7 +599,7 @@ def setup(app: FastAPI, ollama, resolve_model=None):
             clean = clean[len(char_name) + 1:].strip()
         return clean
 
-    _scene_state_model = "q36"
+    _scene_state_model = "qwen3:14b"
 
     async def _generate_scene_state(model: str, messages: list[dict], previous_state: str = "",
                                      ai_name: str = "Character", user_name: str = "User",
