@@ -496,7 +496,6 @@ def create_default_pipeline() -> Pipeline:
     p.add_pre(expand_variables)
     p.add_pre(select_style)
     p.add_pre(detect_pov)
-    p.add_pre(inject_tools)
     p.add_post(clean_response)
     p.add_post(enforce_pronouns)
     p.add_post(check_stock_phrases)

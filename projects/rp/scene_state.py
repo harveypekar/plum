@@ -21,7 +21,7 @@ _STOPWORDS = frozenset({
     "now", "still", "also", "about", "up", "down",
 })
 
-_SKIP_VALIDATION = frozenset({"mood", "voice"})
+_SKIP_VALIDATION = frozenset({"mood", "voice", "arc"})
 
 _STRIP_CATEGORIES = frozenset({"personality", "character", "background", "description"})
 
@@ -99,6 +99,8 @@ def build_scene_state_prompt(messages: list[dict], previous_state: str = "",
         "Position: (posture, who is where, physical contact)\n"
         "Props: (objects currently in play)\n"
         "Mood: (what characters feel right now — use neutral terms; avoid sexually-charged words like 'charged' or 'electric' unless characters are explicitly intimate)\n"
+        "Arc: (where the emotional/romantic dynamic currently stands between the characters — what feelings are present, "
+        "what's unspoken, and what would feel like a natural next beat. Describe state, not rules.)\n"
         "ONLY state facts explicitly shown or described in the messages. Do NOT invent or assume details not present.\n"
         f"{clothing_instruction}"
         "No narration, no story, no explanation. Just the current facts.\n\n"
