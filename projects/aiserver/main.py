@@ -27,10 +27,12 @@ from models import (  # noqa: E402
     StatsResponse,
 )
 from ollama import OllamaClient, OllamaError  # noqa: E402
+from multi_client import MultiClient  # noqa: E402
 
 
 config = Config()
-ollama = OllamaClient(base_url=config.ollama_url)
+_raw_ollama = OllamaClient(base_url=config.ollama_url)
+ollama = MultiClient(_raw_ollama)
 
 # Server identity
 _started_at = datetime.now(timezone.utc).isoformat()
@@ -161,13 +163,23 @@ async def health():
     available = await ollama.is_available()
     models = []
     if available:
-        # Build reverse alias map: full_name -> alias
         reverse_aliases = {v: k for k, v in config.aliases.items()}
         for m in await ollama.list_models_detail():
             models.append(ModelInfo(
                 alias=reverse_aliases.get(m["name"]),
                 **m,
             ))
+    from anthropic_client import ANTHROPIC_MODELS
+    reverse_aliases = {v: k for k, v in config.aliases.items()}
+    for name in sorted(ANTHROPIC_MODELS):
+        models.append(ModelInfo(
+            name=name,
+            alias=reverse_aliases.get(name),
+            parameter_size="",
+            quantization_level="api",
+            size_bytes=0,
+            supports_think=True,
+        ))
     return HealthResponse(
         status="ok" if available else "ollama_unavailable",
         ollama_connected=available,
