@@ -20,7 +20,7 @@ _log = logging.getLogger("rp.prompt_builder")
 CHAT_DEFAULTS = {
     "num_predict": 768,
     "num_ctx": 16384,
-    "temperature": 1.05,
+    "temperature": 1.1,
     "repeat_penalty": 1.08,
     "repeat_last_n": 512,
     "frequency_penalty": 0.1,
