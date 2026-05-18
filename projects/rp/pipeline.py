@@ -368,6 +368,46 @@ def check_stock_phrases(ctx: dict) -> dict:
 
 
 REPETITION_OVERLAP_THRESHOLD = 0.85
+REPEATED_PHRASE_MIN_HISTORY = 2
+REPEATED_PHRASE_NGRAM = 4
+
+
+def _extract_ngrams(text: str, n: int) -> list[str]:
+    """Extract word n-grams from text, lowercased."""
+    words = re.findall(r"[a-z']+", text.lower())
+    return [" ".join(words[i:i + n]) for i in range(len(words) - n + 1)]
+
+
+def check_repeated_phrases(ctx: dict) -> dict:
+    """Detect phrases the model repeats across messages in this conversation."""
+    response = ctx.get("response", "")
+    recent = ctx.get("_recent_assistant_messages", [])
+    if not response or len(recent) < REPEATED_PHRASE_MIN_HISTORY:
+        return ctx
+
+    from collections import Counter
+    history_ngrams: Counter[str] = Counter()
+    for msg in recent:
+        seen_in_msg: set[str] = set()
+        for ng in _extract_ngrams(msg, REPEATED_PHRASE_NGRAM):
+            if ng not in seen_in_msg:
+                history_ngrams[ng] += 1
+                seen_in_msg.add(ng)
+
+    overused = {ng for ng, count in history_ngrams.items() if count >= REPEATED_PHRASE_MIN_HISTORY}
+    if not overused:
+        return ctx
+
+    response_ngrams = set(_extract_ngrams(response, REPEATED_PHRASE_NGRAM))
+    repeated = overused & response_ngrams
+
+    if repeated:
+        existing = ctx.get("_stock_phrase_violations", [])
+        ctx["_stock_phrase_violations"] = existing + sorted(repeated)
+        ctx["_repeated_phrase_count"] = len(repeated)
+        _log.warning("Repeated phrases detected (%d): %s", len(repeated),
+                     sorted(repeated)[:5])
+    return ctx
 
 
 def check_repetition(ctx: dict) -> dict:
@@ -499,5 +539,6 @@ def create_default_pipeline() -> Pipeline:
     p.add_post(clean_response)
     p.add_post(enforce_pronouns)
     p.add_post(check_stock_phrases)
+    p.add_post(check_repeated_phrases)
     p.add_post(check_repetition)
     return p
