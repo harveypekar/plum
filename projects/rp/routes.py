@@ -621,7 +621,8 @@ def setup(app: FastAPI, ollama, resolve_model=None):
             _log.error("Scene state generation failed: %s", e)
             return previous_state
         clean = clean_scene_state_response(result)
-        return validate_scene_state(clean, previous_state, messages)
+        return validate_scene_state(clean, previous_state, messages,
+                                    character_names=[ai_name, user_name])
 
     async def _auto_update_scene_state(conv_id: int, model: str,
                                         ai_name: str = "Character", user_name: str = "User",

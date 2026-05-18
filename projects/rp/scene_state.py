@@ -21,7 +21,7 @@ _STOPWORDS = frozenset({
     "now", "still", "also", "about", "up", "down",
 })
 
-_SKIP_VALIDATION = frozenset({"mood", "voice", "arc"})
+_SKIP_VALIDATION = frozenset({"mood", "voice"})
 
 _STRIP_CATEGORIES = frozenset({"personality", "character", "background", "description"})
 
@@ -99,8 +99,7 @@ def build_scene_state_prompt(messages: list[dict], previous_state: str = "",
         "Position: (posture, who is where, physical contact)\n"
         "Props: (objects currently in play)\n"
         "Mood: (what characters feel right now — use neutral terms; avoid sexually-charged words like 'charged' or 'electric' unless characters are explicitly intimate)\n"
-        "Arc: (where the emotional/romantic dynamic currently stands between the characters — what feelings are present, "
-        "what's unspoken, and what would feel like a natural next beat. Describe state, not rules.)\n"
+        "Arc: (what each character explicitly said or did that reveals their feelings toward the other — quote or paraphrase actual actions/dialogue only, never infer hidden emotions)\n"
         "ONLY state facts explicitly shown or described in the messages. Do NOT invent or assume details not present.\n"
         f"{clothing_instruction}"
         "No narration, no story, no explanation. Just the current facts.\n\n"
@@ -173,6 +172,7 @@ def validate_scene_state(
     new_state: str,
     previous_state: str,
     messages: list[dict],
+    character_names: list[str] | None = None,
 ) -> str:
     """Revert scene state categories that changed without evidence in messages."""
     if not previous_state.strip():
@@ -192,8 +192,12 @@ def validate_scene_state(
 
     old = parse_scene_state(previous_state)
 
+    name_words = set()
+    for name in (character_names or []):
+        name_words.update(w.lower() for w in name.split() if len(w) >= 3)
+
     msg_text = " ".join(m.get("content", "") for m in messages)
-    msg_words = _extract_content_words(msg_text)
+    msg_words = _extract_content_words(msg_text) - name_words
 
     validated: dict[str, str] = {}
 
@@ -222,8 +226,8 @@ def validate_scene_state(
             validated[cat] = old_val
             continue
 
-        new_words = _extract_content_words(new_val)
-        old_words = _extract_content_words(old_val) if old_val else set()
+        new_words = _extract_content_words(new_val) - name_words
+        old_words = (_extract_content_words(old_val) - name_words) if old_val else set()
         added_words = new_words - old_words
 
         if not added_words or _has_evidence(added_words, msg_words):
