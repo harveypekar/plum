@@ -236,7 +236,13 @@ def _render_for_count(ctx: dict) -> list[dict]:
     voice. Omitting the anchor would systematically undercount prompt_eval_count.
     """
     msgs = [{"role": "system", "content": ctx.get("system_prompt", "")}]
-    msgs.extend(ctx.get("messages", []))
+    messages = list(ctx.get("messages", []))
+    authors_note = ctx.get("authors_note", "")
+    if authors_note:
+        depth = ctx.get("authors_note_depth", 4)
+        insert_idx = max(0, len(messages) - depth)
+        messages.insert(insert_idx, {"role": "system", "content": f"[Author's Note: {authors_note}]"})
+    msgs.extend(messages)
     if ctx.get("post_prompt"):
         msgs.append({"role": "system", "content": ctx["post_prompt"]})
     ai_data = ctx.get("ai_card", {}).get("card_data", {}).get(

@@ -102,7 +102,16 @@ def scale_num_predict(opts: dict, user_message: str) -> dict:
 
 def build_chat_messages(ctx: dict) -> list[dict]:
     chat_messages = [{"role": "system", "content": ctx["system_prompt"]}]
-    chat_messages.extend(ctx["messages"])
+
+    messages = list(ctx["messages"])
+    authors_note = ctx.get("authors_note", "")
+    if authors_note:
+        depth = ctx.get("authors_note_depth", 4)
+        insert_idx = max(0, len(messages) - depth)
+        note_msg = {"role": "system", "content": f"[Author's Note: {authors_note}]"}
+        messages.insert(insert_idx, note_msg)
+
+    chat_messages.extend(messages)
     if ctx.get("post_prompt"):
         chat_messages.append({"role": "system", "content": ctx["post_prompt"]})
     ai_name = get_ai_name(ctx)
@@ -154,6 +163,8 @@ async def build_pipeline_ctx(conv, messages, *, pipeline, template_path: Path):
         "post_prompt": "",
         "scene_state": conv.get("scene_state", ""),
         "prompt_template": prompt_template,
+        "authors_note": conv.get("authors_note", ""),
+        "authors_note_depth": conv.get("authors_note_depth", 4),
     }
 
     summary_row = await db.get_latest_summary(conv["id"])

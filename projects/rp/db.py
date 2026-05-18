@@ -215,6 +215,7 @@ async def get_conversation(conv_id: int) -> dict | None:
     pool = await get_pool()
     row = await pool.fetchrow(
         "SELECT id, user_card_id, ai_card_id, scenario_id, model, category, scene_state, scene_state_msg_id, "
+        "authors_note, authors_note_depth, "
         "created_at::text, updated_at::text FROM rp_conversations WHERE id = $1",
         conv_id,
     )
@@ -233,6 +234,15 @@ async def update_scene_state(conv_id: int, scene_state: str, msg_id: int | None 
             "UPDATE rp_conversations SET scene_state=$2, updated_at=NOW() WHERE id=$1",
             conv_id, scene_state,
         )
+    return result == "UPDATE 1"
+
+
+async def update_authors_note(conv_id: int, note: str, depth: int = 4) -> bool:
+    pool = await get_pool()
+    result = await pool.execute(
+        "UPDATE rp_conversations SET authors_note=$2, authors_note_depth=$3, updated_at=NOW() WHERE id=$1",
+        conv_id, note, depth,
+    )
     return result == "UPDATE 1"
 
 

@@ -884,6 +884,62 @@ class TestCheckRepetition:
         assert "_repetition_detected" not in result
 
 
+class TestCheckRepeatedPhrases:
+    def test_flags_repeated_4gram(self):
+        from rp.pipeline import check_repeated_phrases
+        phrase = "hips swaying subtly she"
+        ctx = {
+            "response": f"*Her {phrase} leaned forward.*",
+            "_recent_assistant_messages": [
+                f"*{phrase} reached for the glass.*",
+                f"*{phrase} turned to face him.*",
+            ],
+        }
+        result = check_repeated_phrases(ctx)
+        assert result.get("_repeated_phrase_count", 0) >= 1
+        assert any("hips swaying subtly" in v for v in result.get("_stock_phrase_violations", []))
+
+    def test_no_flag_with_insufficient_history(self):
+        from rp.pipeline import check_repeated_phrases
+        ctx = {
+            "response": "*Her hips swaying subtly she leaned forward.*",
+            "_recent_assistant_messages": [
+                "*Her hips swaying subtly she turned.*",
+            ],
+        }
+        result = check_repeated_phrases(ctx)
+        assert "_repeated_phrase_count" not in result
+
+    def test_no_flag_for_unique_phrases(self):
+        from rp.pipeline import check_repeated_phrases
+        ctx = {
+            "response": "She grabbed the mug and took a sip.",
+            "_recent_assistant_messages": [
+                "The rain hammered against the window.",
+                "She stared at the ceiling, lost in thought.",
+                "A laugh escaped her before she could stop it.",
+            ],
+        }
+        result = check_repeated_phrases(ctx)
+        assert "_repeated_phrase_count" not in result
+
+    def test_merges_with_existing_stock_violations(self):
+        from rp.pipeline import check_repeated_phrases
+        phrase = "a wry smirk tugged"
+        ctx = {
+            "response": f"*{phrase} at her mouth.*",
+            "_recent_assistant_messages": [
+                f"*{phrase} at the corner.*",
+                f"*{phrase} at her lips.*",
+            ],
+            "_stock_phrase_violations": ["breath hitched"],
+        }
+        result = check_repeated_phrases(ctx)
+        violations = result.get("_stock_phrase_violations", [])
+        assert "breath hitched" in violations
+        assert any("wry smirk tugged" in v for v in violations)
+
+
 class TestPipelineClass:
     def test_pre_hooks_run_in_order(self):
         p = Pipeline()

@@ -141,6 +141,58 @@ def parse_scene_state(state: str) -> dict[str, str]:
     return result
 
 
+_NONE_VALUES = frozenset({"none", "n/a", "not described", "not mentioned", ""})
+
+
+def build_constraint_instructions(scene_state: str, ai_name: str = "",
+                                   user_name: str = "") -> str:
+    """Generate hard physical constraint instructions from scene state.
+
+    Returns directive text to inject into the post prompt when restraints,
+    nudity, or specific positions are active.
+    """
+    parsed = parse_scene_state(scene_state)
+    if not parsed:
+        return ""
+
+    instructions: list[str] = []
+
+    restraints = ""
+    for key, val in parsed.items():
+        if "restraint" in key.lower():
+            restraints = val
+            break
+    if restraints and restraints.lower().strip() not in _NONE_VALUES:
+        instructions.append(
+            f"PHYSICAL CONSTRAINT: {restraints}. "
+            "Every action must respect these limits — no reaching, grabbing, "
+            "or gesturing beyond what the restraints allow."
+        )
+
+    for key, val in parsed.items():
+        if "clothing" not in key.lower():
+            continue
+        val_lower = val.lower().strip()
+        if val_lower in _NONE_VALUES:
+            continue
+        name = key.split("'s")[0].strip() if "'s" in key else key.replace("clothing", "").strip()
+        if val_lower in ("naked", "nude", "bare", "nothing", "undressed"):
+            instructions.append(
+                f"{name} is naked — describe their body naturally when relevant. "
+                "Do not add clothing that isn't there."
+            )
+
+    position = ""
+    for key, val in parsed.items():
+        if key.lower() == "position":
+            position = val
+            break
+    if position and position.lower().strip() not in _NONE_VALUES:
+        instructions.append(f"POSITION: {position}. Maintain this until explicitly changed.")
+
+    return "\n".join(instructions)
+
+
 def _extract_content_words(text: str) -> set[str]:
     """Extract meaningful words (3+ chars, no stopwords) from text."""
     return {w for w in re.findall(r"[a-z]{3,}", text.lower()) if w not in _STOPWORDS}

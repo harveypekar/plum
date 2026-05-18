@@ -47,6 +47,8 @@ class ConversationResponse(BaseModel):
     model: str
     scene_state: str = ""
     category: str = "user"
+    authors_note: str = ""
+    authors_note_depth: int = 4
     created_at: str
     updated_at: str
 
@@ -84,6 +86,11 @@ class EditMessageRequest(BaseModel):
 
 class SceneStateRequest(BaseModel):
     scene_state: str
+
+
+class AuthorsNoteRequest(BaseModel):
+    note: str
+    depth: int = 4
 
 
 class CompareConfig(BaseModel):

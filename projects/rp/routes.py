@@ -12,7 +12,7 @@ from .models import (
     CardCreate, CardResponse, ScenarioCreate, ScenarioResponse,
     ConversationCreate, ConversationResponse, ConversationDetailResponse,
     MessageResponse, SendMessageRequest, SavePartialRequest, EditMessageRequest,
-    SceneStateRequest,
+    SceneStateRequest, AuthorsNoteRequest,
 )
 from .pipeline import create_default_pipeline
 from .budget import BudgetError, allocate_injections
@@ -426,6 +426,14 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         conv_log.log_scene_state(conv_id, previous_state, clean)
         return {"scene_state": clean}
 
+    # -- Author's Note --
+
+    @app.put("/rp/conversations/{conv_id}/authors-note")
+    async def update_authors_note(conv_id: int, req: AuthorsNoteRequest):
+        if not await db.update_authors_note(conv_id, req.note, req.depth):
+            raise HTTPException(404, "Conversation not found")
+        return {"ok": True}
+
     # -- Summaries --
 
     @app.get("/rp/conversations/{conv_id}/summaries")
@@ -693,11 +701,14 @@ def setup(app: FastAPI, ollama, resolve_model=None):
 
         try:
             response_text = "".join(tokens)
+            recent_asst = [m["content"] for m in ctx.get("messages", [])
+                           if m.get("role") == "assistant"][-6:]
             post_ctx = {
                 "response": response_text, "ai_name": get_ai_name(ctx),
                 "_char_pronouns": get_ai_pronouns(ctx),
                 "_user_name": get_user_name(ctx),
                 "_user_pronouns": get_user_pronouns(ctx),
+                "_recent_assistant_messages": recent_asst,
             }
             post_ctx = await _pipeline.run_post(post_ctx)
             full_text = prefix_text + post_ctx["response"] if prefix_text else post_ctx["response"]
@@ -867,11 +878,14 @@ def setup(app: FastAPI, ollama, resolve_model=None):
                 cur_messages.append({"role": "user", "content": "\n".join(tool_results) + "\n\nContinue your response naturally, incorporating the information above. Do not use [TOOL:] again for the same query."})
 
             try:
+                recent_asst = [m["content"] for m in ctx.get("messages", [])
+                               if m.get("role") == "assistant"][-6:]
                 post_ctx = {
                     "response": final_text, "ai_name": get_ai_name(ctx),
                     "_char_pronouns": get_ai_pronouns(ctx),
                     "_user_name": get_user_name(ctx),
                     "_user_pronouns": get_user_pronouns(ctx),
+                    "_recent_assistant_messages": recent_asst,
                 }
                 post_ctx = await _pipeline.run_post(post_ctx)
                 await db.add_message(

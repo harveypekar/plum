@@ -974,6 +974,15 @@
           </label>
         </div>
       </div>
+      <div class="scene-state-toggle" id="authorsNoteToggle" style="display:none">Author's Note</div>
+      <div class="scene-state-panel" id="authorsNotePanel" style="display:none">
+        <textarea id="authorsNoteEditor" placeholder="Style steering injected at depth N in message history..." rows="3" style="width:100%;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;border-radius:8px;padding:8px;font-family:inherit;font-size:0.85em;resize:vertical"></textarea>
+        <div style="display:flex;gap:8px;margin-top:6px;align-items:center">
+          <button id="authorsNoteSave" style="font-size:0.8em">Save</button>
+          <label style="font-size:0.8em;color:#8b949e">Depth:</label>
+          <input id="authorsNoteDepth" type="number" min="1" max="20" value="4" style="width:48px;font-size:0.8em;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;border-radius:4px;padding:2px 4px">
+        </div>
+      </div>
       <div class="under-hood-toggle" id="underHoodToggle" style="display:none">Under the Hood</div>
       <div class="under-hood" id="underHood">
         <div class="under-hood-tabs">
