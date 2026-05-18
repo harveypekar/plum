@@ -62,12 +62,17 @@ def expand_variables(ctx: dict) -> dict:
     scene_state = ctx.get("scene_state", "")
     if scene_state.strip():
         ai_name = ai_data.get("name", "")
+        user_name = user_data.get("name", "")
         if ai_name and ai_name not in scene_state:
             _log.warning("Scene state discarded — references unknown character "
                          "(expected %r, state: %s)", ai_name, scene_state[:120])
             ctx["scene_state"] = ""
         else:
             ctx["post_prompt"] += "\n\n[Current Scene State — do NOT contradict this]\n" + scene_state.strip()
+            from .scene_state import build_constraint_instructions
+            constraints = build_constraint_instructions(scene_state, ai_name, user_name)
+            if constraints:
+                ctx["post_prompt"] += "\n\n" + constraints
 
     return ctx
 

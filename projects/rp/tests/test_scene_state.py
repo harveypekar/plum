@@ -467,3 +467,48 @@ class TestValidateSceneState:
         }
         _fix_discarded_clothing(state)
         assert state["Amber's clothing"] == "tank top"
+
+
+class TestBuildConstraintInstructions:
+    def test_restraints_generate_constraint(self):
+        from rp.scene_state import build_constraint_instructions
+        state = "Location: bedroom\nRestraints: wrists bound behind back — no free hand use"
+        result = build_constraint_instructions(state)
+        assert "PHYSICAL CONSTRAINT" in result
+        assert "wrists bound behind back" in result
+
+    def test_naked_generates_body_instruction(self):
+        from rp.scene_state import build_constraint_instructions
+        state = "Amber's clothing: naked\nVal's clothing: hoodie"
+        result = build_constraint_instructions(state)
+        assert "Amber is naked" in result
+        assert "Val" not in result
+
+    def test_none_restraints_ignored(self):
+        from rp.scene_state import build_constraint_instructions
+        state = "Restraints: none\nLocation: park"
+        result = build_constraint_instructions(state)
+        assert "CONSTRAINT" not in result
+
+    def test_position_generates_instruction(self):
+        from rp.scene_state import build_constraint_instructions
+        state = "Position: Amber face down on bed, Val sitting beside her"
+        result = build_constraint_instructions(state)
+        assert "POSITION" in result
+        assert "face down" in result
+
+    def test_empty_state_returns_empty(self):
+        from rp.scene_state import build_constraint_instructions
+        assert build_constraint_instructions("") == ""
+
+    def test_combined_constraints(self):
+        from rp.scene_state import build_constraint_instructions
+        state = (
+            "Restraints: hogtied — wrists and ankles bound, face down\n"
+            "Amber's clothing: naked\n"
+            "Position: face down on bed"
+        )
+        result = build_constraint_instructions(state)
+        assert "PHYSICAL CONSTRAINT" in result
+        assert "naked" in result
+        assert "POSITION" in result
