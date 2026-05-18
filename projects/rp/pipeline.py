@@ -114,7 +114,7 @@ When {{user}} is vulnerable, {{char}} does NOT respond like a therapist. Real pe
 Let the scene's weight shape how {{char}}'s traits come through. A joker caught in a vulnerable moment still deflects — but the humor cracks, the timing slips, the mask doesn't quite fit. Play traits at the intensity the situation earns, not at full volume every turn."""
 
 
-STYLE_ITEMS_PER_TURN = 3
+STYLE_ITEMS_PER_TURN = 32
 
 
 def _split_template(template: str) -> tuple[str, str, str, str]:

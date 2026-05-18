@@ -225,10 +225,10 @@ class TestSelectStyle:
         ctx = {"post_prompt": "", "_style_pool": pool, "messages": []}
         select_style(ctx)
         selected = [item for item in pool if item in ctx["post_prompt"]]
-        assert len(selected) == STYLE_ITEMS_PER_TURN
+        assert len(selected) == min(STYLE_ITEMS_PER_TURN, len(pool))
 
     def test_rotates_with_message_count(self):
-        pool = [f"Item {i}" for i in range(6)]
+        pool = [f"Item {i}" for i in range(60)]
         results = []
         for n_msgs in range(6):
             ctx = {"post_prompt": "", "_style_pool": list(pool),
@@ -381,7 +381,7 @@ class TestSelectStyleWithSceneState:
         assert "Restraint rule" in ctx["post_prompt"]
         general_count = sum(1 for g in ["Gen A", "Gen B", "Gen C", "Gen D"]
                            if g in ctx["post_prompt"])
-        assert general_count == STYLE_ITEMS_PER_TURN
+        assert general_count == min(STYLE_ITEMS_PER_TURN, 4)
 
     def test_no_scene_pool_works_like_before(self):
         ctx = {
