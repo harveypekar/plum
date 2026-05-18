@@ -59,6 +59,16 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_column THEN NULL;
 END $$;
 
+-- Migration: author's note for mid-conversation style steering
+DO $$ BEGIN
+    ALTER TABLE rp_conversations ADD COLUMN authors_note TEXT NOT NULL DEFAULT '';
+EXCEPTION WHEN duplicate_column THEN NULL;
+END $$;
+DO $$ BEGIN
+    ALTER TABLE rp_conversations ADD COLUMN authors_note_depth INTEGER NOT NULL DEFAULT 4;
+EXCEPTION WHEN duplicate_column THEN NULL;
+END $$;
+
 CREATE TABLE IF NOT EXISTS rp_messages (
     id              SERIAL PRIMARY KEY,
     conversation_id INTEGER NOT NULL REFERENCES rp_conversations(id) ON DELETE CASCADE,

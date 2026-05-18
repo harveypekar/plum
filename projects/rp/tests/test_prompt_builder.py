@@ -77,6 +77,43 @@ class TestBuildChatMessages:
         assert msgs[-1]["role"] == "assistant"
 
 
+class TestAuthorsNoteInjection:
+    def test_injects_at_depth(self):
+        ctx = _ctx(ai_name="Jess", messages=[
+            {"role": "user", "content": "M1"},
+            {"role": "assistant", "content": "A1"},
+            {"role": "user", "content": "M2"},
+            {"role": "assistant", "content": "A2"},
+            {"role": "user", "content": "M3"},
+            {"role": "assistant", "content": "A3"},
+        ])
+        ctx["authors_note"] = "Write poetically"
+        ctx["authors_note_depth"] = 4
+        msgs = build_chat_messages(ctx)
+        note_msgs = [m for m in msgs if "Author's Note" in m.get("content", "")]
+        assert len(note_msgs) == 1
+        idx = msgs.index(note_msgs[0])
+        assert msgs[idx + 4]["content"] == "A3"
+
+    def test_no_injection_when_empty(self):
+        ctx = _ctx(ai_name="Jess", messages=[
+            {"role": "user", "content": "Hi"},
+        ])
+        ctx["authors_note"] = ""
+        msgs = build_chat_messages(ctx)
+        assert not any("Author's Note" in m.get("content", "") for m in msgs)
+
+    def test_depth_clamps_to_start(self):
+        ctx = _ctx(ai_name="Jess", messages=[
+            {"role": "user", "content": "Hi"},
+        ])
+        ctx["authors_note"] = "Be bold"
+        ctx["authors_note_depth"] = 100
+        msgs = build_chat_messages(ctx)
+        note_idx = next(i for i, m in enumerate(msgs) if "Author's Note" in m.get("content", ""))
+        assert note_idx == 1
+
+
 class TestBuildOllamaOptions:
     def test_defaults(self):
         opts = build_ollama_options({})

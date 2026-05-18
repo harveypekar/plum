@@ -315,6 +315,8 @@
     $("chatInputArea").style.display = "none";
     $("sceneStateToggle").style.display = "none";
     $("sceneStatePanel").style.display = "none";
+    $("authorsNoteToggle").style.display = "none";
+    $("authorsNotePanel").style.display = "none";
     $("underHoodToggle").style.display = "none";
     $("underHood").classList.remove("open");
     const msgs = $("chatMessages");
@@ -357,10 +359,15 @@
     // Input area
     $("chatInputArea").style.display = "";
     $("sceneStateToggle").style.display = "";
+    $("authorsNoteToggle").style.display = "";
     $("underHoodToggle").style.display = "";
 
     // Scene state
     $("sceneStateEditor").value = conversation.scene_state || "";
+
+    // Author's note
+    $("authorsNoteEditor").value = conversation.authors_note || "";
+    $("authorsNoteDepth").value = conversation.authors_note_depth || 4;
 
     // Chat input avatars
     setAvatarSrc($("chatInputAvatarUser"), user_card.id, user_card.has_avatar);
@@ -946,6 +953,21 @@
     $("sceneStateRefresh").textContent = "Auto-generate";
     $("sceneStatePanel").style.display = "";
     $("sceneStateToggle").textContent = "Hide Scene State";
+  });
+
+  // Author's note
+  $("authorsNoteToggle").addEventListener("click", () => {
+    var panel = $("authorsNotePanel");
+    var isOpen = panel.style.display !== "none";
+    panel.style.display = isOpen ? "none" : "";
+    $("authorsNoteToggle").textContent = isOpen ? "Author's Note" : "Hide Author's Note";
+  });
+  $("authorsNoteSave").addEventListener("click", async () => {
+    if (!currentConvId) return;
+    await api("PUT", "/rp/conversations/" + currentConvId + "/authors-note", {
+      note: $("authorsNoteEditor").value,
+      depth: parseInt($("authorsNoteDepth").value) || 4,
+    });
   });
 
   // Scene state bubble toggle

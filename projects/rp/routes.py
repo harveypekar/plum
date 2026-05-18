@@ -12,7 +12,7 @@ from .models import (
     CardCreate, CardResponse, ScenarioCreate, ScenarioResponse,
     ConversationCreate, ConversationResponse, ConversationDetailResponse,
     MessageResponse, SendMessageRequest, SavePartialRequest, EditMessageRequest,
-    SceneStateRequest,
+    SceneStateRequest, AuthorsNoteRequest,
 )
 from .pipeline import create_default_pipeline
 from .budget import BudgetError, allocate_injections
@@ -425,6 +425,14 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         await db.update_scene_state(conv_id, clean, latest_msg_id)
         conv_log.log_scene_state(conv_id, previous_state, clean)
         return {"scene_state": clean}
+
+    # -- Author's Note --
+
+    @app.put("/rp/conversations/{conv_id}/authors-note")
+    async def update_authors_note(conv_id: int, req: AuthorsNoteRequest):
+        if not await db.update_authors_note(conv_id, req.note, req.depth):
+            raise HTTPException(404, "Conversation not found")
+        return {"ok": True}
 
     # -- Summaries --
 
