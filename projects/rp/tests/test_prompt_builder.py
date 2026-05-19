@@ -135,14 +135,23 @@ class TestBuildOllamaOptions:
 
 
 class TestScaleNumPredict:
-    def test_short_message(self):
+    def test_short_message_hits_floor(self):
         opts = scale_num_predict({"num_predict": 768}, "hi")
-        assert opts["num_predict"] == 1024
+        assert opts["num_predict"] == 384
 
-    def test_long_message(self):
+    def test_medium_message_scales(self):
+        msg = "word " * 200
+        opts = scale_num_predict({"num_predict": 768}, msg)
+        assert 384 < opts["num_predict"] <= 768
+
+    def test_long_message_hits_base(self):
         long_msg = "word " * 5000
         opts = scale_num_predict({"num_predict": 768}, long_msg)
-        assert opts["num_predict"] == 2048
+        assert opts["num_predict"] == 768
+
+    def test_uses_base_from_opts(self):
+        opts = scale_num_predict({"num_predict": 1024}, "word " * 5000)
+        assert opts["num_predict"] == 1024
 
     def test_preserves_other_keys(self):
         opts = scale_num_predict({"num_predict": 768, "temperature": 0.8}, "hello")
