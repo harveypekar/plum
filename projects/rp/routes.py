@@ -688,7 +688,7 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         try:
             async for chunk in _ollama.chat_stream(
                 model=model, messages=chat_messages,
-                options=ollama_options, stop=[f"{user_name}:"],
+                options=ollama_options, stop=[f"{user_name}:", "\n\n\n"],
             ):
                 yield json.dumps(chunk) + "\n"
                 if chunk.get("done"):
@@ -840,7 +840,7 @@ def setup(app: FastAPI, ollama, resolve_model=None):
                 try:
                     async for chunk in _ollama.chat_stream(
                         model=model, messages=cur_messages,
-                        options=ollama_options, stop=[f"{user_name}:"],
+                        options=ollama_options, stop=[f"{user_name}:", "\n\n\n"],
                     ):
                         yield json.dumps(chunk) + "\n"
                         if chunk.get("done"):

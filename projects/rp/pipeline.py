@@ -257,16 +257,32 @@ def render_template(template: str, values: dict) -> str:
 
 # -- Built-in post-processing hooks --
 
+_SENTENCE_END = re.compile(r'[.!?…"\')’”]\s*$')
+
+
+def _truncate_to_sentence(text: str) -> str:
+    """Trim text back to the last complete sentence if it ends mid-sentence."""
+    if not text or _SENTENCE_END.search(text):
+        return text
+    for end_pat in (r'[.!?…]["\')’”]', r'[.!?…]'):
+        m = list(re.finditer(end_pat, text))
+        if m:
+            truncated = text[:m[-1].end()].rstrip()
+            if len(truncated) > len(text) * 0.3:
+                return truncated
+    return text
+
+
 def clean_response(ctx: dict) -> dict:
     """Strip common LLM artifacts from response."""
     response = ctx.get("response", "")
     response = response.strip()
-    # Strip AI name prefix if model echoes it (e.g. "Jessica: ..." or "Jessica Klein: ...")
     ai_name = ctx.get("ai_name", "")
     if ai_name and response.startswith(ai_name):
         after = response[len(ai_name):]
         if after.startswith(": "):
             response = after[2:]
+    response = _truncate_to_sentence(response)
     ctx["response"] = response
     return ctx
 

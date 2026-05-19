@@ -1,5 +1,7 @@
 import pytest  # noqa: F401
-from projects.rp.pipeline import assemble_prompt, expand_variables, render_template
+from projects.rp.pipeline import (
+    assemble_prompt, expand_variables, render_template, _truncate_to_sentence,
+)
 
 
 def _make_ctx(template="", scenario_desc="", ai_desc="", ai_personality="",
@@ -967,3 +969,32 @@ class TestPipelineClass:
         p.add_pre(async_hook)
         result = asyncio.run(p.run_pre({}))
         assert result["async_ran"] is True
+
+
+class TestTruncateToSentence:
+    def test_complete_sentence_unchanged(self):
+        assert _truncate_to_sentence("She walked away.") == "She walked away."
+
+    def test_ends_with_quote(self):
+        text = '"I know," she said.'
+        assert _truncate_to_sentence(text) == text
+
+    def test_trims_mid_sentence(self):
+        text = "She walked away. Then she turned and"
+        assert _truncate_to_sentence(text) == "She walked away."
+
+    def test_trims_to_closing_quote(self):
+        text = '"I told you already, I don\'t want to talk about it." She turned and'
+        assert _truncate_to_sentence(text) == '"I told you already, I don\'t want to talk about it."'
+
+    def test_empty_unchanged(self):
+        assert _truncate_to_sentence("") == ""
+
+    def test_ellipsis_counts_as_end(self):
+        text = "She paused... Then something"
+        assert _truncate_to_sentence(text) == "She paused..."
+
+    def test_no_truncation_if_too_short(self):
+        text = "Hi. Then she walked over to the counter and picked up the glass and started"
+        result = _truncate_to_sentence(text)
+        assert result == text

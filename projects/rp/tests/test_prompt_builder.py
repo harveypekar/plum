@@ -137,12 +137,12 @@ class TestBuildOllamaOptions:
 class TestScaleNumPredict:
     def test_short_message_hits_floor(self):
         opts = scale_num_predict({"num_predict": 768}, "hi")
-        assert opts["num_predict"] == 384
+        assert opts["num_predict"] == 512
 
     def test_medium_message_scales(self):
         msg = "word " * 200
         opts = scale_num_predict({"num_predict": 768}, msg)
-        assert 384 < opts["num_predict"] <= 768
+        assert 512 < opts["num_predict"] <= 768
 
     def test_long_message_hits_base(self):
         long_msg = "word " * 5000
