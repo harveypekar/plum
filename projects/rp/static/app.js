@@ -639,6 +639,14 @@
             } else {
               $("underHoodSummaryContent").textContent = "No summary active.";
             }
+            if (chunk.debug_lorebook && chunk.debug_lorebook.length) {
+              $("underHoodLorebookContent").textContent =
+                "Injected " + chunk.debug_lorebook.length + " entries (" +
+                (chunk.debug_lorebook_tokens || 0) + " tokens):\n" +
+                chunk.debug_lorebook.join(", ");
+            } else {
+              $("underHoodLorebookContent").textContent = "No lorebook entries matched.";
+            }
             // Update bubble side if auto_role differs
             if (chunk.auto_role && chunk.auto_role !== streamRole) {
               streamRole = chunk.auto_role;
@@ -1222,7 +1230,12 @@
           });
         },
       });
+      const loreBtn = el("button", {
+        textContent: "Lorebook",
+        onClick: (e) => { e.stopPropagation(); openLorebook(card.id, card.name); },
+      });
       actions.appendChild(editBtn);
+      actions.appendChild(loreBtn);
       actions.appendChild(exportBtn);
       actions.appendChild(delBtn);
       tile.appendChild(actions);
@@ -1832,6 +1845,139 @@
   });
 
   // ---------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
+  // Lorebook
+  // ---------------------------------------------------------------------------
+  let lorebookCardId = null;
+  let lorebookData = null;
+  let editingEntryId = null;
+
+  async function openLorebook(cardId, cardName) {
+    lorebookCardId = cardId;
+    const panel = document.getElementById("lorebookPanel");
+    document.getElementById("lorebookTitle").textContent = (cardName || "Card") + " — Lorebook";
+    panel.style.display = "block";
+    lorebookData = await api("GET", "/rp/cards/" + cardId + "/lorebook");
+    document.getElementById("lorebookEnabled").checked = lorebookData.enabled;
+    document.getElementById("lorebookScanDepth").value = lorebookData.scan_depth;
+    renderLorebookEntries(lorebookData.entries || []);
+    closeEntryEditor();
+  }
+
+  function closeLorebook() {
+    document.getElementById("lorebookPanel").style.display = "none";
+    lorebookCardId = null;
+    lorebookData = null;
+  }
+
+  function renderLorebookEntries(entries) {
+    const container = document.getElementById("lorebookEntries");
+    while (container.firstChild) container.removeChild(container.firstChild);
+    if (!entries.length) {
+      container.appendChild(el("div", {
+        textContent: "No entries yet. Click + Entry to add one.",
+        style: "color:#8b949e;font-size:0.85em;padding:8px 0",
+      }));
+      return;
+    }
+    for (const entry of entries) {
+      const row = el("div", {
+        style: "display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #21262d",
+      });
+      const toggle = el("input", { type: "checkbox", checked: entry.enabled });
+      toggle.addEventListener("change", async () => {
+        await api("PUT", "/rp/lorebook/entries/" + entry.id, { ...entry, enabled: toggle.checked });
+      });
+      const keys = (entry.keys || []).join(", ");
+      const label = el("span", {
+        textContent: (entry.name || keys || "(no keys)") + (entry.constant ? " [always]" : ""),
+        style: "flex:1;font-size:0.85em;color:" + (entry.enabled ? "#c9d1d9" : "#484f58"),
+      });
+      const pos = el("span", {
+        textContent: entry.position === "before_char" ? "before" : "after",
+        style: "font-size:0.7em;color:#8b949e;background:#161b22;padding:2px 6px;border-radius:3px",
+      });
+      const editBtn = el("button", {
+        textContent: "Edit",
+        className: "btn-secondary",
+        style: "font-size:0.7em;padding:2px 6px",
+        onClick: () => openEntryEditor(entry),
+      });
+      const delBtn = el("button", {
+        textContent: "Del",
+        className: "btn-secondary delete",
+        style: "font-size:0.7em;padding:2px 6px",
+        onClick: () => {
+          confirmAction(delBtn, async () => {
+            await api("DELETE", "/rp/lorebook/entries/" + entry.id);
+            openLorebook(lorebookCardId, "");
+          });
+        },
+      });
+      row.appendChild(toggle);
+      row.appendChild(label);
+      row.appendChild(pos);
+      row.appendChild(editBtn);
+      row.appendChild(delBtn);
+      container.appendChild(row);
+    }
+  }
+
+  function openEntryEditor(entry) {
+    editingEntryId = entry ? entry.id : null;
+    const editor = document.getElementById("lorebookEntryEditor");
+    document.getElementById("lbeName").value = entry ? entry.name : "";
+    document.getElementById("lbeKeys").value = entry ? (entry.keys || []).join(", ") : "";
+    document.getElementById("lbeSecondaryKeys").value = entry ? (entry.secondary_keys || []).join(", ") : "";
+    document.getElementById("lbeContent").value = entry ? entry.content : "";
+    document.getElementById("lbeEnabled").checked = entry ? entry.enabled : true;
+    document.getElementById("lbeConstant").checked = entry ? entry.constant : false;
+    document.getElementById("lbeSelective").checked = entry ? entry.selective : false;
+    document.getElementById("lbePosition").value = entry ? entry.position : "after_char";
+    document.getElementById("lbeOrder").value = entry ? entry.insertion_order : 100;
+    editor.style.display = "block";
+  }
+
+  function closeEntryEditor() {
+    document.getElementById("lorebookEntryEditor").style.display = "none";
+    editingEntryId = null;
+  }
+
+  async function saveEntry() {
+    const data = {
+      name: document.getElementById("lbeName").value,
+      keys: document.getElementById("lbeKeys").value.split(",").map(s => s.trim()).filter(Boolean),
+      secondary_keys: document.getElementById("lbeSecondaryKeys").value.split(",").map(s => s.trim()).filter(Boolean),
+      content: document.getElementById("lbeContent").value,
+      enabled: document.getElementById("lbeEnabled").checked,
+      constant: document.getElementById("lbeConstant").checked,
+      selective: document.getElementById("lbeSelective").checked,
+      position: document.getElementById("lbePosition").value,
+      insertion_order: parseInt(document.getElementById("lbeOrder").value) || 100,
+    };
+    if (editingEntryId) {
+      await api("PUT", "/rp/lorebook/entries/" + editingEntryId, data);
+    } else {
+      await api("POST", "/rp/cards/" + lorebookCardId + "/lorebook/entries", data);
+    }
+    closeEntryEditor();
+    openLorebook(lorebookCardId, "");
+  }
+
+  async function saveLorebookSettings() {
+    if (!lorebookCardId) return;
+    await api("PUT", "/rp/cards/" + lorebookCardId + "/lorebook", {
+      enabled: document.getElementById("lorebookEnabled").checked,
+      scan_depth: parseInt(document.getElementById("lorebookScanDepth").value) || 10,
+    });
+  }
+
+  document.getElementById("lorebookClose").addEventListener("click", closeLorebook);
+  document.getElementById("lorebookAddEntry").addEventListener("click", () => openEntryEditor(null));
+  document.getElementById("lorebookSaveSettings").addEventListener("click", saveLorebookSettings);
+  document.getElementById("lbeSave").addEventListener("click", saveEntry);
+  document.getElementById("lbeCancel").addEventListener("click", closeEntryEditor);
+
   // Init
   // ---------------------------------------------------------------------------
   async function init() {

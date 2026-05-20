@@ -615,3 +615,169 @@ async def get_latest_metrics(
         target_type, target_id, domain,
     )
     return dict(row) if row else None
+
+
+# -- Lorebook --
+
+_LOREBOOK_COLS = (
+    "id, card_id, name, scan_depth, token_budget, recursive_scan, enabled, "
+    "created_at::text, updated_at::text"
+)
+
+_ENTRY_COLS = (
+    "id, lorebook_id, name, keys, secondary_keys, content, enabled, constant, "
+    "selective, position, insertion_order, priority, comment, "
+    "created_at::text, updated_at::text"
+)
+
+
+async def get_lorebook_for_card(card_id: int) -> dict | None:
+    pool = await get_pool()
+    row = await pool.fetchrow(
+        f"SELECT {_LOREBOOK_COLS} FROM rp_lorebooks WHERE card_id = $1", card_id,
+    )
+    return dict(row) if row else None
+
+
+async def get_or_create_lorebook(card_id: int, name: str = "",
+                                  scan_depth: int = 10,
+                                  token_budget: int = 2048) -> dict:
+    pool = await get_pool()
+    row = await pool.fetchrow(
+        f"INSERT INTO rp_lorebooks (card_id, name, scan_depth, token_budget) "
+        f"VALUES ($1, $2, $3, $4) "
+        f"ON CONFLICT (card_id) DO UPDATE SET updated_at=NOW() "
+        f"RETURNING {_LOREBOOK_COLS}",
+        card_id, name, scan_depth, token_budget,
+    )
+    return dict(row)
+
+
+async def update_lorebook(lorebook_id: int, **kwargs) -> dict | None:
+    allowed = {"name", "scan_depth", "token_budget", "recursive_scan", "enabled"}
+    pool = await get_pool()
+    sets, params = [], [lorebook_id]
+    idx = 2
+    for col, val in kwargs.items():
+        if col in allowed and val is not None:
+            sets.append(f"{col}=${idx}")
+            params.append(val)
+            idx += 1
+    if not sets:
+        row = await pool.fetchrow(
+            f"SELECT {_LOREBOOK_COLS} FROM rp_lorebooks WHERE id = $1", lorebook_id)
+        return dict(row) if row else None
+    sets.append("updated_at=NOW()")
+    row = await pool.fetchrow(
+        f"UPDATE rp_lorebooks SET {', '.join(sets)} WHERE id = $1 "
+        f"RETURNING {_LOREBOOK_COLS}", *params,
+    )
+    return dict(row) if row else None
+
+
+async def get_lorebook_entries(lorebook_id: int) -> list[dict]:
+    pool = await get_pool()
+    rows = await pool.fetch(
+        f"SELECT {_ENTRY_COLS} FROM rp_lorebook_entries "
+        f"WHERE lorebook_id = $1 ORDER BY insertion_order, id",
+        lorebook_id,
+    )
+    return [dict(r) for r in rows]
+
+
+async def get_lorebook_entry(entry_id: int) -> dict | None:
+    pool = await get_pool()
+    row = await pool.fetchrow(
+        f"SELECT {_ENTRY_COLS} FROM rp_lorebook_entries WHERE id = $1", entry_id,
+    )
+    return dict(row) if row else None
+
+
+async def create_lorebook_entry(lorebook_id: int, **kwargs) -> dict:
+    pool = await get_pool()
+    row = await pool.fetchrow(
+        f"INSERT INTO rp_lorebook_entries "
+        f"(lorebook_id, name, keys, secondary_keys, content, enabled, constant, "
+        f"selective, position, insertion_order, priority, comment) "
+        f"VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) "
+        f"RETURNING {_ENTRY_COLS}",
+        lorebook_id,
+        kwargs.get("name", ""),
+        kwargs.get("keys", []),
+        kwargs.get("secondary_keys", []),
+        kwargs.get("content", ""),
+        kwargs.get("enabled", True),
+        kwargs.get("constant", False),
+        kwargs.get("selective", False),
+        kwargs.get("position", "after_char"),
+        kwargs.get("insertion_order", 100),
+        kwargs.get("priority", 100),
+        kwargs.get("comment", ""),
+    )
+    return dict(row)
+
+
+async def update_lorebook_entry(entry_id: int, **kwargs) -> dict | None:
+    allowed = {"name", "keys", "secondary_keys", "content", "enabled", "constant",
+               "selective", "position", "insertion_order", "priority", "comment"}
+    pool = await get_pool()
+    sets, params = [], [entry_id]
+    idx = 2
+    for col, val in kwargs.items():
+        if col in allowed:
+            sets.append(f"{col}=${idx}")
+            params.append(val)
+            idx += 1
+    if not sets:
+        return await get_lorebook_entry(entry_id)
+    sets.append("updated_at=NOW()")
+    row = await pool.fetchrow(
+        f"UPDATE rp_lorebook_entries SET {', '.join(sets)} WHERE id = $1 "
+        f"RETURNING {_ENTRY_COLS}", *params,
+    )
+    return dict(row) if row else None
+
+
+async def delete_lorebook_entry(entry_id: int) -> bool:
+    pool = await get_pool()
+    result = await pool.execute(
+        "DELETE FROM rp_lorebook_entries WHERE id = $1", entry_id)
+    return result == "DELETE 1"
+
+
+async def delete_lorebook(lorebook_id: int) -> bool:
+    pool = await get_pool()
+    result = await pool.execute(
+        "DELETE FROM rp_lorebooks WHERE id = $1", lorebook_id)
+    return result == "DELETE 1"
+
+
+async def bulk_import_lorebook_entries(lorebook_id: int,
+                                        entries: list[dict]) -> int:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            await conn.execute(
+                "DELETE FROM rp_lorebook_entries WHERE lorebook_id = $1",
+                lorebook_id,
+            )
+            for e in entries:
+                await conn.execute(
+                    "INSERT INTO rp_lorebook_entries "
+                    "(lorebook_id, name, keys, secondary_keys, content, enabled, "
+                    "constant, selective, position, insertion_order, priority, comment) "
+                    "VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)",
+                    lorebook_id,
+                    e.get("name", "") or "",
+                    e.get("keys", []) or [],
+                    e.get("secondary_keys", []) or [],
+                    e.get("content", "") or "",
+                    bool(e.get("enabled", True)),
+                    bool(e.get("constant", False)),
+                    bool(e.get("selective", False)),
+                    e.get("position", "after_char") or "after_char",
+                    int(e.get("insertion_order", 100)),
+                    int(e.get("priority", 100)),
+                    e.get("comment", "") or "",
+                )
+    return len(entries)

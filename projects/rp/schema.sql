@@ -215,3 +215,38 @@ CREATE TABLE IF NOT EXISTS rp_eval_metrics (
 
 CREATE INDEX IF NOT EXISTS idx_rp_eval_metrics_target
     ON rp_eval_metrics(target_type, target_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS rp_lorebooks (
+    id              SERIAL PRIMARY KEY,
+    card_id         INTEGER NOT NULL REFERENCES rp_character_cards(id) ON DELETE CASCADE,
+    name            TEXT NOT NULL DEFAULT '',
+    scan_depth      INTEGER NOT NULL DEFAULT 10,
+    token_budget    INTEGER NOT NULL DEFAULT 2048,
+    recursive_scan  BOOLEAN NOT NULL DEFAULT FALSE,
+    enabled         BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at      TIMESTAMPTZ DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_rp_lorebooks_card ON rp_lorebooks(card_id);
+
+CREATE TABLE IF NOT EXISTS rp_lorebook_entries (
+    id              SERIAL PRIMARY KEY,
+    lorebook_id     INTEGER NOT NULL REFERENCES rp_lorebooks(id) ON DELETE CASCADE,
+    name            TEXT NOT NULL DEFAULT '',
+    keys            TEXT[] NOT NULL DEFAULT '{}',
+    secondary_keys  TEXT[] NOT NULL DEFAULT '{}',
+    content         TEXT NOT NULL DEFAULT '',
+    enabled         BOOLEAN NOT NULL DEFAULT TRUE,
+    constant        BOOLEAN NOT NULL DEFAULT FALSE,
+    selective       BOOLEAN NOT NULL DEFAULT FALSE,
+    position        TEXT NOT NULL DEFAULT 'after_char' CHECK (position IN ('before_char', 'after_char')),
+    insertion_order INTEGER NOT NULL DEFAULT 100,
+    priority        INTEGER NOT NULL DEFAULT 100,
+    comment         TEXT NOT NULL DEFAULT '',
+    created_at      TIMESTAMPTZ DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_rp_lorebook_entries_book
+    ON rp_lorebook_entries(lorebook_id, insertion_order);
