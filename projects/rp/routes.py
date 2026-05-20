@@ -26,6 +26,7 @@ from .prompt_builder import (
     build_ollama_options, scale_num_predict, budget_to_json,
     build_pipeline_ctx, budget_ctx,
 )
+from .lorebook import extract_character_book
 from . import conv_log
 
 # Priority levels from aiserver's inference queue (lower = higher priority).
@@ -97,6 +98,17 @@ def setup(app: FastAPI, ollama, resolve_model=None):
             existing_scenario = await db.find_scenario_by_name(scenario_name)
             if not existing_scenario:
                 await db.create_scenario(scenario_name, scenario_text, {})
+        char_book = extract_character_book(card_data)
+        if char_book and char_book.get("entries"):
+            lorebook = await db.get_or_create_lorebook(
+                card["id"],
+                name=char_book.get("name", ""),
+                scan_depth=char_book.get("scan_depth", 10),
+                token_budget=char_book.get("token_budget", 2048),
+            )
+            await db.bulk_import_lorebook_entries(lorebook["id"], char_book["entries"])
+            _log.info("Imported %d lorebook entries for card %s",
+                      len(char_book["entries"]), name)
         return card
 
     @app.get("/rp/cards/{card_id}", response_model=CardResponse)
@@ -157,6 +169,75 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         if not scenario_text.strip():
             raise HTTPException(400, "Card has no scenario text")
         return await db.create_scenario(card["name"] + " — Scenario", scenario_text, {})
+
+    # -- Lorebook --
+
+    from .models import (
+        LorebookEntryCreate, LorebookEntryResponse, LorebookUpdate, LorebookResponse,
+    )
+
+    @app.get("/rp/cards/{card_id}/lorebook", response_model=LorebookResponse)
+    async def get_lorebook(card_id: int):
+        card = await db.get_card(card_id)
+        if not card:
+            raise HTTPException(404, "Card not found")
+        lorebook = await db.get_lorebook_for_card(card_id)
+        if not lorebook:
+            lorebook = await db.get_or_create_lorebook(card_id)
+        entries = await db.get_lorebook_entries(lorebook["id"])
+        return {**lorebook, "entries": entries}
+
+    @app.put("/rp/cards/{card_id}/lorebook", response_model=LorebookResponse)
+    async def update_lorebook_settings(card_id: int, req: LorebookUpdate):
+        card = await db.get_card(card_id)
+        if not card:
+            raise HTTPException(404, "Card not found")
+        lorebook = await db.get_lorebook_for_card(card_id)
+        if not lorebook:
+            lorebook = await db.get_or_create_lorebook(card_id)
+        updated = await db.update_lorebook(lorebook["id"], **req.model_dump(exclude_none=True))
+        entries = await db.get_lorebook_entries(updated["id"])
+        return {**updated, "entries": entries}
+
+    @app.post("/rp/cards/{card_id}/lorebook/entries", response_model=LorebookEntryResponse)
+    async def create_entry(card_id: int, req: LorebookEntryCreate):
+        card = await db.get_card(card_id)
+        if not card:
+            raise HTTPException(404, "Card not found")
+        lorebook = await db.get_lorebook_for_card(card_id)
+        if not lorebook:
+            lorebook = await db.get_or_create_lorebook(card_id)
+        return await db.create_lorebook_entry(lorebook["id"], **req.model_dump())
+
+    @app.put("/rp/lorebook/entries/{entry_id}", response_model=LorebookEntryResponse)
+    async def update_entry(entry_id: int, req: LorebookEntryCreate):
+        result = await db.update_lorebook_entry(entry_id, **req.model_dump())
+        if not result:
+            raise HTTPException(404, "Entry not found")
+        return result
+
+    @app.delete("/rp/lorebook/entries/{entry_id}")
+    async def delete_entry(entry_id: int):
+        if not await db.delete_lorebook_entry(entry_id):
+            raise HTTPException(404, "Entry not found")
+        return {"ok": True}
+
+    @app.post("/rp/cards/{card_id}/lorebook/import")
+    async def reimport_lorebook(card_id: int):
+        card = await db.get_card(card_id)
+        if not card:
+            raise HTTPException(404, "Card not found")
+        char_book = extract_character_book(card["card_data"])
+        if not char_book or not char_book.get("entries"):
+            raise HTTPException(400, "No character_book in card data")
+        lorebook = await db.get_or_create_lorebook(
+            card_id,
+            name=char_book.get("name", ""),
+            scan_depth=char_book.get("scan_depth", 10),
+            token_budget=char_book.get("token_budget", 2048),
+        )
+        count = await db.bulk_import_lorebook_entries(lorebook["id"], char_book["entries"])
+        return {"ok": True, "imported": count}
 
     # -- Card Generation --
 
@@ -679,6 +760,9 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         if ctx.get("_summary"):
             debug["debug_summary"] = ctx["_summary"]
             debug["debug_summary_through"] = ctx.get("_summary_through_sequence", 0)
+        if ctx.get("_lorebook_injected"):
+            debug["debug_lorebook"] = ctx["_lorebook_injected"]
+            debug["debug_lorebook_tokens"] = ctx.get("_lorebook_tokens", 0)
         if extra_debug:
             debug.update(extra_debug)
         yield json.dumps(debug) + "\n"

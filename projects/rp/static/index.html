@@ -990,6 +990,7 @@
           <div class="under-hood-tab" data-pane="user-prompt">User Prompt</div>
           <div class="under-hood-tab" data-pane="summary">Summary</div>
           <div class="under-hood-tab" data-pane="raw">Raw Response</div>
+          <div class="under-hood-tab" data-pane="lorebook">Lorebook</div>
         </div>
         <div class="under-hood-pane active" id="underHoodPrompt" data-pane="prompt">
           <div class="under-hood-content" id="underHoodPromptContent">No data yet.</div>
@@ -1002,6 +1003,9 @@
         </div>
         <div class="under-hood-pane" id="underHoodRaw" data-pane="raw">
           <div class="under-hood-content" id="underHoodContent">No data yet.</div>
+        </div>
+        <div class="under-hood-pane" id="underHoodLorebook" data-pane="lorebook">
+          <div class="under-hood-content" id="underHoodLorebookContent">No lorebook data yet.</div>
         </div>
       </div>
       <div class="chat-input-area" id="chatInputArea" style="display:none">
@@ -1100,6 +1104,41 @@
           </div>
         </div>
         <div class="cards-grid" id="cardsGrid"></div>
+        <div id="lorebookPanel" style="display:none;margin-top:16px;padding:16px;background:#0d1117;border:1px solid #30363d;border-radius:8px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+            <h3 id="lorebookTitle" style="font-size:0.95em;color:#f0f6fc;margin:0"></h3>
+            <div style="display:flex;gap:8px;align-items:center">
+              <label style="font-size:0.75em;color:#8b949e"><input type="checkbox" id="lorebookEnabled" checked> Enabled</label>
+              <label style="font-size:0.75em;color:#8b949e">Depth: <input id="lorebookScanDepth" type="number" min="1" max="50" value="10" style="width:48px;font-size:0.8em;background:#161b22;color:#c9d1d9;border:1px solid #30363d;border-radius:4px;padding:2px 4px"></label>
+              <button id="lorebookSaveSettings" class="btn-secondary" style="font-size:0.75em;padding:4px 8px">Save</button>
+              <button id="lorebookAddEntry" class="btn-primary" style="font-size:0.75em;padding:4px 8px">+ Entry</button>
+              <button id="lorebookClose" class="btn-secondary" style="font-size:0.75em;padding:4px 8px">Close</button>
+            </div>
+          </div>
+          <div id="lorebookEntries"></div>
+          <div id="lorebookEntryEditor" style="display:none;margin-top:12px;padding:12px;background:#161b22;border:1px solid #30363d;border-radius:6px">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+              <input id="lbeName" placeholder="Entry name" style="background:#0d1117;color:#c9d1d9;border:1px solid #30363d;border-radius:4px;padding:6px;font-size:0.85em">
+              <input id="lbeKeys" placeholder="Keywords (comma-separated)" style="background:#0d1117;color:#c9d1d9;border:1px solid #30363d;border-radius:4px;padding:6px;font-size:0.85em">
+            </div>
+            <input id="lbeSecondaryKeys" placeholder="Secondary keys (for selective matching)" style="width:100%;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;border-radius:4px;padding:6px;font-size:0.85em;margin-bottom:8px;box-sizing:border-box">
+            <textarea id="lbeContent" placeholder="Content to inject when keywords match..." rows="4" style="width:100%;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;border-radius:4px;padding:6px;font-family:inherit;font-size:0.85em;resize:vertical;box-sizing:border-box"></textarea>
+            <div style="display:flex;gap:12px;align-items:center;margin-top:8px">
+              <label style="font-size:0.75em;color:#8b949e"><input type="checkbox" id="lbeEnabled" checked> Enabled</label>
+              <label style="font-size:0.75em;color:#8b949e"><input type="checkbox" id="lbeConstant"> Always inject</label>
+              <label style="font-size:0.75em;color:#8b949e"><input type="checkbox" id="lbeSelective"> Selective</label>
+              <select id="lbePosition" style="font-size:0.75em;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;border-radius:4px;padding:2px 4px">
+                <option value="after_char">After char</option>
+                <option value="before_char">Before char</option>
+              </select>
+              <label style="font-size:0.75em;color:#8b949e">Order: <input id="lbeOrder" type="number" value="100" style="width:48px;font-size:0.85em;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;border-radius:4px;padding:2px 4px"></label>
+              <div style="margin-left:auto;display:flex;gap:6px">
+                <button id="lbeSave" class="btn-primary" style="font-size:0.75em;padding:4px 10px">Save</button>
+                <button id="lbeCancel" class="btn-secondary" style="font-size:0.75em;padding:4px 10px">Cancel</button>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 

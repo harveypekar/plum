@@ -93,6 +93,48 @@ class AuthorsNoteRequest(BaseModel):
     depth: int = 4
 
 
+class LorebookEntryCreate(BaseModel):
+    name: str = ""
+    keys: list[str] = []
+    secondary_keys: list[str] = []
+    content: str = ""
+    enabled: bool = True
+    constant: bool = False
+    selective: bool = False
+    position: str = "after_char"
+    insertion_order: int = 100
+    priority: int = 100
+    comment: str = ""
+
+
+class LorebookEntryResponse(LorebookEntryCreate):
+    id: int
+    lorebook_id: int
+    created_at: str
+    updated_at: str
+
+
+class LorebookUpdate(BaseModel):
+    name: str | None = None
+    scan_depth: int | None = None
+    token_budget: int | None = None
+    recursive_scan: bool | None = None
+    enabled: bool | None = None
+
+
+class LorebookResponse(BaseModel):
+    id: int
+    card_id: int
+    name: str
+    scan_depth: int
+    token_budget: int
+    recursive_scan: bool
+    enabled: bool
+    entries: list[LorebookEntryResponse] = []
+    created_at: str
+    updated_at: str
+
+
 class CompareConfig(BaseModel):
     label: str = ""
     model: str | None = None

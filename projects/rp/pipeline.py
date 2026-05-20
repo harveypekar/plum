@@ -554,8 +554,10 @@ def create_default_pipeline() -> Pipeline:
     needs access to the ollama client and resolved model name.
     """
     p = Pipeline()
+    from .lorebook import inject_lorebook
     p.add_pre(assemble_prompt)
     p.add_pre(expand_variables)
+    p.add_pre(inject_lorebook)
     p.add_pre(select_style)
     p.add_pre(detect_pov)
     p.add_post(clean_response)

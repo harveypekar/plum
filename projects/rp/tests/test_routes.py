@@ -293,6 +293,17 @@ class FakeDB:
     async def set_cached_first_message(self, *args):
         pass
 
+    # -- Lorebook (stubs) --
+
+    async def get_lorebook_for_card(self, card_id: int):
+        return None
+
+    async def get_or_create_lorebook(self, card_id, **kw):
+        return None
+
+    async def get_lorebook_entries(self, lorebook_id):
+        return []
+
 
 # ---------------------------------------------------------------------------
 # Stub Ollama — extends conftest StubOllama with generate + chat_stream
