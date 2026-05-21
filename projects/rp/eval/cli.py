@@ -129,13 +129,15 @@ async def _warmup_model(aiserver_url: str, model: str):
     try:
         import httpx
         async with httpx.AsyncClient() as client:
-            await client.post(
-                f"{aiserver_url}/chat",
+            async with client.stream(
+                "POST", f"{aiserver_url}/chat",
                 json={"model": model, "messages": [
                     {"role": "user", "content": "hi"}
-                ], "stream": False, "priority": 5},
-                timeout=600.0,
-            )
+                ], "priority": 5},
+                timeout=httpx.Timeout(600.0, connect=30.0),
+            ) as resp:
+                async for _ in resp.aiter_lines():
+                    pass
     except Exception:
         pass
     print(f" {time.time() - t_load:.1f}s\n")

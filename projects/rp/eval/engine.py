@@ -4,6 +4,7 @@ Uses G-Eval pattern: chain-of-thought rubric in the system prompt, content to ev
 in the user message, structured score output parsed from the judge's response.
 """
 
+import json
 import re
 import tomllib
 from dataclasses import dataclass
@@ -228,23 +229,31 @@ async def judge(
     ]
 
     async with httpx.AsyncClient() as client:
-        resp = await client.post(
+        async with client.stream(
+            "POST",
             f"{aiserver_url}/chat",
             json={
                 "model": model,
                 "messages": messages,
-                "stream": False,
                 "priority": 10,
                 "options": {"temperature": 0.3, "num_predict": 4096, "think": True},
             },
-            timeout=1800.0,
-        )
-        if resp.status_code != 200:
-            raise RuntimeError(f"aiserver {resp.status_code}: {resp.text[:300]}")
-        data = resp.json()
-        if "error" in data:
-            raise RuntimeError(f"aiserver error: {data['error']}")
-        raw_output = data["message"]["content"]
+            timeout=httpx.Timeout(1800.0, connect=30.0),
+        ) as resp:
+            if resp.status_code != 200:
+                body = await resp.aread()
+                raise RuntimeError(f"aiserver {resp.status_code}: {body[:300]}")
+            tokens = []
+            async for line in resp.aiter_lines():
+                if not line.strip():
+                    continue
+                chunk = json.loads(line)
+                if "error" in chunk:
+                    raise RuntimeError(f"aiserver error: {chunk['error']}")
+                tok = chunk.get("token", "")
+                if tok and not chunk.get("thinking", False):
+                    tokens.append(tok)
+            raw_output = "".join(tokens)
 
     scores = parse_scores(raw_output, rubric)
     weighted_avg = compute_weighted_average(scores, rubric)
