@@ -211,7 +211,7 @@ def setup(app: FastAPI, ollama, resolve_model=None):
 
     @app.put("/rp/lorebook/entries/{entry_id}", response_model=LorebookEntryResponse)
     async def update_entry(entry_id: int, req: LorebookEntryCreate):
-        result = await db.update_lorebook_entry(entry_id, **req.model_dump())
+        result = await db.update_lorebook_entry(entry_id, **req.model_dump(exclude_unset=True))
         if not result:
             raise HTTPException(404, "Entry not found")
         return result
