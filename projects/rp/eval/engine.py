@@ -100,6 +100,9 @@ def build_judge_prompt(rubric: Rubric, context: dict) -> tuple[str, str]:
         f"Score: N\n"
         f"Explanation: Your reasoning in 1-2 sentences.\n\n"
         f"Evaluate ALL dimensions listed below. Do not skip any.\n\n"
+        f"IMPORTANT: You are EVALUATING the writing, not continuing it. "
+        f"Output ONLY the score blocks above. "
+        f"Do NOT write fiction or continue the story.\n\n"
         f"=== EVALUATION CRITERIA ===\n\n{dimensions_text}"
     )
 
@@ -119,40 +122,81 @@ def build_judge_prompt(rubric: Rubric, context: dict) -> tuple[str, str]:
             if formatted:
                 sections.append(f"### {label}\n{formatted}")
 
-    user_message = "=== CONTENT TO EVALUATE ===\n\n" + "\n\n".join(sections)
+    user_message = (
+        "=== CONTENT TO EVALUATE ===\n\n"
+        + "\n\n".join(sections)
+        + "\n\n=== END OF CONTENT ===\n\n"
+        "Output ONLY the evaluation scores in the format specified above. "
+        "Do NOT continue the story."
+    )
     return system_prompt, user_message
+
+
+def _rescale(raw_score: int, raw_max: int, rubric: Rubric) -> int:
+    """Rescale a score from an arbitrary range to the rubric's scale."""
+    if raw_max <= rubric.scale_max:
+        return max(rubric.scale_min, min(rubric.scale_max, raw_score))
+    scaled = round(raw_score / raw_max * rubric.scale_max)
+    return max(rubric.scale_min, min(rubric.scale_max, scaled))
+
+
+def _extract_score_from_text(text: str, rubric: Rubric) -> int:
+    """Extract a numeric score from text, handling Score: N, N/M, and : N."""
+    m = re.search(r"Score:\s*(\d+)", text, re.IGNORECASE)
+    if m:
+        return _rescale(int(m.group(1)), rubric.scale_max, rubric)
+    m = re.search(r"(\d+)\s*/\s*(\d+)", text)
+    if m:
+        return _rescale(int(m.group(1)), int(m.group(2)), rubric)
+    m = re.search(r":\s*(\d+)\b", text)
+    if m:
+        raw = int(m.group(1))
+        raw_max = 10 if raw > rubric.scale_max else rubric.scale_max
+        return _rescale(raw, raw_max, rubric)
+    return -1
+
+
+def _extract_explanation(block: str) -> str:
+    """Extract explanation text from a score block."""
+    m = re.search(r"Explanation:\s*(.+)", block, re.IGNORECASE | re.DOTALL)
+    if m:
+        text = m.group(1).strip()
+        sentences = re.split(r'(?<=[.!?])\s+', text)
+        return " ".join(sentences[:3])
+    lines = [ln.strip() for ln in block.split('\n') if ln.strip()]
+    text_lines = [ln for ln in lines
+                  if not re.match(r'^\s*(?:Score|[\d\[#*])', ln, re.IGNORECASE)]
+    if text_lines:
+        return " ".join(text_lines[:2])[:200]
+    return ""
 
 
 def parse_scores(raw_response: str, rubric: Rubric) -> list[DimensionScore]:
     """Parse structured scores from the judge's response.
 
-    Strategy: find each dimension's section by its key or name header,
-    then extract Score and Explanation from that section only.
+    Handles multiple output formats: [key]\\nScore: N, key: N/10,
+    N. **Name**: N/10, and numbered lists.
     """
-    # Build a list of all dimension identifiers (keys and names) for splitting
     all_ids = []
     for dim in rubric.dimensions:
         all_ids.append(re.escape(dim.key))
         if dim.name.lower() != dim.key.lower():
             all_ids.append(re.escape(dim.name))
 
-    # Split response into sections by dimension headers
-    # Match [key], **key**, ### key, or bare key on its own line followed by newline
+    # Match [key], **key**, ### key, key:, N. key, N. **key**
     header_pattern = (
-        r"(?:^|\n)\s*(?:\[|\*\*|###?\s*)?"
+        r"(?:^|\n)\s*(?:\d+\.\s*)?(?:\[|\*\*|###?\s*)?"
         r"(" + "|".join(all_ids) + r")"
-        r"(?:\]|\*\*|)?\s*(?:—[^\n]*)?\n"
+        r"(?:\]|\*\*|)?\s*(?:[—:][^\n]*)?\n?"
     )
     splits = list(re.finditer(header_pattern, raw_response, re.IGNORECASE))
 
-    # Map each dimension key to its text block
     blocks: dict[str, str] = {}
     for i, m in enumerate(splits):
         matched_id = m.group(1).strip().lower()
-        start = m.end()
+        start = m.start()
         end = splits[i + 1].start() if i + 1 < len(splits) else len(raw_response)
         block_text = raw_response[start:end]
-        # Map to canonical dimension key
         for dim in rubric.dimensions:
             if matched_id in (dim.key.lower(), dim.name.lower()):
                 blocks[dim.key] = block_text
@@ -161,32 +205,26 @@ def parse_scores(raw_response: str, rubric: Rubric) -> list[DimensionScore]:
     scores = []
     for dim in rubric.dimensions:
         block = blocks.get(dim.key, "")
+        score = _extract_score_from_text(block, rubric) if block else -1
 
-        # Extract score
-        score = -1
-        score_match = re.search(r"Score:\s*(\d+)", block, re.IGNORECASE)
-        if score_match:
-            score = int(score_match.group(1))
-            score = max(rubric.scale_min, min(rubric.scale_max, score))
-        elif not block:
-            # Fallback: search whole response for this dimension's score
-            fallback = re.search(
-                rf"{re.escape(dim.key)}[^\n]*Score:\s*(\d+)",
-                raw_response, re.IGNORECASE,
-            )
-            if fallback:
-                score = int(fallback.group(1))
-                score = max(rubric.scale_min, min(rubric.scale_max, score))
+        if score < 0:
+            for ident in (dim.key, dim.name):
+                m = re.search(
+                    rf"{re.escape(ident)}[^\n]*?(\d+)\s*/\s*(\d+)",
+                    raw_response, re.IGNORECASE,
+                )
+                if m:
+                    score = _rescale(int(m.group(1)), int(m.group(2)), rubric)
+                    break
+                m = re.search(
+                    rf"{re.escape(ident)}[^\n]*?Score:\s*(\d+)",
+                    raw_response, re.IGNORECASE,
+                )
+                if m:
+                    score = _rescale(int(m.group(1)), rubric.scale_max, rubric)
+                    break
 
-        # Extract explanation
-        explanation = ""
-        exp_match = re.search(r"Explanation:\s*(.+)", block, re.IGNORECASE | re.DOTALL)
-        if exp_match:
-            explanation = exp_match.group(1).strip()
-            # Trim to first 2-3 sentences
-            sentences = re.split(r'(?<=[.!?])\s+', explanation)
-            explanation = " ".join(sentences[:3])
-
+        explanation = _extract_explanation(block) if block else ""
         scores.append(DimensionScore(
             dimension=dim.key,
             score=score,
@@ -236,7 +274,7 @@ async def judge(
                 "model": model,
                 "messages": messages,
                 "priority": 10,
-                "options": {"temperature": 0.3, "num_predict": 4096, "think": True},
+                "options": {"temperature": 0.3, "num_predict": 2048},
             },
             timeout=httpx.Timeout(1800.0, connect=30.0),
         ) as resp:
