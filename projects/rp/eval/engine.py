@@ -89,20 +89,21 @@ def build_judge_prompt(rubric: Rubric, context: dict) -> tuple[str, str]:
         )
     dimensions_text = "\n\n".join(dim_blocks)
 
+    dim_keys = "\n".join(f"[{dim.key}]" for dim in rubric.dimensions)
+
     system_prompt = (
         f"You are an expert evaluator of roleplay writing quality.\n"
         f"Evaluate the content below on {len(rubric.dimensions)} dimensions.\n"
         f"Scale: {rubric.scale_min} (worst) to {rubric.scale_max} (best).\n\n"
-        f"For each dimension, reason step-by-step about the criteria, "
-        f"then assign a score.\n\n"
-        f"Output format — one block per dimension, in this exact order:\n\n"
+        f"IMPORTANT: You are EVALUATING the writing, not continuing it. "
+        f"Do NOT write fiction or continue the story.\n\n"
+        f"Output EXACTLY {len(rubric.dimensions)} blocks using THESE "
+        f"dimension keys (no other keys):\n\n"
+        f"{dim_keys}\n\n"
+        f"Format for each block:\n\n"
         f"[dimension_key]\n"
         f"Score: N\n"
-        f"Explanation: Your reasoning in 1-2 sentences.\n\n"
-        f"Evaluate ALL dimensions listed below. Do not skip any.\n\n"
-        f"IMPORTANT: You are EVALUATING the writing, not continuing it. "
-        f"Output ONLY the score blocks above. "
-        f"Do NOT write fiction or continue the story.\n\n"
+        f"Explanation: 1-2 sentences.\n\n"
         f"=== EVALUATION CRITERIA ===\n\n{dimensions_text}"
     )
 
