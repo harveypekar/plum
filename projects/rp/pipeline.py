@@ -322,7 +322,10 @@ def _fix_character_pronouns(response: str, char_name: str, pronouns: str) -> tup
     if not mapping or not char_name:
         return response, 0
 
-    sentences = re.split(r'(?<=[.!?…"])\s+', response)
+    parts = re.split(r'(?<=[.!?…"])(\s+)', response)
+    sentences = parts[0::2]
+    separators = parts[1::2]
+
     fixed = []
     name_recent = False
     corrections = 0
@@ -344,7 +347,12 @@ def _fix_character_pronouns(response: str, char_name: str, pronouns: str) -> tup
         elif re.search(r'\b[A-Z][a-z]+\b', sent) and not has_name:
             name_recent = False
 
-    return " ".join(fixed), corrections
+    result = []
+    for i, sent in enumerate(fixed):
+        result.append(sent)
+        if i < len(separators):
+            result.append(separators[i])
+    return "".join(result), corrections
 
 
 def enforce_pronouns(ctx: dict) -> dict:
