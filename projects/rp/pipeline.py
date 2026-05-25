@@ -545,6 +545,73 @@ def detect_pov(ctx: dict) -> dict:
     return ctx
 
 
+AVOID_LIST_NGRAM = 4
+AVOID_LIST_MIN_OCCURRENCES = 2
+AVOID_LIST_MAX_PHRASES = 12
+AVOID_LIST_MIN_MESSAGES = 4
+
+
+def _merge_overlapping(ngrams: list[str]) -> list[str]:
+    """Merge overlapping ngrams into longer phrases."""
+    merged: list[str] = []
+    used: set[int] = set()
+    for i, ng in enumerate(ngrams):
+        if i in used:
+            continue
+        chain = ng
+        used.add(i)
+        while True:
+            suffix = " ".join(chain.split()[-3:])
+            found = False
+            for j, other in enumerate(ngrams):
+                if j in used:
+                    continue
+                if other.startswith(suffix + " "):
+                    chain += " " + other.split()[-1]
+                    used.add(j)
+                    found = True
+                    break
+            if not found:
+                break
+        merged.append(chain)
+    return merged
+
+
+def inject_avoid_list(ctx: dict) -> dict:
+    """Scan recent assistant messages for repeated phrases, inject avoid list."""
+    messages = ctx.get("messages", [])
+    recent_asst = [m["content"] for m in messages if m.get("role") == "assistant"]
+    if len(recent_asst) < AVOID_LIST_MIN_MESSAGES:
+        return ctx
+
+    window = recent_asst[-6:]
+
+    from collections import Counter
+    ngram_counts: Counter[str] = Counter()
+    for msg in window:
+        seen: set[str] = set()
+        for ng in _extract_ngrams(msg, AVOID_LIST_NGRAM):
+            if ng not in seen:
+                ngram_counts[ng] += 1
+                seen.add(ng)
+
+    overused = sorted(
+        [ng for ng, count in ngram_counts.items()
+         if count >= AVOID_LIST_MIN_OCCURRENCES],
+        key=lambda ng: -ngram_counts[ng],
+    )
+
+    if not overused:
+        return ctx
+
+    phrases = _merge_overlapping(overused)[:AVOID_LIST_MAX_PHRASES]
+    avoid_block = "\n\nDo NOT reuse these phrases (find fresh alternatives):\n- " + "\n- ".join(phrases)
+    ctx["post_prompt"] += avoid_block
+    ctx["_avoid_list"] = phrases
+    _log.info("Injected avoid list: %d phrases", len(phrases))
+    return ctx
+
+
 def inject_tools(ctx: dict) -> dict:
     """Add tool descriptions to the system prompt if MCP tools are available."""
     router = get_router()
@@ -568,6 +635,7 @@ def create_default_pipeline() -> Pipeline:
     p.add_pre(inject_lorebook)
     p.add_pre(select_style)
     p.add_pre(detect_pov)
+    p.add_pre(inject_avoid_list)
     p.add_post(clean_response)
     p.add_post(enforce_pronouns)
     p.add_post(check_stock_phrases)
