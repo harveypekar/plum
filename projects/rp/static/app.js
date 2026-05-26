@@ -1177,10 +1177,10 @@
     aiSelect.textContent = "";
     for (var ei = 0; ei < extraSelects.length; ei++) {
       extraSelects[ei].textContent = "";
-      var noneOpt = document.createElement("option");
-      noneOpt.value = "";
-      noneOpt.textContent = "— None —";
-      extraSelects[ei].appendChild(noneOpt);
+      var extraNone = document.createElement("option");
+      extraNone.value = "";
+      extraNone.textContent = "— None —";
+      extraSelects[ei].appendChild(extraNone);
     }
 
     for (const card of allCards) {
