@@ -240,9 +240,11 @@ async def build_pipeline_ctx(conv, messages, *, pipeline, template_path: Path):
 
 
 async def build_pipeline_ctx_for_character(conv, messages, active_card, *,
-                                            pipeline, template_path: Path):
-    """Like build_pipeline_ctx but swaps ai_card to the active character's card."""
+                                            pipeline, template_path: Path,
+                                            all_char_cards: list[dict] | None = None):
+    """Like build_pipeline_ctx but uses the primary card for {{char}} and active card for generation."""
     user_card = await db.get_card(conv["user_card_id"])
+    primary_card = await db.get_card(conv["ai_card_id"])
     scenario = await db.get_scenario(conv["scenario_id"]) if conv["scenario_id"] else {}
     scenario = scenario or {}
 
@@ -262,8 +264,9 @@ async def build_pipeline_ctx_for_character(conv, messages, active_card, *,
 
     ctx = {
         "user_card": user_card,
-        "ai_card": active_card,
+        "ai_card": primary_card,
         "_active_card": active_card,
+        "_char_cards": all_char_cards or [primary_card],
         "scenario": scenario,
         "messages": msg_dicts,
         "system_prompt": "",

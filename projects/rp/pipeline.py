@@ -33,19 +33,26 @@ class Pipeline:
 # -- Built-in pre-processing hooks --
 
 def expand_variables(ctx: dict) -> dict:
-    """Replace ${user}, ${char}, ${scenario} in all text fields."""
+    """Replace ${user}, ${char}, ${active_char}, ${char2-4}, ${scenario} in all text fields."""
     user_card = ctx.get("user_card", {})
     ai_card = ctx.get("ai_card", {})
+    active_card = ctx.get("_active_card", ai_card)
     scenario = ctx.get("scenario", {})
 
     user_data = user_card.get("card_data", {}).get("data", user_card.get("card_data", {}))
     ai_data = ai_card.get("card_data", {}).get("data", ai_card.get("card_data", {}))
+    active_data = active_card.get("card_data", {}).get("data", active_card.get("card_data", {}))
 
     replacements = {
         "${user}": user_data.get("name", "User"),
         "${char}": ai_data.get("name", "Character"),
+        "${active_char}": active_data.get("name", ai_data.get("name", "Character")),
         "${scenario}": scenario.get("description", ""),
     }
+
+    for i, cc in enumerate(ctx.get("_char_cards", [])[1:], start=2):
+        cd = cc.get("card_data", {}).get("data", cc.get("card_data", {}))
+        replacements[f"${{char{i}}}"] = cd.get("name", f"Character{i}")
 
     def replace(text: str) -> str:
         for var, val in replacements.items():
@@ -61,9 +68,10 @@ def expand_variables(ctx: dict) -> dict:
     # from a card that was overwritten), discard it to prevent identity bleed.
     scene_state = ctx.get("scene_state", "")
     if scene_state.strip():
-        ai_name = ai_data.get("name", "")
+        ai_name = active_data.get("name", ai_data.get("name", ""))
+        primary_name = ai_data.get("name", "")
         user_name = user_data.get("name", "")
-        if ai_name and ai_name not in scene_state:
+        if primary_name and primary_name not in scene_state:
             _log.warning("Scene state discarded — references unknown character "
                          "(expected %r, state: %s)", ai_name, scene_state[:120])
             ctx["scene_state"] = ""
@@ -204,24 +212,35 @@ def _match_scene_condition(category: str, keywords: list[str],
 def assemble_prompt(ctx: dict) -> dict:
     """Build system_prompt, post_prompt, and style pool from template + card data."""
     ai_card = ctx.get("ai_card", {})
+    active_card = ctx.get("_active_card", ai_card)
     scenario = ctx.get("scenario", {})
     user_card = ctx.get("user_card", {})
     ai_data = ai_card.get("card_data", {}).get("data", ai_card.get("card_data", {}))
+    active_data = active_card.get("card_data", {}).get("data", active_card.get("card_data", {}))
     user_data = user_card.get("card_data", {}).get("data", user_card.get("card_data", {}))
+
+    is_multi = ctx.get("_multi_character", False)
+    desc_data = active_data if is_multi else ai_data
 
     template = ctx.get("prompt_template", "") or DEFAULT_PROMPT_TEMPLATE
 
     values = {
         "scenario": scenario.get("description", ""),
-        "description": ai_data.get("description", ""),
-        "personality": ai_data.get("personality", ""),
-        "mes_example": ai_data.get("mes_example", ""),
+        "description": desc_data.get("description", ""),
+        "personality": desc_data.get("personality", ""),
+        "mes_example": desc_data.get("mes_example", ""),
         "char": ai_data.get("name", "Character"),
+        "active_char": active_data.get("name", ai_data.get("name", "Character")),
         "user": user_data.get("name", "User"),
         "user_description": user_data.get("description", ""),
         "user_pronouns": user_data.get("pronouns", "") or infer_pronouns(user_data.get("description", "")),
-        "char_pronouns": ai_data.get("pronouns", "") or infer_pronouns(ai_data.get("description", "")),
+        "char_pronouns": desc_data.get("pronouns", "") or infer_pronouns(desc_data.get("description", "")),
     }
+
+    char_cards = ctx.get("_char_cards", [])
+    for i, cc in enumerate(char_cards[1:], start=2):
+        cd = cc.get("card_data", {}).get("data", cc.get("card_data", {}))
+        values[f"char{i}"] = cd.get("name", f"Character{i}")
 
     system_part, post_part, style_part, scene_style_part = _split_template(template)
     ctx["system_prompt"] = render_template(system_part, values)
