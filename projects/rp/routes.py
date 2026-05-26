@@ -884,16 +884,17 @@ def setup(app: FastAPI, ollama, resolve_model=None):
             yield json.dumps({"error": f"Failed to save response: {e}", "done": True}) + "\n"
 
     async def _generate_for_character(conv_id, conv, char_card, card_names,
-                                      model, ollama_options, user_content):
+                                      model, ollama_options, user_content,
+                                      all_char_cards=None):
         """Generate one character's response in a multi-char conversation.
 
         Yields NDJSON chunks. Saves the message to DB when done.
-        Returns the saved message text (or "" on error).
         """
         messages = await db.get_messages(conv_id)
         ctx = await build_pipeline_ctx_for_character(
             conv, messages, char_card,
-            pipeline=_pipeline, template_path=_template_path)
+            pipeline=_pipeline, template_path=_template_path,
+            all_char_cards=all_char_cards)
 
         card_data = char_card.get("card_data", {}).get("data", char_card.get("card_data", {}))
         char_name = card_data.get("name", "Character")
@@ -1151,6 +1152,8 @@ def setup(app: FastAPI, ollama, resolve_model=None):
                 cdata = card.get("card_data", {}).get("data", card.get("card_data", {}))
                 card_names[ch["card_id"]] = cdata.get("name", "Character")
 
+        all_cards_ordered = [char_cards[ch["card_id"]] for ch in characters if ch["card_id"] in char_cards]
+
         async def multi_stream():
             yield json.dumps({"multi_character": True, "character_count": len(characters)}) + "\n"
 
@@ -1172,6 +1175,7 @@ def setup(app: FastAPI, ollama, resolve_model=None):
                 async for chunk in _generate_for_character(
                     conv_id, conv, card, card_names,
                     model, ollama_options, user_content,
+                    all_char_cards=all_cards_ordered,
                 ):
                     yield chunk
 
