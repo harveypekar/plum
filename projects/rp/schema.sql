@@ -250,3 +250,25 @@ CREATE TABLE IF NOT EXISTS rp_lorebook_entries (
 
 CREATE INDEX IF NOT EXISTS idx_rp_lorebook_entries_book
     ON rp_lorebook_entries(lorebook_id, insertion_order);
+
+-- Migration: track which character authored each message (multi-character conversations)
+DO $$ BEGIN
+    ALTER TABLE rp_messages ADD COLUMN character_card_id INTEGER REFERENCES rp_character_cards(id) ON DELETE SET NULL;
+EXCEPTION WHEN duplicate_column THEN NULL;
+END $$;
+
+CREATE INDEX IF NOT EXISTS idx_rp_messages_character ON rp_messages(character_card_id);
+
+-- Junction table: which AI characters participate in a conversation
+CREATE TABLE IF NOT EXISTS rp_conversation_characters (
+    id              SERIAL PRIMARY KEY,
+    conversation_id INTEGER NOT NULL REFERENCES rp_conversations(id) ON DELETE CASCADE,
+    card_id         INTEGER NOT NULL REFERENCES rp_character_cards(id) ON DELETE CASCADE,
+    color           TEXT NOT NULL DEFAULT '',
+    generation_order INTEGER NOT NULL DEFAULT 0,
+    created_at      TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(conversation_id, card_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_rp_conv_chars
+    ON rp_conversation_characters(conversation_id, generation_order);

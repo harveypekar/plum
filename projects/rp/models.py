@@ -35,6 +35,7 @@ class ScenarioResponse(BaseModel):
 class ConversationCreate(BaseModel):
     user_card_id: int
     ai_card_id: int
+    ai_card_ids: list[int] = []
     scenario_id: int | None = None
     model: str
 
@@ -60,6 +61,17 @@ class MessageResponse(BaseModel):
     content: str
     raw_response: dict | None
     sequence: int
+    character_card_id: int | None = None
+    created_at: str
+
+
+class ConversationCharacterResponse(BaseModel):
+    id: int
+    conversation_id: int
+    card_id: int
+    card_name: str = ""
+    color: str = ""
+    generation_order: int = 0
     created_at: str
 
 
@@ -67,6 +79,8 @@ class ConversationDetailResponse(BaseModel):
     conversation: ConversationResponse
     user_card: CardResponse
     ai_card: CardResponse
+    ai_cards: list[CardResponse] = []
+    characters: list[ConversationCharacterResponse] = []
     scenario: ScenarioResponse | None
     messages: list[MessageResponse]
 
@@ -151,3 +165,14 @@ class CompareRequest(BaseModel):
 class SelectCandidateRequest(BaseModel):
     candidate_id: int
     preference_tags: list[str] = []
+
+
+class AddCharacterRequest(BaseModel):
+    card_id: int
+    color: str = ""
+    generation_order: int = 0
+
+
+class UpdateCharacterRequest(BaseModel):
+    color: str | None = None
+    generation_order: int | None = None

@@ -189,7 +189,8 @@ async def list_conversations() -> list[dict]:
     rows = await pool.fetch(
         "SELECT c.id, c.user_card_id, c.ai_card_id, c.scenario_id, c.model, "
         "c.category, c.created_at::text, c.updated_at::text, "
-        "uc.name as user_name, ac.name as ai_name "
+        "uc.name as user_name, ac.name as ai_name, "
+        "(SELECT COUNT(*) FROM rp_conversation_characters cc WHERE cc.conversation_id = c.id) as character_count "
         "FROM rp_conversations c "
         "JOIN rp_character_cards uc ON c.user_card_id = uc.id "
         "JOIN rp_character_cards ac ON c.ai_card_id = ac.id "
@@ -252,6 +253,64 @@ async def delete_conversation(conv_id: int) -> bool:
     return result == "DELETE 1"
 
 
+# -- Conversation Characters --
+
+async def get_conversation_characters(conv_id: int) -> list[dict]:
+    pool = await get_pool()
+    rows = await pool.fetch(
+        "SELECT cc.id, cc.conversation_id, cc.card_id, cc.color, cc.generation_order, "
+        "cc.created_at::text, c.name as card_name "
+        "FROM rp_conversation_characters cc "
+        "JOIN rp_character_cards c ON cc.card_id = c.id "
+        "WHERE cc.conversation_id = $1 ORDER BY cc.generation_order",
+        conv_id,
+    )
+    return [dict(r) for r in rows]
+
+
+async def add_conversation_character(conv_id: int, card_id: int,
+                                      color: str = "", generation_order: int = 0) -> dict:
+    pool = await get_pool()
+    row = await pool.fetchrow(
+        "INSERT INTO rp_conversation_characters (conversation_id, card_id, color, generation_order) "
+        "VALUES ($1, $2, $3, $4) "
+        "ON CONFLICT (conversation_id, card_id) DO UPDATE SET color=EXCLUDED.color, generation_order=EXCLUDED.generation_order "
+        "RETURNING id, conversation_id, card_id, color, generation_order, created_at::text",
+        conv_id, card_id, color, generation_order,
+    )
+    return dict(row)
+
+
+async def remove_conversation_character(conv_id: int, card_id: int) -> bool:
+    pool = await get_pool()
+    result = await pool.execute(
+        "DELETE FROM rp_conversation_characters WHERE conversation_id = $1 AND card_id = $2",
+        conv_id, card_id,
+    )
+    return result == "DELETE 1"
+
+
+async def update_conversation_character(conv_id: int, card_id: int, **kwargs) -> dict | None:
+    pool = await get_pool()
+    sets = []
+    vals = [conv_id, card_id]
+    i = 3
+    for k in ("color", "generation_order"):
+        if k in kwargs:
+            sets.append(f"{k} = ${i}")
+            vals.append(kwargs[k])
+            i += 1
+    if not sets:
+        return None
+    row = await pool.fetchrow(
+        f"UPDATE rp_conversation_characters SET {', '.join(sets)} "
+        f"WHERE conversation_id = $1 AND card_id = $2 "
+        f"RETURNING id, conversation_id, card_id, color, generation_order, created_at::text",
+        *vals,
+    )
+    return dict(row) if row else None
+
+
 # -- Messages --
 
 async def delete_all_messages(conv_id: int):
@@ -264,7 +323,8 @@ async def get_messages(conv_id: int) -> list[dict]:
     rows = await pool.fetch(
         "SELECT id, conversation_id, role, content, raw_response, sequence, "
         "system_prompt, scene_state, post_prompt, budget_json, prompt_json, "
-        "created_at::text FROM rp_messages WHERE conversation_id = $1 ORDER BY sequence",
+        "character_card_id, created_at::text "
+        "FROM rp_messages WHERE conversation_id = $1 ORDER BY sequence",
         conv_id,
     )
     return [dict(r) for r in rows]
@@ -276,16 +336,19 @@ async def add_message(conv_id: int, role: str, content: str,
                       scene_state: str | None = None,
                       post_prompt: str | None = None,
                       budget_json: dict | None = None,
-                      prompt_json: list | None = None) -> dict:
+                      prompt_json: list | None = None,
+                      character_card_id: int | None = None) -> dict:
     pool = await get_pool()
     row = await pool.fetchrow(
         "INSERT INTO rp_messages (conversation_id, role, content, raw_response, "
-        "system_prompt, scene_state, post_prompt, budget_json, prompt_json, sequence) "
-        "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, "
+        "system_prompt, scene_state, post_prompt, budget_json, prompt_json, character_card_id, sequence) "
+        "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, "
         "(SELECT COALESCE(MAX(sequence), 0) + 1 FROM rp_messages WHERE conversation_id = $1)) "
         "RETURNING id, conversation_id, role, content, "
-        "raw_response, sequence, system_prompt, scene_state, post_prompt, budget_json, prompt_json, created_at::text",
+        "raw_response, sequence, system_prompt, scene_state, post_prompt, budget_json, prompt_json, "
+        "character_card_id, created_at::text",
         conv_id, role, content, raw_response, system_prompt, scene_state, post_prompt, budget_json, prompt_json,
+        character_card_id,
     )
     await pool.execute(
         "UPDATE rp_conversations SET updated_at = NOW() WHERE id = $1", conv_id

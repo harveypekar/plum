@@ -261,6 +261,13 @@
   }
   .message.user .message-number { text-align: left; }
 
+  .char-name-label {
+    font-size: 0.75em;
+    font-weight: 600;
+    margin-bottom: 3px;
+    padding-left: 2px;
+  }
+
   /* Thinking section in messages */
   .msg-thinking {
     margin-bottom: 8px;
@@ -1215,8 +1222,12 @@
         <select id="modalUserCard"></select>
       </div>
       <div class="form-group">
-        <label for="modalAiCard">AI Character</label>
+        <label for="modalAiCard">AI Character (primary)</label>
         <select id="modalAiCard"></select>
+      </div>
+      <div class="form-group">
+        <label for="modalExtraAiCards">Additional AI Characters (multi-select, optional)</label>
+        <select id="modalExtraAiCards" multiple style="height:80px"></select>
       </div>
       <div class="form-group">
         <label for="modalScenario">Scenario (optional)</label>

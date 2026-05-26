@@ -11,8 +11,10 @@ from .cards import parse_card_png, export_card_png, extract_name
 from .models import (
     CardCreate, CardResponse, ScenarioCreate, ScenarioResponse,
     ConversationCreate, ConversationResponse, ConversationDetailResponse,
+    ConversationCharacterResponse,
     MessageResponse, SendMessageRequest, SavePartialRequest, EditMessageRequest,
     SceneStateRequest, AuthorsNoteRequest,
+    AddCharacterRequest, UpdateCharacterRequest,
 )
 from .pipeline import create_default_pipeline
 from .budget import BudgetError, allocate_injections
@@ -23,8 +25,9 @@ from .summarize import maybe_generate_summary
 from .prompt_builder import (
     get_ai_name, get_user_name, get_ai_personality, get_ai_pronouns,
     get_user_pronouns, get_user_description, build_chat_messages,
-    build_ollama_options, scale_num_predict, budget_to_json,
-    build_pipeline_ctx, budget_ctx,
+    build_multi_char_messages, build_ollama_options, scale_num_predict,
+    budget_to_json, build_pipeline_ctx, build_pipeline_ctx_for_character,
+    budget_ctx,
 )
 from .lorebook import extract_character_book
 from . import conv_log
@@ -386,14 +389,28 @@ def setup(app: FastAPI, ollama, resolve_model=None):
 
     @app.post("/rp/conversations", response_model=ConversationResponse)
     async def create_conversation(conv: ConversationCreate):
-        # Verify cards exist
         if not await db.get_card(conv.user_card_id):
             raise HTTPException(404, "User card not found")
         if not await db.get_card(conv.ai_card_id):
             raise HTTPException(404, "AI card not found")
+
+        all_ai_ids = [conv.ai_card_id] + [cid for cid in conv.ai_card_ids if cid != conv.ai_card_id]
+        for cid in all_ai_ids[1:]:
+            if not await db.get_card(cid):
+                raise HTTPException(404, f"AI card {cid} not found")
+
         result = await db.create_conversation(
             conv.user_card_id, conv.ai_card_id, conv.scenario_id, conv.model
         )
+
+        colors = ["#4a9eff", "#ff6b6b", "#51cf66", "#ffd43b", "#cc5de8", "#ff922b"]
+        for i, cid in enumerate(all_ai_ids):
+            await db.add_conversation_character(
+                result["id"], cid,
+                color=colors[i % len(colors)],
+                generation_order=i,
+            )
+
         ai_card = await db.get_card(conv.ai_card_id)
         user_card = await db.get_card(conv.user_card_id)
         scenario = await db.get_scenario(conv.scenario_id) if conv.scenario_id else None
@@ -402,8 +419,8 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         first_mes = await _get_or_generate_first_message(result, ai_card, user_card, scenario, model)
 
         if first_mes:
-            await db.add_message(result["id"], "assistant", first_mes)
-            # Initial scene state from first message + scenario + card context
+            await db.add_message(result["id"], "assistant", first_mes,
+                                 character_card_id=conv.ai_card_id)
             ai_data = ai_card["card_data"].get("data", ai_card["card_data"])
             user_data = user_card["card_data"].get("data", user_card["card_data"])
             scenario_desc = (scenario or {}).get("description", "")
@@ -426,8 +443,15 @@ def setup(app: FastAPI, ollama, resolve_model=None):
             raise HTTPException(404, "Card referenced by conversation no longer exists")
         scenario = await db.get_scenario(conv["scenario_id"]) if conv["scenario_id"] else None
         messages = await db.get_messages(conv_id)
+        characters = await db.get_conversation_characters(conv_id)
+        ai_cards = []
+        for ch in characters:
+            card = await db.get_card(ch["card_id"])
+            if card:
+                ai_cards.append(card)
         return ConversationDetailResponse(
             conversation=conv, user_card=user_card, ai_card=ai_card,
+            ai_cards=ai_cards, characters=characters,
             scenario=scenario, messages=messages,
         )
 
@@ -436,6 +460,44 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         if not await db.delete_conversation(conv_id):
             raise HTTPException(404, "Conversation not found")
         return {"ok": True}
+
+    @app.get("/rp/conversations/{conv_id}/characters",
+             response_model=list[ConversationCharacterResponse])
+    async def list_characters(conv_id: int):
+        conv = await db.get_conversation(conv_id)
+        if not conv:
+            raise HTTPException(404, "Conversation not found")
+        return await db.get_conversation_characters(conv_id)
+
+    @app.post("/rp/conversations/{conv_id}/characters",
+              response_model=ConversationCharacterResponse)
+    async def add_character(conv_id: int, req: AddCharacterRequest):
+        conv = await db.get_conversation(conv_id)
+        if not conv:
+            raise HTTPException(404, "Conversation not found")
+        if not await db.get_card(req.card_id):
+            raise HTTPException(404, "Card not found")
+        return await db.add_conversation_character(
+            conv_id, req.card_id, color=req.color, generation_order=req.generation_order)
+
+    @app.delete("/rp/conversations/{conv_id}/characters/{card_id}")
+    async def remove_character(conv_id: int, card_id: int):
+        if not await db.remove_conversation_character(conv_id, card_id):
+            raise HTTPException(404, "Character not in conversation")
+        return {"ok": True}
+
+    @app.put("/rp/conversations/{conv_id}/characters/{card_id}",
+             response_model=ConversationCharacterResponse)
+    async def update_character(conv_id: int, card_id: int, req: UpdateCharacterRequest):
+        kwargs = {}
+        if req.color is not None:
+            kwargs["color"] = req.color
+        if req.generation_order is not None:
+            kwargs["generation_order"] = req.generation_order
+        result = await db.update_conversation_character(conv_id, card_id, **kwargs)
+        if not result:
+            raise HTTPException(404, "Character not in conversation")
+        return result
 
     @app.post("/rp/conversations/{conv_id}/restart")
     async def restart_conversation(conv_id: int):
@@ -453,8 +515,8 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         first_mes = await _get_or_generate_first_message(conv, ai_card, user_card, scenario, model)
 
         if first_mes:
-            await db.add_message(conv_id, "assistant", first_mes)
-            # Initial scene state from first message + scenario + card context
+            await db.add_message(conv_id, "assistant", first_mes,
+                                 character_card_id=conv["ai_card_id"])
             ai_data = ai_card["card_data"].get("data", ai_card["card_data"])
             user_data = user_card["card_data"].get("data", user_card["card_data"])
             scenario_desc = (scenario or {}).get("description", "")
@@ -608,7 +670,7 @@ def setup(app: FastAPI, ollama, resolve_model=None):
             first_mes = await _generate_first_message(conv, ai_card, user_card, scenario)
         except Exception as e:
             _log.warning("Failed to generate first message: %s", e)
-            return ""
+            return
 
         await db.set_cached_first_message(combo_hash, card_hash, scenario_hash, model, first_mes)
         _log.info("First message cached for combo %s", combo_hash)
@@ -806,6 +868,7 @@ def setup(app: FastAPI, ollama, resolve_model=None):
                     post_prompt=ctx.get("post_prompt", ""),
                     budget_json=budget_to_json(ctx),
                     prompt_json=chat_messages,
+                    character_card_id=conv.get("ai_card_id"),
                 )
             conv_log.log_response(conv_id, save_role, post_ctx["response"], raw)
             budget_report = ctx.get("_budget_report")
@@ -820,14 +883,87 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         except Exception as e:
             yield json.dumps({"error": f"Failed to save response: {e}", "done": True}) + "\n"
 
+    async def _generate_for_character(conv_id, conv, char_card, card_names,
+                                      model, ollama_options, user_content):
+        """Generate one character's response in a multi-char conversation.
+
+        Yields NDJSON chunks. Saves the message to DB when done.
+        Returns the saved message text (or "" on error).
+        """
+        messages = await db.get_messages(conv_id)
+        ctx = await build_pipeline_ctx_for_character(
+            conv, messages, char_card,
+            pipeline=_pipeline, template_path=_template_path)
+
+        card_data = char_card.get("card_data", {}).get("data", char_card.get("card_data", {}))
+        char_name = card_data.get("name", "Character")
+        char_id = char_card["id"]
+
+        try:
+            await _budget_ctx(ctx, model, ollama_options)
+        except BudgetError as e:
+            yield json.dumps({"error": f"Budget error for {char_name}: {e}", "done": False}) + "\n"
+            return
+
+        opts = {**ollama_options, "num_ctx": ctx["_num_ctx"]}
+        chat_messages = build_multi_char_messages(ctx, char_id, card_names)
+        user_name = get_user_name(ctx)
+
+        tokens = []
+        raw = {}
+        try:
+            async for chunk in _ollama.chat_stream(
+                model=model, messages=chat_messages,
+                options=opts, stop=[f"{user_name}:", "\n\n\n"],
+            ):
+                yield json.dumps(chunk) + "\n"
+                if chunk.get("done"):
+                    raw = chunk
+                elif not chunk.get("thinking"):
+                    tokens.append(chunk["token"])
+        except Exception as e:
+            yield json.dumps({"error": str(e), "done": False}) + "\n"
+            return
+
+        response_text = "".join(tokens)
+        recent_asst = [m["content"] for m in ctx.get("messages", [])
+                       if m.get("role") == "assistant"
+                       and m.get("_character_card_id") == char_id][-6:]
+        post_ctx = {
+            "response": response_text, "ai_name": char_name,
+            "_char_pronouns": card_data.get("pronouns", ""),
+            "_user_name": get_user_name(ctx),
+            "_user_pronouns": get_user_pronouns(ctx),
+            "_recent_assistant_messages": recent_asst,
+        }
+        post_ctx = await _pipeline.run_post(post_ctx)
+        final_text = post_ctx["response"]
+
+        await db.add_message(
+            conv_id, "assistant", final_text, raw_response=raw,
+            system_prompt=ctx.get("system_prompt", ""),
+            scene_state=conv.get("scene_state", ""),
+            post_prompt=ctx.get("post_prompt", ""),
+            budget_json=budget_to_json(ctx),
+            prompt_json=chat_messages,
+            character_card_id=char_id,
+        )
+        conv_log.log_response(conv_id, "assistant", final_text, raw)
+
     @app.post("/rp/conversations/{conv_id}/message")
     async def send_message(conv_id: int, req: SendMessageRequest):
         conv = await db.get_conversation(conv_id)
         if not conv:
             raise HTTPException(404, "Conversation not found")
 
+        characters = await db.get_conversation_characters(conv_id)
+        is_multi = len(characters) > 1
+
         await db.add_message(conv_id, "user", req.content)
         conv_log.log_response(conv_id, "user", req.content)
+
+        if is_multi:
+            return await _send_multi_char_message(conv_id, conv, characters, req.content)
 
         messages = await db.get_messages(conv_id)
         ctx = await _build_pipeline_ctx(conv, messages)
@@ -979,9 +1115,9 @@ def setup(app: FastAPI, ollama, resolve_model=None):
                     post_prompt=ctx.get("post_prompt", ""),
                     budget_json=budget_to_json(ctx),
                     prompt_json=chat_messages,
+                    character_card_id=conv["ai_card_id"],
                 )
                 conv_log.log_response(conv_id, "assistant", post_ctx["response"], raw)
-                # Update scene state and maybe generate summary in background
                 budget_report = ctx.get("_budget_report")
                 msg_budget = budget_report.messages_budget if budget_report else 0
                 asyncio.create_task(_auto_update_scene_state(conv_id, model,
@@ -995,6 +1131,61 @@ def setup(app: FastAPI, ollama, resolve_model=None):
                 yield json.dumps({"error": f"Failed to save response: {e}", "done": True}) + "\n"
 
         return StreamingResponse(stream(), media_type="application/x-ndjson")
+
+    async def _send_multi_char_message(conv_id, conv, characters, user_content):
+        """Handle message in a multi-character conversation with round-robin generation."""
+        model = _resolve_model(conv["model"])
+        scenario = {}
+        if conv["scenario_id"]:
+            scenario = await db.get_scenario(conv["scenario_id"]) or {}
+        settings = scenario.get("settings", {})
+        ollama_options = scale_num_predict(
+            build_ollama_options(settings), user_content)
+
+        char_cards = {}
+        card_names = {}
+        for ch in characters:
+            card = await db.get_card(ch["card_id"])
+            if card:
+                char_cards[ch["card_id"]] = card
+                cdata = card.get("card_data", {}).get("data", card.get("card_data", {}))
+                card_names[ch["card_id"]] = cdata.get("name", "Character")
+
+        async def multi_stream():
+            yield json.dumps({"multi_character": True, "character_count": len(characters)}) + "\n"
+
+            for ch in characters:
+                card_id = ch["card_id"]
+                card = char_cards.get(card_id)
+                if not card:
+                    continue
+                name = card_names.get(card_id, "Character")
+
+                yield json.dumps({
+                    "character_start": {
+                        "card_id": card_id,
+                        "name": name,
+                        "color": ch.get("color", ""),
+                    }
+                }) + "\n"
+
+                async for chunk in _generate_for_character(
+                    conv_id, conv, card, card_names,
+                    model, ollama_options, user_content,
+                ):
+                    yield chunk
+
+                yield json.dumps({"character_done": {"card_id": card_id, "name": name}}) + "\n"
+
+            asyncio.create_task(_auto_update_scene_state(
+                conv_id, model,
+                card_names.get(characters[0]["card_id"], "Character"),
+                get_user_name({"user_card": char_cards.get(conv["user_card_id"], await db.get_card(conv["user_card_id"]))}),
+                "",
+                user_description=""))
+            yield json.dumps({"done": True}) + "\n"
+
+        return StreamingResponse(multi_stream(), media_type="application/x-ndjson")
 
     @app.post("/rp/conversations/{conv_id}/save-partial")
     async def save_partial(conv_id: int, req: SavePartialRequest):
