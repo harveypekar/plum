@@ -268,7 +268,11 @@
       item.appendChild(avatar);
 
       const info = el("div", { className: "conv-info" });
-      const name = el("div", { className: "conv-name", textContent: "Conv #" + c.id });
+      var convLabel = "Conv #" + c.id;
+      if (c.character_count && c.character_count > 1) {
+        convLabel += " [" + c.character_count + " chars]";
+      }
+      const name = el("div", { className: "conv-name", textContent: convLabel });
       const date = el("div", { className: "conv-date", textContent: timeAgo(c.updated_at) });
       info.appendChild(name);
       info.appendChild(date);
@@ -325,13 +329,33 @@
   }
 
   function renderChat(detail) {
-    const { conversation, user_card, ai_card, scenario, messages } = detail;
+    const { conversation, user_card, ai_card, ai_cards, characters, scenario, messages } = detail;
+
+    var charMap = {};
+    if (characters && characters.length > 0) {
+      for (var ci = 0; ci < characters.length; ci++) {
+        charMap[characters[ci].card_id] = characters[ci];
+      }
+    }
+    var cardMap = {};
+    if (ai_cards && ai_cards.length > 0) {
+      for (var ci = 0; ci < ai_cards.length; ci++) {
+        cardMap[ai_cards[ci].id] = ai_cards[ci];
+      }
+    }
+    cardMap[ai_card.id] = ai_card;
+    var isMultiChar = characters && characters.length > 1;
 
     // Header
     $("chatHeader").style.display = "";
     setAvatarSrc($("chatHeaderAvatar"), ai_card.id, ai_card.has_avatar);
     const aiData = ai_card.card_data.data || ai_card.card_data;
-    $("chatHeaderName").textContent = aiData.name || ai_card.name;
+    var headerName = aiData.name || ai_card.name;
+    if (isMultiChar) {
+      var charNames = characters.map(function (ch) { return ch.card_name || "?"; });
+      headerName = charNames.join(", ");
+    }
+    $("chatHeaderName").textContent = headerName;
     $("chatHeaderModel").textContent = conversation.model + (scenario ? " | " + scenario.name : "");
 
     // Messages
@@ -350,7 +374,16 @@
     }
 
     for (var i = 0; i < messages.length; i++) {
-      appendMessageBubble(container, messages[i], user_card, ai_card, i);
+      var msg = messages[i];
+      var msgCard = ai_card;
+      var msgChar = null;
+      if (msg.character_card_id && cardMap[msg.character_card_id]) {
+        msgCard = cardMap[msg.character_card_id];
+      }
+      if (msg.character_card_id && charMap[msg.character_card_id]) {
+        msgChar = charMap[msg.character_card_id];
+      }
+      appendMessageBubble(container, msg, user_card, msgCard, i, isMultiChar ? msgChar : null);
     }
 
     // Scroll to bottom
@@ -395,7 +428,7 @@
     });
   }
 
-  function appendMessageBubble(container, msg, userCard, aiCard, msgIndex) {
+  function appendMessageBubble(container, msg, userCard, aiCard, msgIndex, charInfo) {
     const isUser = msg.role === "user";
     const wrapper = el("div", { className: "message " + msg.role });
 
@@ -408,6 +441,20 @@
     wrapper.appendChild(avatar);
 
     const col = el("div");
+
+    if (charInfo && !isUser) {
+      var nameData = aiCard.card_data.data || aiCard.card_data;
+      var charLabel = el("div", {
+        className: "char-name-label",
+        textContent: nameData.name || aiCard.name,
+      });
+      if (charInfo.color) {
+        charLabel.style.color = charInfo.color;
+        wrapper.style.borderLeft = "3px solid " + charInfo.color;
+      }
+      col.appendChild(charLabel);
+    }
+
     const bubble = el("div", { className: "message-bubble" });
     renderDialogue(bubble, msg.content, msg.role);
     col.appendChild(bubble);
@@ -591,26 +638,70 @@
       opts.body = JSON.stringify(body);
     }
 
-    // Create message bubble for streaming — role may be overridden by auto_role from server
     var streamRole = forceRole || "assistant";
-    const wrapper = el("div", { className: "message " + streamRole });
-    const avatar = el("img", { className: "message-avatar", alt: "" });
-    if (currentConvDetail) {
-      var card = streamRole === "user" ? currentConvDetail.user_card : currentConvDetail.ai_card;
-      setAvatarSrc(avatar, card.id, card.has_avatar);
-    }
-    wrapper.appendChild(avatar);
-
-    const col = el("div");
-    let thinkingSection = null;
-    let thinkingContent = null;
-    let hasThinking = false;
+    var isMultiChar = false;
+    var wrapper, avatar, col, bubble, thinkingSection, thinkingContent, hasThinking;
     let hadError = false;
 
-    const bubble = el("div", { className: "message-bubble streaming-cursor" });
-    col.appendChild(bubble);
-    wrapper.appendChild(col);
-    container.appendChild(wrapper);
+    function createBubble(charStart) {
+      wrapper = el("div", { className: "message assistant" });
+      avatar = el("img", { className: "message-avatar", alt: "" });
+      col = el("div");
+      thinkingSection = null;
+      thinkingContent = null;
+      hasThinking = false;
+
+      if (charStart) {
+        var charCard = null;
+        if (currentConvDetail && currentConvDetail.ai_cards) {
+          for (var ci = 0; ci < currentConvDetail.ai_cards.length; ci++) {
+            if (currentConvDetail.ai_cards[ci].id === charStart.card_id) {
+              charCard = currentConvDetail.ai_cards[ci];
+              break;
+            }
+          }
+        }
+        if (!charCard && currentConvDetail) charCard = currentConvDetail.ai_card;
+        if (charCard) setAvatarSrc(avatar, charCard.id, charCard.has_avatar);
+        var nameLabel = el("div", {
+          className: "char-name-label",
+          textContent: charStart.name || "Character",
+        });
+        if (charStart.color) {
+          nameLabel.style.color = charStart.color;
+          wrapper.style.borderLeft = "3px solid " + charStart.color;
+        }
+        col.appendChild(nameLabel);
+      } else {
+        if (currentConvDetail) {
+          var card = streamRole === "user" ? currentConvDetail.user_card : currentConvDetail.ai_card;
+          setAvatarSrc(avatar, card.id, card.has_avatar);
+        }
+        wrapper.className = "message " + streamRole;
+      }
+
+      wrapper.appendChild(avatar);
+      bubble = el("div", { className: "message-bubble streaming-cursor" });
+      col.appendChild(bubble);
+      wrapper.appendChild(col);
+      container.appendChild(wrapper);
+    }
+
+    function finalizeBubble() {
+      if (!bubble) return;
+      bubble.classList.remove("streaming-cursor");
+      var fullText = bubble.textContent;
+      if (fullText) {
+        bubble.textContent = "";
+        renderDialogue(bubble, fullText, "assistant");
+      }
+      if (thinkingContent) {
+        var toggle = thinkingSection.querySelector(".msg-thinking-toggle");
+        if (toggle) toggle.textContent = "Hide thinking";
+      }
+    }
+
+    createBubble(null);
 
     try {
       const resp = await fetch(url, opts);
@@ -630,6 +721,22 @@
           if (!line.trim()) continue;
           const chunk = JSON.parse(line);
 
+          if (chunk.multi_character) {
+            isMultiChar = true;
+            wrapper.remove();
+            continue;
+          }
+
+          if (chunk.character_start) {
+            createBubble(chunk.character_start);
+            continue;
+          }
+
+          if (chunk.character_done) {
+            finalizeBubble();
+            continue;
+          }
+
           if (chunk.debug_prompt !== undefined) {
             $("underHoodPromptContent").textContent = chunk.debug_prompt || "(empty)";
             $("underHoodUserPromptContent").textContent = chunk.debug_user_prompt || "(empty)";
@@ -647,8 +754,7 @@
             } else {
               $("underHoodLorebookContent").textContent = "No lorebook entries matched.";
             }
-            // Update bubble side if auto_role differs
-            if (chunk.auto_role && chunk.auto_role !== streamRole) {
+            if (chunk.auto_role && chunk.auto_role !== streamRole && !isMultiChar) {
               streamRole = chunk.auto_role;
               wrapper.className = "message " + streamRole;
               if (currentConvDetail) {
@@ -661,19 +767,20 @@
 
           if (chunk.error) {
             hadError = true;
-            bubble.classList.remove("streaming-cursor");
-            const errSpan = el("span", {
-              style: { color: "#f85149" },
-              textContent: "Error: " + chunk.error,
-            });
-            bubble.appendChild(errSpan);
-            break;
+            if (bubble) {
+              bubble.classList.remove("streaming-cursor");
+              const errSpan = el("span", {
+                style: { color: "#f85149" },
+                textContent: "Error: " + chunk.error,
+              });
+              bubble.appendChild(errSpan);
+            }
+            if (chunk.done !== false) break;
+            continue;
           }
 
-          // Queue status messages
           if (chunk.status) {
-            if (chunk.status === "preempted") {
-              // Clear partial text — generation will restart
+            if (chunk.status === "preempted" && bubble) {
               bubble.textContent = "";
               if (thinkingContent) thinkingContent.textContent = "";
             }
@@ -697,24 +804,14 @@
               thinkingSection.appendChild(toggle);
               thinkingContent = el("div", { className: "msg-thinking-content" });
               thinkingSection.appendChild(thinkingContent);
-              // Insert thinking before the bubble
               col.insertBefore(thinkingSection, bubble);
             }
             thinkingContent.textContent += chunk.token;
           } else if (chunk.done) {
-            bubble.classList.remove("streaming-cursor");
-            // Re-render with dialogue coloring
-            var fullText = bubble.textContent;
-            bubble.textContent = "";
-            renderDialogue(bubble, fullText, streamRole);
-            if (thinkingContent) {
-              const toggle = thinkingSection.querySelector(".msg-thinking-toggle");
-              toggle.textContent = "Hide thinking";
-            }
-            // Update under-the-hood
+            if (!isMultiChar) finalizeBubble();
             $("underHoodContent").textContent = JSON.stringify(chunk, null, 2);
           } else {
-            bubble.textContent += chunk.token;
+            if (bubble) bubble.textContent += chunk.token;
           }
 
           var atBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 60;
@@ -723,8 +820,7 @@
       }
     } catch (e) {
       if (e.name === "AbortError") {
-        // Stop was pressed — save whatever we have so far
-        var partialText = bubble.textContent.trim();
+        var partialText = bubble ? bubble.textContent.trim() : "";
         if (partialText && currentConvId) {
           try {
             await fetch("/rp/conversations/" + currentConvId + "/save-partial", {
@@ -734,18 +830,22 @@
             });
           } catch (_) {}
         }
-        bubble.classList.remove("streaming-cursor");
-        if (partialText) {
-          bubble.textContent = "";
-          renderDialogue(bubble, partialText, streamRole);
+        if (bubble) {
+          bubble.classList.remove("streaming-cursor");
+          if (partialText) {
+            bubble.textContent = "";
+            renderDialogue(bubble, partialText, streamRole);
+          }
         }
       } else {
         hadError = true;
-        bubble.classList.remove("streaming-cursor");
-        bubble.textContent += "\n[Stream error: " + e.message + "]";
+        if (bubble) {
+          bubble.classList.remove("streaming-cursor");
+          bubble.textContent += "\n[Stream error: " + e.message + "]";
+        }
       }
     } finally {
-      bubble.classList.remove("streaming-cursor");
+      if (bubble) bubble.classList.remove("streaming-cursor");
       abortController = null;
     }
     return hadError;
@@ -1069,11 +1169,13 @@
     // Populate selects
     const userSelect = $("modalUserCard");
     const aiSelect = $("modalAiCard");
+    const extraAiSelect = $("modalExtraAiCards");
     const scenarioSelect = $("modalScenario");
     const modelSelect = $("modalModel");
 
     userSelect.textContent = "";
     aiSelect.textContent = "";
+    extraAiSelect.textContent = "";
 
     for (const card of allCards) {
       const cardData = card.card_data.data || card.card_data;
@@ -1090,6 +1192,11 @@
       opt2.textContent = label;
       if (last && card.id === last.ai_card_id) opt2.selected = true;
       aiSelect.appendChild(opt2);
+
+      const opt3 = document.createElement("option");
+      opt3.value = card.id;
+      opt3.textContent = label;
+      extraAiSelect.appendChild(opt3);
     }
 
     // Scenarios
@@ -1124,12 +1231,18 @@
     const scenarioId = $("modalScenario").value ? parseInt($("modalScenario").value) : null;
     const model = $("modalModel").value;
 
+    var extraAiIds = [];
+    var extraOpts = $("modalExtraAiCards").selectedOptions;
+    for (var i = 0; i < extraOpts.length; i++) {
+      var eid = parseInt(extraOpts[i].value);
+      if (eid !== aiCardId) extraAiIds.push(eid);
+    }
+
     if (!userCardId || !aiCardId || !model) {
       alert("Please select all required fields.");
       return;
     }
 
-    // Show a timer while waiting for first message generation
     $("newChatModal").classList.remove("open");
     switchView("chat");
     var timerStart = Date.now();
@@ -1147,6 +1260,7 @@
       const conv = await api("POST", "/rp/conversations", {
         user_card_id: userCardId,
         ai_card_id: aiCardId,
+        ai_card_ids: extraAiIds,
         scenario_id: scenarioId,
         model: model,
       });

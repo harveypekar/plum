@@ -580,7 +580,13 @@ def _merge_overlapping(ngrams: list[str]) -> list[str]:
 def inject_avoid_list(ctx: dict) -> dict:
     """Scan recent assistant messages for repeated phrases, inject avoid list."""
     messages = ctx.get("messages", [])
-    recent_asst = [m["content"] for m in messages if m.get("role") == "assistant"]
+    active_card_id = ctx.get("_active_card", {}).get("id") if ctx.get("_multi_character") else None
+    if active_card_id:
+        recent_asst = [m["content"] for m in messages
+                       if m.get("role") == "assistant"
+                       and m.get("_character_card_id") == active_card_id]
+    else:
+        recent_asst = [m["content"] for m in messages if m.get("role") == "assistant"]
     if len(recent_asst) < AVOID_LIST_MIN_MESSAGES:
         return ctx
 

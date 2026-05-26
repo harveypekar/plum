@@ -33,8 +33,9 @@ class FakeDB:
         self.messages: dict[int, dict] = {}
         self.eval_sets: dict[int, dict] = {}
         self.eval_candidates: dict[int, dict] = {}
+        self.conv_characters: list[dict] = []
         self._next = {"card": 1, "scenario": 1, "conv": 1, "msg": 1,
-                       "eval_set": 1, "eval_cand": 1}
+                       "eval_set": 1, "eval_cand": 1, "conv_char": 1}
 
     def _now(self) -> str:
         return datetime.now(timezone.utc).isoformat()
@@ -139,7 +140,13 @@ class FakeDB:
     # -- Conversations --
 
     async def list_conversations(self) -> list[dict]:
-        return sorted(self.conversations.values(), key=lambda c: c["id"])
+        result = []
+        for c in sorted(self.conversations.values(), key=lambda c: c["id"]):
+            cc = dict(c)
+            cc["character_count"] = len([ch for ch in self.conv_characters
+                                          if ch["conversation_id"] == c["id"]])
+            result.append(cc)
+        return result
 
     async def create_conversation(self, user_card_id: int, ai_card_id: int,
                                   scenario_id: int | None,
@@ -150,7 +157,8 @@ class FakeDB:
             "id": cid, "user_card_id": user_card_id,
             "ai_card_id": ai_card_id, "scenario_id": scenario_id,
             "model": model, "scene_state": "", "scene_state_msg_id": None,
-            "category": "user", "created_at": now, "updated_at": now,
+            "category": "user", "authors_note": "", "authors_note_depth": 4,
+            "created_at": now, "updated_at": now,
         }
         self.conversations[cid] = conv
         return conv
@@ -167,6 +175,37 @@ class FakeDB:
             if v["conversation_id"] != conv_id
         }
         return True
+
+    async def get_conversation_characters(self, conv_id: int) -> list[dict]:
+        return [c for c in self.conv_characters if c["conversation_id"] == conv_id]
+
+    async def add_conversation_character(self, conv_id: int, card_id: int,
+                                          color: str = "", generation_order: int = 0) -> dict:
+        cid = self._id("conv_char")
+        entry = {
+            "id": cid, "conversation_id": conv_id, "card_id": card_id,
+            "color": color, "generation_order": generation_order,
+            "card_name": "", "created_at": self._now(),
+        }
+        card = self.cards.get(card_id)
+        if card:
+            cd = card.get("card_data", {}).get("data", card.get("card_data", {}))
+            entry["card_name"] = cd.get("name", card.get("name", ""))
+        self.conv_characters.append(entry)
+        return entry
+
+    async def remove_conversation_character(self, conv_id: int, card_id: int) -> bool:
+        before = len(self.conv_characters)
+        self.conv_characters = [c for c in self.conv_characters
+                                 if not (c["conversation_id"] == conv_id and c["card_id"] == card_id)]
+        return len(self.conv_characters) < before
+
+    async def update_conversation_character(self, conv_id: int, card_id: int, **kwargs) -> dict | None:
+        for c in self.conv_characters:
+            if c["conversation_id"] == conv_id and c["card_id"] == card_id:
+                c.update(kwargs)
+                return c
+        return None
 
     async def delete_all_messages(self, conv_id: int):
         self.messages = {
@@ -196,7 +235,8 @@ class FakeDB:
                           raw_response=None, system_prompt: str | None = None,
                           scene_state: str | None = None,
                           post_prompt: str | None = None,
-                          budget_json=None, prompt_json=None) -> dict:
+                          budget_json=None, prompt_json=None,
+                          character_card_id: int | None = None) -> dict:
         mid = self._id("msg")
         existing = [m for m in self.messages.values()
                     if m["conversation_id"] == conv_id]
@@ -204,7 +244,8 @@ class FakeDB:
         msg = {
             "id": mid, "conversation_id": conv_id, "role": role,
             "content": content, "raw_response": raw_response,
-            "sequence": seq, "created_at": self._now(),
+            "sequence": seq, "character_card_id": character_card_id,
+            "created_at": self._now(),
         }
         self.messages[mid] = msg
         return msg
