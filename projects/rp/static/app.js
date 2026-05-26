@@ -1169,13 +1169,19 @@
     // Populate selects
     const userSelect = $("modalUserCard");
     const aiSelect = $("modalAiCard");
-    const extraAiSelect = $("modalExtraAiCards");
+    const extraSelects = [$("modalAiCard2"), $("modalAiCard3"), $("modalAiCard4")];
     const scenarioSelect = $("modalScenario");
     const modelSelect = $("modalModel");
 
     userSelect.textContent = "";
     aiSelect.textContent = "";
-    extraAiSelect.textContent = "";
+    for (var ei = 0; ei < extraSelects.length; ei++) {
+      extraSelects[ei].textContent = "";
+      var noneOpt = document.createElement("option");
+      noneOpt.value = "";
+      noneOpt.textContent = "— None —";
+      extraSelects[ei].appendChild(noneOpt);
+    }
 
     for (const card of allCards) {
       const cardData = card.card_data.data || card.card_data;
@@ -1193,10 +1199,12 @@
       if (last && card.id === last.ai_card_id) opt2.selected = true;
       aiSelect.appendChild(opt2);
 
-      const opt3 = document.createElement("option");
-      opt3.value = card.id;
-      opt3.textContent = label;
-      extraAiSelect.appendChild(opt3);
+      for (var ei = 0; ei < extraSelects.length; ei++) {
+        var opt3 = document.createElement("option");
+        opt3.value = card.id;
+        opt3.textContent = label;
+        extraSelects[ei].appendChild(opt3);
+      }
     }
 
     // Scenarios
@@ -1232,11 +1240,13 @@
     const model = $("modalModel").value;
 
     var extraAiIds = [];
-    var extraOpts = $("modalExtraAiCards").selectedOptions;
-    for (var i = 0; i < extraOpts.length; i++) {
-      var eid = parseInt(extraOpts[i].value);
-      if (eid !== aiCardId) extraAiIds.push(eid);
-    }
+    ["modalAiCard2", "modalAiCard3", "modalAiCard4"].forEach(function (selId) {
+      var val = $(selId).value;
+      if (val) {
+        var eid = parseInt(val);
+        if (eid !== aiCardId && extraAiIds.indexOf(eid) === -1) extraAiIds.push(eid);
+      }
+    });
 
     if (!userCardId || !aiCardId || !model) {
       alert("Please select all required fields.");
