@@ -43,10 +43,14 @@ def expand_variables(ctx: dict) -> dict:
     ai_data = ai_card.get("card_data", {}).get("data", ai_card.get("card_data", {}))
     active_data = active_card.get("card_data", {}).get("data", active_card.get("card_data", {}))
 
+    is_multi = ctx.get("_multi_character", False)
+    primary_name = ai_data.get("name", "Character")
+    active_name = active_data.get("name", primary_name)
+
     replacements = {
         "${user}": user_data.get("name", "User"),
-        "${char}": ai_data.get("name", "Character"),
-        "${active_char}": active_data.get("name", ai_data.get("name", "Character")),
+        "${char}": active_name if is_multi else primary_name,
+        "${active_char}": active_name,
         "${scenario}": scenario.get("description", ""),
     }
 
@@ -224,14 +228,23 @@ def assemble_prompt(ctx: dict) -> dict:
 
     template = ctx.get("prompt_template", "") or DEFAULT_PROMPT_TEMPLATE
 
+    primary_name = ai_data.get("name", "Character")
+    active_name = active_data.get("name", primary_name)
+    user_name = user_data.get("name", "User")
+
+    scenario_text = scenario.get("description", "")
+    if is_multi and scenario_text:
+        scenario_text = scenario_text.replace("{{char}}", primary_name)
+        scenario_text = scenario_text.replace("{{user}}", user_name)
+
     values = {
-        "scenario": scenario.get("description", ""),
+        "scenario": scenario_text,
         "description": desc_data.get("description", ""),
         "personality": desc_data.get("personality", ""),
         "mes_example": desc_data.get("mes_example", ""),
-        "char": ai_data.get("name", "Character"),
-        "active_char": active_data.get("name", ai_data.get("name", "Character")),
-        "user": user_data.get("name", "User"),
+        "char": active_name if is_multi else primary_name,
+        "active_char": active_name,
+        "user": user_name,
         "user_description": user_data.get("description", ""),
         "user_pronouns": user_data.get("pronouns", "") or infer_pronouns(user_data.get("description", "")),
         "char_pronouns": desc_data.get("pronouns", "") or infer_pronouns(desc_data.get("description", "")),
