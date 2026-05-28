@@ -1388,7 +1388,10 @@ def setup(app: FastAPI, ollama, resolve_model=None):
 
         if generating_as_user:
             model = _resolve_model("qwen3:14b")
-            ollama_options = {"temperature": 0.7, "num_predict": 256, "think": False}
+            ollama_options = {
+                "temperature": 0.7, "num_predict": 128, "think": False,
+                "repeat_penalty": 1.15, "repeat_last_n": 256,
+            }
         else:
             model = _resolve_model(conv["model"])
             scenario = ctx.get("scenario") or {}
@@ -1413,7 +1416,7 @@ def setup(app: FastAPI, ollama, resolve_model=None):
 
         chat_messages = build_chat_messages(ctx)
         if generating_as_user:
-            chat_messages[-1] = {"role": "assistant", "content": "*I "}
+            chat_messages.pop()
         user_name = get_user_name(ctx)
         conv_log.log_prompt(conv_id, "auto_reply", model,
                             ctx["system_prompt"], ctx.get("post_prompt", ""),
