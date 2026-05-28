@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import random
 from fastapi import FastAPI, UploadFile, File, HTTPException, Request
 from fastapi.responses import Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -1136,8 +1137,90 @@ def setup(app: FastAPI, ollama, resolve_model=None):
 
         return StreamingResponse(stream(), media_type="application/x-ndjson")
 
+    async def _select_turn_order(messages, characters, card_names, user_name):
+        """Ask a small model which characters should respond and in what order."""
+        name_to_id = {}
+        for card_id, name in card_names.items():
+            name_to_id[name.lower()] = card_id
+        all_names = [card_names[ch["card_id"]] for ch in characters if ch["card_id"] in card_names]
+
+        recent = []
+        for m in messages[-8:]:
+            role = m["role"]
+            content = m["content"]
+            char_id = m.get("character_card_id") or m.get("_character_card_id")
+            if char_id and char_id in card_names:
+                speaker = card_names[char_id]
+            elif role == "user":
+                speaker = user_name
+            else:
+                speaker = "Assistant"
+            recent.append(f"{speaker}: {content[:200]}")
+
+        system = (
+            "You direct a roleplay conversation. Given the recent messages and available characters, "
+            "decide which characters should respond next and in what order.\n"
+            "Not every character needs to respond every turn — only those who would naturally react.\n"
+            "Return ONLY a JSON array of character names, e.g. [\"Riley\", \"Amber\"]\n"
+            "Return at least one character. No explanation, just the JSON array."
+        )
+        prompt_text = (
+            f"Available characters: {', '.join(all_names)}\n"
+            f"User character: {user_name}\n\n"
+            "Recent messages:\n" + "\n".join(recent)
+        )
+
+        try:
+            selector_model = _resolve_model("qwen3:8b")
+            result = await _ollama.chat(
+                model=selector_model,
+                messages=[
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": prompt_text},
+                ],
+                options={"temperature": 0.3, "num_predict": 64, "think": False},
+            )
+            raw_text = result.get("message", {}).get("content", "").strip()
+            start = raw_text.find("[")
+            end = raw_text.rfind("]")
+            if start >= 0 and end > start:
+                selected_names = json.loads(raw_text[start:end + 1])
+            else:
+                selected_names = json.loads(raw_text)
+
+            selected_ids = []
+            for name in selected_names:
+                card_id = name_to_id.get(name.lower())
+                if card_id is not None and card_id not in selected_ids:
+                    selected_ids.append(card_id)
+
+            if not selected_ids:
+                return characters
+
+            if random.random() < 0.10:
+                random.shuffle(selected_ids)
+                _log.info("Turn selector: randomized order → %s",
+                          [card_names.get(cid) for cid in selected_ids])
+
+            id_set = {ch["card_id"] for ch in characters}
+            selected_ids = [cid for cid in selected_ids if cid in id_set]
+            if not selected_ids:
+                return characters
+
+            id_to_ch = {ch["card_id"]: ch for ch in characters}
+            ordered = [id_to_ch[cid] for cid in selected_ids]
+
+            _log.info("Turn selector: %s → %s",
+                      [card_names.get(ch["card_id"]) for ch in characters],
+                      [card_names.get(ch["card_id"]) for ch in ordered])
+            return ordered
+
+        except Exception as e:
+            _log.warning("Turn selector failed, using default order: %s", e)
+            return characters
+
     async def _send_multi_char_message(conv_id, conv, characters, user_content):
-        """Handle message in a multi-character conversation with round-robin generation."""
+        """Handle message in a multi-character conversation with dynamic turn order."""
         model = _resolve_model(conv["model"])
         scenario = {}
         if conv["scenario_id"]:
@@ -1157,10 +1240,16 @@ def setup(app: FastAPI, ollama, resolve_model=None):
 
         all_cards_ordered = [char_cards[ch["card_id"]] for ch in characters if ch["card_id"] in char_cards]
 
-        async def multi_stream():
-            yield json.dumps({"multi_character": True, "character_count": len(characters)}) + "\n"
+        messages = await db.get_messages(conv_id)
+        user_card = await db.get_card(conv["user_card_id"])
+        u_data = user_card["card_data"].get("data", user_card["card_data"]) if user_card else {}
+        u_name = u_data.get("name", "User")
+        responding = await _select_turn_order(messages, characters, card_names, u_name)
 
-            for ch in characters:
+        async def multi_stream():
+            yield json.dumps({"multi_character": True, "character_count": len(responding)}) + "\n"
+
+            for ch in responding:
                 card_id = ch["card_id"]
                 card = char_cards.get(card_id)
                 if not card:
