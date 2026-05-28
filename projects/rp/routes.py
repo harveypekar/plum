@@ -1354,18 +1354,24 @@ def setup(app: FastAPI, ollama, resolve_model=None):
                 conv_id, conv, characters, last_user_content)
 
         if generating_as_user:
+            orig_ai_card = await db.get_card(conv["ai_card_id"])
+            orig_ai_data = orig_ai_card["card_data"].get("data", orig_ai_card["card_data"])
+            orig_user_card = await db.get_card(conv["user_card_id"])
+            orig_user_data = orig_user_card["card_data"].get("data", orig_user_card["card_data"])
             swapped_conv = dict(conv)
             swapped_conv["user_card_id"] = conv["ai_card_id"]
             swapped_conv["ai_card_id"] = conv["user_card_id"]
+            swapped_conv["_scenario_names"] = {
+                "char": orig_ai_data.get("name", "Character"),
+                "user": orig_user_data.get("name", "User"),
+            }
             swapped_messages = []
             for m in messages:
                 sm = dict(m)
                 sm["role"] = "assistant" if m["role"] == "user" else "user"
                 swapped_messages.append(sm)
             ctx = await _build_pipeline_ctx(swapped_conv, swapped_messages)
-            user_card = await db.get_card(conv["user_card_id"])
-            user_data = user_card["card_data"].get("data", user_card["card_data"])
-            user_name_str = user_data.get("name", "User")
+            user_name_str = orig_user_data.get("name", "User")
             ai_char_names = []
             for ch in characters:
                 card = await db.get_card(ch["card_id"])
@@ -1389,7 +1395,7 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         if generating_as_user:
             model = _resolve_model("qwen3:14b")
             ollama_options = {
-                "temperature": 0.7, "num_predict": 128, "think": False,
+                "temperature": 0.7, "num_predict": 256, "think": False,
                 "repeat_penalty": 1.15, "repeat_last_n": 256,
             }
         else:
