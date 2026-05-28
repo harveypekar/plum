@@ -810,10 +810,13 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         except Exception as e:
             _log.warning("Scene state auto-update failed: %s", e)
 
+    _UNSET = object()
+
     async def _stream_response(ctx, conv_id, conv, model, chat_messages,
                                 ollama_options, user_name,
                                 save_role="assistant", prefix_text="",
-                                continue_msg_id=None, extra_debug=None):
+                                continue_msg_id=None, extra_debug=None,
+                                character_card_id=_UNSET):
         debug = {
             "debug_prompt": ctx["system_prompt"],
             "debug_user_prompt": ctx.get("post_prompt", ""),
@@ -868,7 +871,7 @@ def setup(app: FastAPI, ollama, resolve_model=None):
                     post_prompt=ctx.get("post_prompt", ""),
                     budget_json=budget_to_json(ctx),
                     prompt_json=chat_messages,
-                    character_card_id=conv.get("ai_card_id"),
+                    character_card_id=conv.get("ai_card_id") if character_card_id is _UNSET else character_card_id,
                 )
             conv_log.log_response(conv_id, save_role, post_ctx["response"], raw)
             budget_report = ctx.get("_budget_report")
@@ -1338,50 +1341,59 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         generating_as_user = last_role == "assistant"
         save_role = "user" if generating_as_user else "assistant"
 
+        characters = await db.get_conversation_characters(conv_id)
+        is_multi = len(characters) > 1
+
+        if not generating_as_user and is_multi:
+            last_user_content = ""
+            for m in reversed(messages):
+                if m["role"] == "user":
+                    last_user_content = m["content"]
+                    break
+            return await _send_multi_char_message(
+                conv_id, conv, characters, last_user_content)
+
         if generating_as_user:
-            # Swap cards so pipeline builds prompt for user's character
             swapped_conv = dict(conv)
             swapped_conv["user_card_id"] = conv["ai_card_id"]
             swapped_conv["ai_card_id"] = conv["user_card_id"]
-            # Flip message roles so the model sees the conversation from the other side
             swapped_messages = []
             for m in messages:
                 sm = dict(m)
                 sm["role"] = "assistant" if m["role"] == "user" else "user"
                 swapped_messages.append(sm)
             ctx = await _build_pipeline_ctx(swapped_conv, swapped_messages)
-            # Override post prompt for user-side: shorter, more reactive
             user_card = await db.get_card(conv["user_card_id"])
             user_data = user_card["card_data"].get("data", user_card["card_data"])
             user_name_str = user_data.get("name", "User")
-            ai_card = await db.get_card(conv["ai_card_id"])
-            ai_data = ai_card["card_data"].get("data", ai_card["card_data"])
-            ai_name_str = ai_data.get("name", "Character")
+            ai_char_names = []
+            for ch in characters:
+                card = await db.get_card(ch["card_id"])
+                if card:
+                    cdata = card["card_data"].get("data", card["card_data"])
+                    ai_char_names.append(cdata.get("name", "Character"))
+            never_write = ", ".join(ai_char_names) if ai_char_names else "the other characters"
             ctx["post_prompt"] = (
                 f"Write {user_name_str}'s next action or dialogue. Stay in character as {user_name_str}.\n"
-                f"NEVER write {ai_name_str}'s actions, speech, or thoughts.\n"
+                f"NEVER write {never_write}'s actions, speech, or thoughts.\n"
                 "Write 1-2 short paragraphs. Mix action and dialogue.\n"
                 "Use first person for actions (e.g. 'I walk over') and direct speech for dialogue.\n"
                 "Be reactive to what just happened — don't repeat or restart the scene."
             )
-            # Re-inject scene state into overridden post prompt
             scene_state = ctx.get("scene_state", "")
             if scene_state.strip():
                 ctx["post_prompt"] += "\n\n[Current Scene State — do NOT contradict this]\n" + scene_state.strip()
         else:
             ctx = await _build_pipeline_ctx(conv, messages)
 
-        _auto_user_model = "qwen3:14b"
         if generating_as_user:
-            model = _resolve_model(_auto_user_model)
+            model = _resolve_model("qwen3:14b")
+            ollama_options = {"temperature": 0.7, "num_predict": 256, "think": False}
         else:
             model = _resolve_model(conv["model"])
-        scenario = ctx.get("scenario") or {}
-        settings = scenario.get("settings", {})
-        ollama_options = build_ollama_options(settings)
-        if generating_as_user:
-            # Instruct model: lower temperature, no thinking
-            ollama_options = {"temperature": 0.7, "num_predict": 256, "think": False}
+            scenario = ctx.get("scenario") or {}
+            settings = scenario.get("settings", {})
+            ollama_options = build_ollama_options(settings)
 
         try:
             await _budget_ctx(ctx, model, ollama_options)
@@ -1397,10 +1409,11 @@ def setup(app: FastAPI, ollama, resolve_model=None):
                 status_code=413,
             )
 
-        # Tell Ollama to load the model with its real context window
         ollama_options = {**ollama_options, "num_ctx": ctx["_num_ctx"]}
 
         chat_messages = build_chat_messages(ctx)
+        if generating_as_user:
+            chat_messages[-1] = {"role": "assistant", "content": "*I "}
         user_name = get_user_name(ctx)
         conv_log.log_prompt(conv_id, "auto_reply", model,
                             ctx["system_prompt"], ctx.get("post_prompt", ""),
@@ -1410,7 +1423,8 @@ def setup(app: FastAPI, ollama, resolve_model=None):
             _stream_response(ctx, conv_id, conv, model, chat_messages,
                               ollama_options, user_name,
                               save_role=save_role,
-                              extra_debug={"auto_role": save_role}),
+                              extra_debug={"auto_role": save_role},
+                              character_card_id=None if generating_as_user else _UNSET),
             media_type="application/x-ndjson")
 
     # -- Compare (A/B eval) --
