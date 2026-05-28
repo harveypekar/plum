@@ -233,7 +233,11 @@ def assemble_prompt(ctx: dict) -> dict:
     user_name = user_data.get("name", "User")
 
     scenario_text = scenario.get("description", "")
-    if is_multi and scenario_text:
+    scenario_names = ctx.get("_scenario_names")
+    if scenario_text and scenario_names:
+        scenario_text = scenario_text.replace("{{char}}", scenario_names["char"])
+        scenario_text = scenario_text.replace("{{user}}", scenario_names["user"])
+    elif is_multi and scenario_text:
         scenario_text = scenario_text.replace("{{char}}", primary_name)
         scenario_text = scenario_text.replace("{{user}}", user_name)
 

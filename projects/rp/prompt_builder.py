@@ -230,6 +230,8 @@ async def build_pipeline_ctx(conv, messages, *, pipeline, template_path: Path):
         "authors_note": conv.get("authors_note", ""),
         "authors_note_depth": conv.get("authors_note_depth", 4),
     }
+    if conv.get("_scenario_names"):
+        ctx["_scenario_names"] = conv["_scenario_names"]
 
     summary_row = await db.get_latest_summary(conv["id"])
     if summary_row:
