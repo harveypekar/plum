@@ -1475,6 +1475,13 @@ def setup(app: FastAPI, ollama, resolve_model=None):
                 "Use first person for actions (e.g. 'I walk over') and direct speech for dialogue.\n"
                 "Be reactive to what just happened — don't repeat or restart the scene."
             )
+            recent_user = [m["content"][:150] for m in messages if m["role"] == "user"][-3:]
+            if recent_user:
+                ctx["post_prompt"] += (
+                    "\n\nYou already wrote these — write something COMPLETELY DIFFERENT "
+                    "(different actions, different words, advance the scene):\n"
+                    + "\n---\n".join(recent_user)
+                )
             scene_state = ctx.get("scene_state", "")
             if scene_state.strip():
                 ctx["post_prompt"] += "\n\n[Current Scene State — do NOT contradict this]\n" + scene_state.strip()
