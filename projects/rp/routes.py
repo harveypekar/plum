@@ -1490,9 +1490,14 @@ def setup(app: FastAPI, ollama, resolve_model=None):
 
         if generating_as_user:
             model = _resolve_model("qwen3:14b")
+            recent_user_texts = [m["content"] for m in messages if m["role"] == "user"][-3:]
+            has_repetition = (len(recent_user_texts) >= 2
+                              and recent_user_texts[-1][:80] == recent_user_texts[-2][:80])
             ollama_options = {
-                "temperature": 0.7, "num_predict": 256, "think": False,
-                "repeat_penalty": 1.15, "repeat_last_n": 256,
+                "temperature": 1.1 if has_repetition else 0.7,
+                "num_predict": 256, "think": False,
+                "repeat_penalty": 1.3 if has_repetition else 1.15,
+                "repeat_last_n": 512 if has_repetition else 256,
             }
         else:
             model = _resolve_model(conv["model"])

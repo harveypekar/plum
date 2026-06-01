@@ -67,8 +67,11 @@ def expand_variables(ctx: dict) -> dict:
     if ctx.get("post_prompt"):
         ctx["post_prompt"] = replace(ctx["post_prompt"])
 
+    active_card_id = ctx.get("_active_card", {}).get("id") if is_multi else None
     recent_asst = [m["content"][:80] for m in ctx.get("messages", [])
-                   if m.get("role") == "assistant"][-3:]
+                   if m.get("role") == "assistant"
+                   and (active_card_id is None
+                        or m.get("_character_card_id") == active_card_id)][-3:]
     if len(recent_asst) >= 2:
         ctx["post_prompt"] += (
             "\n\nDo NOT open with the same action, gesture, or phrase as your recent messages. "
