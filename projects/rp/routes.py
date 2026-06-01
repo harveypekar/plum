@@ -1137,8 +1137,8 @@ def setup(app: FastAPI, ollama, resolve_model=None):
 
         return StreamingResponse(stream(), media_type="application/x-ndjson")
 
-    async def _select_turn_order(messages, characters, card_names, user_name):
-        """Ask a small model which characters should respond and in what order."""
+    async def _select_turn_order(messages, characters, card_names, user_name, model):
+        """Ask the conversation model which characters should respond and in what order."""
         name_to_id = {}
         for card_id, name in card_names.items():
             name_to_id[name.lower()] = card_id
@@ -1171,9 +1171,8 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         )
 
         try:
-            selector_model = _resolve_model("qwen3:8b")
             result = await _ollama.chat(
-                model=selector_model,
+                model=model,
                 messages=[
                     {"role": "system", "content": system},
                     {"role": "user", "content": prompt_text},
@@ -1245,7 +1244,7 @@ def setup(app: FastAPI, ollama, resolve_model=None):
         user_card = await db.get_card(conv["user_card_id"])
         u_data = user_card["card_data"].get("data", user_card["card_data"]) if user_card else {}
         u_name = u_data.get("name", "User")
-        responding = await _select_turn_order(messages, characters, card_names, u_name)
+        responding = await _select_turn_order(messages, characters, card_names, u_name, model)
 
         async def multi_stream():
             yield json.dumps({"multi_character": True, "character_count": len(responding)}) + "\n"
