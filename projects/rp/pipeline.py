@@ -271,6 +271,25 @@ def assemble_prompt(ctx: dict) -> dict:
     ctx["system_prompt"] = render_template(system_part, values)
     ctx["post_prompt"] = render_template(post_part, values) if post_part else ""
 
+    if is_multi:
+        other_names = []
+        for cc in char_cards:
+            cd = cc.get("card_data", {}).get("data", cc.get("card_data", {}))
+            n = cd.get("name", "")
+            if n and n != active_name:
+                other_names.append(n)
+        if other_names:
+            others_str = ", ".join(other_names)
+            ctx["system_prompt"] += (
+                f"\n\nOther characters present: {others_str}. "
+                f"Their messages appear as [{others_str}]: in the conversation. "
+                f"React to what they say and do — acknowledge their presence and actions."
+            )
+            ctx["post_prompt"] += (
+                f"\nAlso do NOT write for {others_str}. "
+                f"But DO react to and acknowledge {others_str}'s actions and dialogue."
+            )
+
     raw_items = _parse_style_items(style_part)
     ctx["_style_pool"] = [render_template(item, values) for item in raw_items]
 
