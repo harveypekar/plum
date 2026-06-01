@@ -1178,7 +1178,8 @@ def setup(app: FastAPI, ollama, resolve_model=None):
                     {"role": "system", "content": system},
                     {"role": "user", "content": prompt_text},
                 ],
-                options={"temperature": 0.3, "num_predict": 64, "think": False},
+                think=False,
+                options={"temperature": 0.3, "num_predict": 64},
             )
             raw_text = result.get("message", {}).get("content", "").strip()
             start = raw_text.find("[")
