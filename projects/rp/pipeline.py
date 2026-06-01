@@ -590,9 +590,19 @@ def detect_pov(ctx: dict) -> dict:
 
 
 AVOID_LIST_NGRAM = 4
+AVOID_LIST_SHORT_NGRAM = 3
 AVOID_LIST_MIN_OCCURRENCES = 2
 AVOID_LIST_MAX_PHRASES = 12
-AVOID_LIST_MIN_MESSAGES = 4
+AVOID_LIST_MIN_MESSAGES = 2
+
+DIALECT_PATTERNS = re.compile(
+    r"\b(whaddya|whatcha|lookit|gonna|wanna|gotta|kinda|sorta|lemme|dunno)"
+    r"(?:\b|(?=\s|$))"
+    r"|\b(ain't|y'know|ya'll|somethin'|anythin'|nothin'|everythin'"
+    r"|doin'|goin'|thinkin'|feelin'|sayin'|tryin'|comin'|runnin')"
+    r"(?=\s|[.,!?;:\"]|$)",
+    re.IGNORECASE,
+)
 
 
 def _merge_overlapping(ngrams: list[str]) -> list[str]:
@@ -621,8 +631,19 @@ def _merge_overlapping(ngrams: list[str]) -> list[str]:
     return merged
 
 
+def _detect_dialect(messages: list[str]) -> list[str]:
+    """Find dialect words used across messages."""
+    from collections import Counter
+    counts: Counter[str] = Counter()
+    for msg in messages:
+        found = set(m.group(0).lower() for m in DIALECT_PATTERNS.finditer(msg))
+        for word in found:
+            counts[word] += 1
+    return sorted(w for w, c in counts.items() if c >= 1)
+
+
 def inject_avoid_list(ctx: dict) -> dict:
-    """Scan recent assistant messages for repeated phrases, inject avoid list."""
+    """Scan recent assistant messages for repeated phrases and dialect, inject avoid list."""
     messages = ctx.get("messages", [])
     active_card_id = ctx.get("_active_card", {}).get("id") if ctx.get("_multi_character") else None
     if active_card_id:
@@ -631,34 +652,49 @@ def inject_avoid_list(ctx: dict) -> dict:
                        and m.get("_character_card_id") == active_card_id]
     else:
         recent_asst = [m["content"] for m in messages if m.get("role") == "assistant"]
-    if len(recent_asst) < AVOID_LIST_MIN_MESSAGES:
+
+    phrases: list[str] = []
+    dialect_words: list[str] = []
+
+    if len(recent_asst) >= AVOID_LIST_MIN_MESSAGES:
+        window = recent_asst[-6:]
+
+        from collections import Counter
+        ngram_counts: Counter[str] = Counter()
+        for msg in window:
+            seen: set[str] = set()
+            for n in (AVOID_LIST_NGRAM, AVOID_LIST_SHORT_NGRAM):
+                for ng in _extract_ngrams(msg, n):
+                    if ng not in seen:
+                        ngram_counts[ng] += 1
+                        seen.add(ng)
+
+        overused = sorted(
+            [ng for ng, count in ngram_counts.items()
+             if count >= AVOID_LIST_MIN_OCCURRENCES],
+            key=lambda ng: -ngram_counts[ng],
+        )
+        phrases = _merge_overlapping(overused)[:AVOID_LIST_MAX_PHRASES]
+
+    if recent_asst:
+        dialect_words = _detect_dialect(recent_asst[-3:])
+
+    if not phrases and not dialect_words:
         return ctx
 
-    window = recent_asst[-6:]
+    parts: list[str] = []
+    if phrases:
+        parts.append("Do NOT reuse these phrases (find fresh alternatives):\n- " + "\n- ".join(phrases))
+    if dialect_words:
+        parts.append("Do NOT use dialect spelling or phonetic contractions (write standard English instead):\n- " + ", ".join(dialect_words))
 
-    from collections import Counter
-    ngram_counts: Counter[str] = Counter()
-    for msg in window:
-        seen: set[str] = set()
-        for ng in _extract_ngrams(msg, AVOID_LIST_NGRAM):
-            if ng not in seen:
-                ngram_counts[ng] += 1
-                seen.add(ng)
-
-    overused = sorted(
-        [ng for ng, count in ngram_counts.items()
-         if count >= AVOID_LIST_MIN_OCCURRENCES],
-        key=lambda ng: -ngram_counts[ng],
-    )
-
-    if not overused:
-        return ctx
-
-    phrases = _merge_overlapping(overused)[:AVOID_LIST_MAX_PHRASES]
-    avoid_block = "\n\nDo NOT reuse these phrases (find fresh alternatives):\n- " + "\n- ".join(phrases)
-    ctx["post_prompt"] += avoid_block
+    ctx["post_prompt"] += "\n\n" + "\n\n".join(parts)
     ctx["_avoid_list"] = phrases
-    _log.info("Injected avoid list: %d phrases", len(phrases))
+    ctx["_dialect_violations"] = dialect_words
+    if phrases:
+        _log.info("Injected avoid list: %d phrases", len(phrases))
+    if dialect_words:
+        _log.info("Injected dialect avoid: %s", dialect_words)
     return ctx
 
 
