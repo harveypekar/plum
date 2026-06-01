@@ -67,6 +67,14 @@ def expand_variables(ctx: dict) -> dict:
     if ctx.get("post_prompt"):
         ctx["post_prompt"] = replace(ctx["post_prompt"])
 
+    recent_asst = [m["content"][:80] for m in ctx.get("messages", [])
+                   if m.get("role") == "assistant"][-3:]
+    if len(recent_asst) >= 2:
+        ctx["post_prompt"] += (
+            "\n\nDo NOT open with the same action, gesture, or phrase as your recent messages. "
+            "Vary your opening line:\n" + "\n".join(f"- {s}..." for s in recent_asst)
+        )
+
     # Inject scene state into post prompt so it's close to generation.
     # Guard: if scene state references a different character (e.g. stale data
     # from a card that was overwritten), discard it to prevent identity bleed.
