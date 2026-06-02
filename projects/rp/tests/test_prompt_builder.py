@@ -172,25 +172,25 @@ class TestGetAiPronouns:
 
 
 class TestBuildChatMessagesWithPronouns:
-    def test_includes_pronouns_in_anchor(self):
+    def test_anchor_is_name_only(self):
         ctx = _ctx(ai_name="Kasa", ai_pronouns="she/her")
         msgs = build_chat_messages(ctx)
-        assert msgs[-1]["content"] == "Kasa [she/her] "
+        assert msgs[-1]["content"] == "Kasa "
 
     def test_no_pronouns_plain_anchor(self):
         ctx = _ctx(ai_name="Kasa")
         msgs = build_chat_messages(ctx)
         assert msgs[-1]["content"] == "Kasa "
 
-    def test_he_him_pronouns(self):
+    def test_anchor_ignores_pronouns(self):
         ctx = _ctx(ai_name="Marcus", ai_pronouns="he/him")
         msgs = build_chat_messages(ctx)
-        assert msgs[-1]["content"] == "Marcus [he/him] "
+        assert msgs[-1]["content"] == "Marcus "
 
-    def test_they_them_pronouns(self):
+    def test_they_them_anchor_is_name_only(self):
         ctx = _ctx(ai_name="River", ai_pronouns="they/them")
         msgs = build_chat_messages(ctx)
-        assert msgs[-1]["content"] == "River [they/them] "
+        assert msgs[-1]["content"] == "River "
 
 
 class TestBudgetToJson:
