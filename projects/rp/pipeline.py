@@ -615,7 +615,7 @@ AVOID_LIST_NGRAM = 4
 AVOID_LIST_SHORT_NGRAM = 3
 AVOID_LIST_MIN_OCCURRENCES = 2
 AVOID_LIST_MAX_PHRASES = 12
-AVOID_LIST_MIN_MESSAGES = 2
+AVOID_LIST_MIN_MESSAGES = 3
 
 DIALECT_PATTERNS = re.compile(
     r"\b(whaddya|whatcha|lookit|gonna|wanna|gotta|kinda|sorta|lemme|dunno)"
@@ -628,7 +628,7 @@ DIALECT_PATTERNS = re.compile(
 
 
 def _merge_overlapping(ngrams: list[str]) -> list[str]:
-    """Merge overlapping ngrams into longer phrases."""
+    """Merge overlapping ngrams into longer phrases, then drop sub-phrases."""
     merged: list[str] = []
     used: set[int] = set()
     for i, ng in enumerate(ngrams):
@@ -650,7 +650,12 @@ def _merge_overlapping(ngrams: list[str]) -> list[str]:
             if not found:
                 break
         merged.append(chain)
-    return merged
+    deduped: list[str] = []
+    for phrase in merged:
+        if any(phrase != other and phrase in other for other in merged):
+            continue
+        deduped.append(phrase)
+    return deduped
 
 
 def _detect_dialect(messages: list[str]) -> list[str]:

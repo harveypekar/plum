@@ -11,13 +11,22 @@ def _ctx_with_assistant_messages(messages: list[str]) -> dict:
 
 
 class TestAvoidListThreshold:
-    def test_kicks_in_after_two_messages(self):
+    def test_kicks_in_after_three_messages(self):
+        ctx = _ctx_with_assistant_messages([
+            "Her tongue darted out to wet suddenly dry lips as she shifted.",
+            "Her tongue darted out to wet suddenly dry lips nervously.",
+            "Her tongue darted out to wet suddenly dry lips again.",
+        ])
+        result = inject_avoid_list(ctx)
+        assert result.get("_avoid_list"), "Should detect repeats after 3 messages"
+
+    def test_no_injection_with_two_messages(self):
         ctx = _ctx_with_assistant_messages([
             "Her tongue darted out to wet suddenly dry lips as she shifted.",
             "Her tongue darted out to wet suddenly dry lips nervously.",
         ])
         result = inject_avoid_list(ctx)
-        assert result.get("_avoid_list"), "Should detect repeats after 2 messages"
+        assert not result.get("_avoid_list")
 
     def test_no_injection_with_one_message(self):
         ctx = _ctx_with_assistant_messages([
@@ -46,6 +55,18 @@ class TestShortNgrams:
         assert result.get("_avoid_list")
         joined = " ".join(result["_avoid_list"])
         assert "hazel eyes" in joined
+
+    def test_subsumes_shorter_phrases(self):
+        ctx = _ctx_with_assistant_messages([
+            "She swallowed hard and looked away from the door.",
+            "She swallowed hard and tried to breathe.",
+            "She swallowed hard and clenched her fists.",
+        ])
+        result = inject_avoid_list(ctx)
+        phrases = result.get("_avoid_list", [])
+        assert any("swallowed hard" in p for p in phrases)
+        assert not any(p == "she swallowed" for p in phrases), \
+            "Sub-phrase 'she swallowed' should be subsumed by 'she swallowed hard'"
 
 
 class TestDialectDetection:
@@ -84,6 +105,7 @@ class TestCombined:
         ctx = _ctx_with_assistant_messages([
             "Her tongue darted out to wet suddenly dry lips. Gonna be fun, ain't it?",
             "Her tongue darted out to wet suddenly dry lips. Whatcha thinkin'?",
+            "Her tongue darted out to wet suddenly dry lips. Gonna try again.",
         ])
         result = inject_avoid_list(ctx)
         assert result.get("_avoid_list")
