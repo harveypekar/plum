@@ -1,0 +1,13 @@
+www.elmarcel.com {
+	root * /srv/site
+	encode gzip
+	file_server
+	handle_errors {
+		rewrite * /404.html
+		file_server
+	}
+}
+
+elmarcel.com {
+	redir https://www.elmarcel.com{uri} permanent
+}
