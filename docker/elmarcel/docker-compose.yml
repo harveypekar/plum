@@ -1,0 +1,22 @@
+# Caddy serving the elmarcel.com static site.
+# Deployed to /opt/elmarcel/ on the VPS by scripts/deploy/deploy-elmarcel.sh.
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # Mount the parent of the docroot: the deploy script atomically swaps
+      # www/site.new -> www/site, which only stays visible to the container
+      # if path resolution happens inside the mount on every request.
+      - ./www:/srv:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:
