@@ -115,12 +115,7 @@ def build_chat_messages(ctx: dict) -> list[dict]:
     if ctx.get("post_prompt"):
         chat_messages.append({"role": "system", "content": ctx["post_prompt"]})
     ai_name = get_ai_name(ctx)
-    pronouns = get_ai_pronouns(ctx)
-    if pronouns:
-        anchor = f"{ai_name} [{pronouns}] "
-    else:
-        anchor = ai_name + " "
-    chat_messages.append({"role": "assistant", "content": anchor})
+    chat_messages.append({"role": "assistant", "content": ai_name + " "})
     return chat_messages
 
 
@@ -177,12 +172,7 @@ def build_multi_char_messages(ctx: dict, active_card_id: int,
     active_card = ctx.get("_active_card", ctx.get("ai_card", {}))
     card_data = active_card.get("card_data", {}).get("data", active_card.get("card_data", {}))
     ai_name = card_data.get("name", "Character")
-    pronouns = card_data.get("pronouns", "") or infer_pronouns(card_data.get("description", ""))
-    if pronouns:
-        anchor = f"{ai_name} [{pronouns}] "
-    else:
-        anchor = ai_name + " "
-    chat_messages.append({"role": "assistant", "content": anchor})
+    chat_messages.append({"role": "assistant", "content": ai_name + " "})
     return chat_messages
 
 
