@@ -1,10 +1,15 @@
 www.elmarcel.com {
-	root * /srv/site
-	encode gzip
-	file_server
-	handle_errors {
-		rewrite * /404.html
+	redir / /blog/ 301
+	redir /blog /blog/ 301
+
+	handle_path /blog/* {
+		root * /srv/site
+		encode gzip
 		file_server
+		handle_errors {
+			rewrite * /404.html
+			file_server
+		}
 	}
 }
 
