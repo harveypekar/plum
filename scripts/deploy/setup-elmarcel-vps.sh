@@ -39,6 +39,9 @@ COMPOSE_VERSION="$(remote 'docker compose version' || true)"
 [ -n "$COMPOSE_VERSION" ] || log_die "Docker compose plugin missing: 'docker compose version' returned nothing"
 log_info "Compose present: $COMPOSE_VERSION"
 
+log_info "Installing rclone if absent"
+remote "command -v rclone >/dev/null || curl -fsSL https://rclone.org/install.sh | bash"
+
 log_info "Creating $REMOTE_ROOT/www"
 remote "mkdir -p $REMOTE_ROOT/www"
 
