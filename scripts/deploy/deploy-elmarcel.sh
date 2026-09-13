@@ -37,7 +37,7 @@ DEEP_POST_PATH="/blog/posts/2008_10_19_6_changelog/"
 # On-disk path is unprefixed (Hugo's output layout doesn't nest under /blog;
 # Caddy's handle_path strips the /blog prefix when serving). SAMPLE_IMAGE_PATH
 # is the public URL path; GALLERY_SAMPLE_REL is the same file relative to the
-# built site root, used for filesystem checks in verify_build.
+# built site root, used for filesystem checks in build-and-swap.sh.
 GALLERY_SAMPLE_REL="/images/gallery/2004_01_03_13_35_42_4138319335.jpg"
 SAMPLE_IMAGE_PATH="/blog${GALLERY_SAMPLE_REL}"
 
@@ -82,22 +82,6 @@ run_check() {
     echo "All post-cutover checks passed."
 }
 
-verify_build() {
-    log_info "Verifying built site on target"
-    remote "test -f $REMOTE_ROOT/www/site/index.html" \
-        || log_die "Build verification failed: www/site/index.html missing"
-    remote "grep -qF 'https://www.elmarcel.com' $REMOTE_ROOT/www/site/index.xml" \
-        || log_die "Build verification failed: RSS lacks https baseURL"
-    local count
-    count="$(remote "find $REMOTE_ROOT/www/site/images/gallery -type f | wc -l")" \
-        || log_die "Build verification failed: cannot count gallery files"
-    [ "$count" -ge "$GALLERY_MIN_FILES" ] \
-        || log_die "Build verification failed: gallery has $count files, expected >= $GALLERY_MIN_FILES"
-    remote "test -f $REMOTE_ROOT/www/site${GALLERY_SAMPLE_REL}" \
-        || log_die "Build verification failed: sample gallery image missing"
-    log_info "Build verified: index.html present, https RSS, $count gallery files"
-}
-
 # --- mode setup -----------------------------------------------------------
 
 if [ "$MODE" = "--check" ]; then
@@ -127,49 +111,52 @@ fi
     || log_die "static/images/gallery missing in $SITE_SRC — run the gallery restore first"
 
 log_info "Syncing compose config and Hugo source to target"
+# NOTE (applies to both branches below): build-and-swap.sh sources
+# "../../common/logging.sh" relative to its own location (it lives at
+# scripts/deploy/lib/ in this repo, two levels below scripts/). Staging it
+# must mirror that same two-level nesting under REMOTE_ROOT
+# (REMOTE_ROOT/deploy/lib/..) so its relative source path still resolves to
+# REMOTE_ROOT/common/logging.sh. Do not flatten this back to
+# REMOTE_ROOT/lib — that breaks the relative source and build-and-swap.sh
+# fails immediately on the target.
 if [ "$MODE" = "--local" ]; then
     # On the real VPS, setup-elmarcel-vps.sh pre-creates www/ as the SSH user
     # before any deploy runs. Mirror that here: if www/ doesn't exist yet,
     # Docker's bind-mount auto-creates it as root, poisoning ownership of
     # every file the Hugo container writes underneath it.
-    mkdir -p "$REMOTE_ROOT/www"
+    mkdir -p "$REMOTE_ROOT/www" "$REMOTE_ROOT/deploy/lib" "$REMOTE_ROOT/common"
     rsync -az "$COMPOSE_SRC/docker-compose.yml" "$COMPOSE_SRC/Caddyfile" \
         "$REMOTE_ROOT/"
+    rsync -az "$SCRIPT_DIR/lib/build-and-swap.sh" "$REMOTE_ROOT/deploy/lib/"
+    rsync -az "$SCRIPT_DIR/../common/logging.sh" "$REMOTE_ROOT/common/"
     rsync -az --delete \
         "$SITE_SRC/content" "$SITE_SRC/static" "$SITE_SRC/layouts" \
         "$SITE_SRC/archetypes" "$SITE_SRC/config.toml" \
         "$REMOTE_ROOT/src/"
 else
+    # rsync only auto-creates the final path component on the remote side, so
+    # pre-create deploy/lib (two levels) and common explicitly before
+    # rsyncing into them.
+    remote "mkdir -p $REMOTE_ROOT/deploy/lib $REMOTE_ROOT/common"
     rsync -az -e "ssh -i $VPS_SSH_KEY -o BatchMode=yes" \
         "$COMPOSE_SRC/docker-compose.yml" "$COMPOSE_SRC/Caddyfile" \
         "${VPS_USER}@${VPS_HOST}:${REMOTE_ROOT}/"
+    rsync -az -e "ssh -i $VPS_SSH_KEY -o BatchMode=yes" \
+        "$SCRIPT_DIR/lib/build-and-swap.sh" "${VPS_USER}@${VPS_HOST}:${REMOTE_ROOT}/deploy/lib/"
+    rsync -az -e "ssh -i $VPS_SSH_KEY -o BatchMode=yes" \
+        "$SCRIPT_DIR/../common/logging.sh" "${VPS_USER}@${VPS_HOST}:${REMOTE_ROOT}/common/"
     rsync -az --delete -e "ssh -i $VPS_SSH_KEY -o BatchMode=yes" \
         "$SITE_SRC/content" "$SITE_SRC/static" "$SITE_SRC/layouts" \
         "$SITE_SRC/archetypes" "$SITE_SRC/config.toml" \
         "${VPS_USER}@${VPS_HOST}:${REMOTE_ROOT}/src/"
 fi
 
-log_info "Building site on target with $HUGO_IMAGE"
-# src is NOT mounted :ro: Hugo writes a transient .hugo_build.lock into the
-# source dir during the build and errors out on a read-only filesystem.
-remote "docker run --rm \
-    -v $REMOTE_ROOT/src:/src \
-    -v $REMOTE_ROOT/www:/target \
-    $HUGO_IMAGE hugo \
-    --source /src --destination /target/site.new \
-    --baseURL $BASE_URL --cleanDestinationDir" \
-    || log_die "Hugo build failed on target; live site untouched"
-
-remote "test -f $REMOTE_ROOT/www/site.new/index.html" \
-    || log_die "Build produced no index.html; live site untouched"
-
-log_info "Atomically swapping site.new -> site"
-remote "cd $REMOTE_ROOT/www && rm -rf site.old \
-    && { [ ! -d site ] || mv site site.old; } \
-    && mv site.new site" \
-    || log_die "Site swap failed"
-
-verify_build
+log_info "Building and swapping on target"
+remote "TARGET_ROOT=$REMOTE_ROOT SRC_DIR=$REMOTE_ROOT/src HUGO_IMAGE=$HUGO_IMAGE \
+    BASE_URL=$BASE_URL GALLERY_MIN_FILES=$GALLERY_MIN_FILES \
+    GALLERY_SAMPLE_REL=$GALLERY_SAMPLE_REL \
+    bash $REMOTE_ROOT/deploy/lib/build-and-swap.sh" \
+    || log_die "build-and-swap failed on target; see target's ~/.logs/plum/build-and-swap/ for details"
 
 if [ "$MODE" = "--local" ]; then
     log_info "LOCAL MODE complete (Caddy not started; serving tested separately)"
