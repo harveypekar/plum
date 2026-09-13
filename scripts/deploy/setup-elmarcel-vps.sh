@@ -42,6 +42,29 @@ log_info "Compose present: $COMPOSE_VERSION"
 log_info "Creating $REMOTE_ROOT/www"
 remote "mkdir -p $REMOTE_ROOT/www"
 
+log_info "Setting up bare repo for push-to-deploy"
+remote "git init --bare $REMOTE_ROOT/repo.git"
+remote "mkdir -p $REMOTE_ROOT/deploy/lib $REMOTE_ROOT/common"
+
+# shellcheck disable=SC2029  # client-side expansion is intentional
+scp -i "$VPS_SSH_KEY" "$SCRIPT_DIR/hooks/post-receive-elmarcel.sh" \
+    "${VPS_USER}@${VPS_HOST}:${REMOTE_ROOT}/repo.git/hooks/post-receive"
+remote "chmod +x $REMOTE_ROOT/repo.git/hooks/post-receive"
+
+# build-and-swap.sh and logging.sh: the hook calls these directly (no SSH
+# indirection needed since it already runs on the VPS), so they need to be
+# resident there, not just staged transiently by a deploy run.
+# shellcheck disable=SC2029
+scp -i "$VPS_SSH_KEY" "$SCRIPT_DIR/lib/build-and-swap.sh" \
+    "${VPS_USER}@${VPS_HOST}:${REMOTE_ROOT}/deploy/lib/"
+# shellcheck disable=SC2029
+scp -i "$VPS_SSH_KEY" "$SCRIPT_DIR/../common/logging.sh" \
+    "${VPS_USER}@${VPS_HOST}:${REMOTE_ROOT}/common/"
+
+echo "Bare repo ready at ${VPS_USER}@${VPS_HOST}:${REMOTE_ROOT}/repo.git"
+echo "Add it as a remote from the blog repo checkout:"
+echo "  git remote add hetzner ${VPS_USER}@${VPS_HOST}:${REMOTE_ROOT}/repo.git"
+
 log_info "VPS setup complete."
 echo "VPS setup complete."
 echo ""
