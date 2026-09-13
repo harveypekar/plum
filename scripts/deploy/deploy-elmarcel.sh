@@ -111,16 +111,19 @@ fi
     || log_die "static/images/gallery missing in $SITE_SRC — run the gallery restore first"
 
 log_info "Syncing compose config and Hugo source to target"
+# NOTE (applies to both branches below): build-and-swap.sh sources
+# "../../common/logging.sh" relative to its own location (it lives at
+# scripts/deploy/lib/ in this repo, two levels below scripts/). Staging it
+# must mirror that same two-level nesting under REMOTE_ROOT
+# (REMOTE_ROOT/deploy/lib/..) so its relative source path still resolves to
+# REMOTE_ROOT/common/logging.sh. Do not flatten this back to
+# REMOTE_ROOT/lib — that breaks the relative source and build-and-swap.sh
+# fails immediately on the target.
 if [ "$MODE" = "--local" ]; then
     # On the real VPS, setup-elmarcel-vps.sh pre-creates www/ as the SSH user
     # before any deploy runs. Mirror that here: if www/ doesn't exist yet,
     # Docker's bind-mount auto-creates it as root, poisoning ownership of
     # every file the Hugo container writes underneath it.
-    # build-and-swap.sh sources "../../common/logging.sh" relative to its own
-    # location (it lives at scripts/deploy/lib/ in this repo, two levels below
-    # scripts/). Mirror that same two-level nesting under REMOTE_ROOT
-    # (REMOTE_ROOT/deploy/lib/..) so its relative source path still resolves
-    # to REMOTE_ROOT/common/logging.sh.
     mkdir -p "$REMOTE_ROOT/www" "$REMOTE_ROOT/deploy/lib" "$REMOTE_ROOT/common"
     rsync -az "$COMPOSE_SRC/docker-compose.yml" "$COMPOSE_SRC/Caddyfile" \
         "$REMOTE_ROOT/"
@@ -132,8 +135,8 @@ if [ "$MODE" = "--local" ]; then
         "$REMOTE_ROOT/src/"
 else
     # rsync only auto-creates the final path component on the remote side, so
-    # pre-create the (multi-level, newly introduced) deploy/lib and common
-    # dirs explicitly before rsyncing into them.
+    # pre-create deploy/lib (two levels) and common explicitly before
+    # rsyncing into them.
     remote "mkdir -p $REMOTE_ROOT/deploy/lib $REMOTE_ROOT/common"
     rsync -az -e "ssh -i $VPS_SSH_KEY -o BatchMode=yes" \
         "$COMPOSE_SRC/docker-compose.yml" "$COMPOSE_SRC/Caddyfile" \
@@ -153,7 +156,7 @@ remote "TARGET_ROOT=$REMOTE_ROOT SRC_DIR=$REMOTE_ROOT/src HUGO_IMAGE=$HUGO_IMAGE
     BASE_URL=$BASE_URL GALLERY_MIN_FILES=$GALLERY_MIN_FILES \
     GALLERY_SAMPLE_REL=$GALLERY_SAMPLE_REL \
     bash $REMOTE_ROOT/deploy/lib/build-and-swap.sh" \
-    || log_die "build-and-swap failed on target"
+    || log_die "build-and-swap failed on target; see target's ~/.logs/plum/build-and-swap/ for details"
 
 if [ "$MODE" = "--local" ]; then
     log_info "LOCAL MODE complete (Caddy not started; serving tested separately)"
