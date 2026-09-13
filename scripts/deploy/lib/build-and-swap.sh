@@ -26,6 +26,7 @@ source "$SCRIPT_DIR/../../common/logging.sh"
 [ -f "$SRC_DIR/config.toml" ] || log_die "config.toml missing in $SRC_DIR"
 [ -d "$SRC_DIR/static/images/gallery" ] \
     || log_die "static/images/gallery missing in $SRC_DIR — run the gallery restore first"
+[ -d "$TARGET_ROOT/www" ] || log_die "TARGET_ROOT/www missing — caller must create it before invoking this script"
 
 log_info "Building site with $HUGO_IMAGE"
 # SRC_DIR is NOT mounted :ro: Hugo writes a transient .hugo_build.lock into
