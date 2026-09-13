@@ -29,12 +29,17 @@ esac
 SITE_SRC="${ELMARCEL_SITE_SRC:-/mnt/d/prg/bogartindustries_com_blog/pacifishticks}"
 COMPOSE_SRC="$SCRIPT_DIR/../../docker/elmarcel"
 HUGO_IMAGE="hugomods/hugo:0.133.1"
-BASE_URL="https://www.elmarcel.com/"
+BASE_URL="https://www.elmarcel.com/blog/"
 CANONICAL_HOST="www.elmarcel.com"
 APEX_HOST="elmarcel.com"
 GALLERY_MIN_FILES=118
-DEEP_POST_PATH="/blog/2008_10_19_6_changelog/"
-SAMPLE_IMAGE_PATH="/images/gallery/2004_01_03_13_35_42_4138319335.jpg"
+DEEP_POST_PATH="/blog/posts/2008_10_19_6_changelog/"
+# On-disk path is unprefixed (Hugo's output layout doesn't nest under /blog;
+# Caddy's handle_path strips the /blog prefix when serving). SAMPLE_IMAGE_PATH
+# is the public URL path; GALLERY_SAMPLE_REL is the same file relative to the
+# built site root, used for filesystem checks in verify_build.
+GALLERY_SAMPLE_REL="/images/gallery/2004_01_03_13_35_42_4138319335.jpg"
+SAMPLE_IMAGE_PATH="/blog${GALLERY_SAMPLE_REL}"
 
 # --- verification helpers -----------------------------------------------
 
@@ -63,14 +68,16 @@ curl_contains() {
 
 run_check() {
     log_info "Running post-cutover verification against live DNS"
-    curl_contains "https://${CANONICAL_HOST}/" "PACIFISHTICKS"
-    curl_contains "https://${CANONICAL_HOST}/index.xml" "https://www.elmarcel.com"
+    curl_expect "https://${CANONICAL_HOST}/" 301
+    curl_expect "https://${CANONICAL_HOST}/blog" 301
+    curl_contains "https://${CANONICAL_HOST}/blog/" "PACIFISHTICKS"
+    curl_contains "https://${CANONICAL_HOST}/blog/index.xml" "https://www.elmarcel.com"
     curl_expect "https://${CANONICAL_HOST}${DEEP_POST_PATH}" 200
     curl_expect "https://${CANONICAL_HOST}${SAMPLE_IMAGE_PATH}" 200
     # Caddy auto-HTTPS redirect is 308; Caddyfile 'redir ... permanent' is 301.
     curl_expect "http://${CANONICAL_HOST}/" 308
     curl_expect "https://${APEX_HOST}/" 301
-    curl_expect "https://${CANONICAL_HOST}/definitely-not-a-page" 404
+    curl_expect "https://${CANONICAL_HOST}/blog/definitely-not-a-page" 404
     log_info "All post-cutover checks passed"
     echo "All post-cutover checks passed."
 }
@@ -86,7 +93,7 @@ verify_build() {
         || log_die "Build verification failed: cannot count gallery files"
     [ "$count" -ge "$GALLERY_MIN_FILES" ] \
         || log_die "Build verification failed: gallery has $count files, expected >= $GALLERY_MIN_FILES"
-    remote "test -f $REMOTE_ROOT/www/site${SAMPLE_IMAGE_PATH}" \
+    remote "test -f $REMOTE_ROOT/www/site${GALLERY_SAMPLE_REL}" \
         || log_die "Build verification failed: sample gallery image missing"
     log_info "Build verified: index.html present, https RSS, $count gallery files"
 }
