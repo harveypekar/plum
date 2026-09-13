@@ -30,8 +30,14 @@ while read -r _old_sha new_sha ref_name; do
         BASE_URL="https://www.elmarcel.com/blog/" \
         GALLERY_MIN_FILES=118 \
         GALLERY_SAMPLE_REL="/images/gallery/2004_01_03_13_35_42_4138319335.jpg" \
+        LOG_VERBOSE=true \
         bash "$REPO_ROOT/deploy/lib/build-and-swap.sh"; then
-        echo "post-receive: build/swap failed; live site untouched" >&2
+        # build-and-swap.sh swaps site.new -> site BEFORE running its own
+        # post-swap verification, so a failure here does not necessarily mean
+        # the live site is untouched — it may already have been swapped to a
+        # broken/incomplete build. Do not claim otherwise.
+        echo "post-receive: build/swap failed — site may or may not have been swapped; check target log (see below)" >&2
+        echo "post-receive: see ~/.logs/plum/build-and-swap/ on the VPS for full detail" >&2
         exit 1
     fi
 
