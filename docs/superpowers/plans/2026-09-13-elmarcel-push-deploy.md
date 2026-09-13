@@ -519,3 +519,12 @@ Expected: hook succeeds again (`post-receive: deploy complete`), confirming reco
 ## Post-plan note
 
 `deploy-elmarcel.sh` still exists and still matters — it's the path for *infrastructure* changes (Caddyfile, compose file) that live in the `plum` repo, not blog content. Nothing in this plan removes or replaces it; Task 2 only changes what it delegates to internally.
+
+## Corrections found during execution (Task 5)
+
+Two things in this plan turned out to be wrong once actually run against production — noted here so a future re-read of this plan doesn't repeat the confusion:
+
+- **The `VAR=... bash setup-elmarcel-vps.sh` inline-override pattern doesn't work.** `load-env.sh` unconditionally `source`s `.env`, which clobbers any same-named env vars set on the command line *before* the script runs — the override has no effect. If `setup-elmarcel-vps.sh` needs to run with different values than what's in a worktree's `.env` (e.g. a placeholder-only `.env` in a fresh worktree), the values need to be re-exported *after* `load-env.sh` sources the file, not passed as a command-line prefix.
+- **A `post-receive` hook's exit status never reaches the pusher's `git push` exit code.** By git's own design, only `pre-receive`/`update` hooks (which run before the ref update is accepted) can affect that; `post-receive` runs after git has already accepted the push, so a failing hook still leaves `git push` reporting success (exit 0) to the client — the only signal of failure is the hook's own stdout/stderr, relayed live as `remote: ...` lines. This plan's Task 5 Step 6 wrongly expected "a non-zero exit reported by git" — that's not achievable with this hook type, and isn't a bug in the hook itself.
+
+Actual end-to-end test results (all verified independently, not just trusted from hook output): a real push built and deployed correctly (393 pages, 118 gallery files, live content confirmed); a deliberately broken push (invalid TOML front matter) failed the Hugo build and left the live site provably untouched (site file mtimes unchanged, broken content never appeared, confirmed via direct filesystem check on the VPS); a recovery push after reverting the break redeployed cleanly, and the Storage Box backup was confirmed current after each successful deploy.
