@@ -92,6 +92,12 @@ def test_browse_blocks_path_traversal_variants(client, tmp_path, attack_path):
 
     resp = client.get(f"/browse/{attack_path}")
     assert resp.status_code == 404
+    # Pin the detail to the app's own guard (_safe_resolve's HTTPException),
+    # not Starlette's router-level "Not Found" for an unmatched route — a
+    # plain status-code check can't tell those apart, and a future routing
+    # change could silently stop exercising _safe_resolve() while this test
+    # kept passing for the wrong reason.
+    assert resp.json()["detail"] == "Not found"
 
 
 def test_browse_missing_path_is_404(client):
