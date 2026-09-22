@@ -1,0 +1,6 @@
+# Fetch fresh Garmin data every 4 hours. Cron strips the container's
+# environment, so source /etc/cron.env (written by docker-entrypoint-cron.sh
+# at container start) before running anything that needs GARMIN_EMAIL/
+# GARMIN_PASSWORD/RCLONE_REMOTE.
+0 */4 * * * . /etc/cron.env; cd /app && python fetch_garmin.py >> /proc/1/fd/1 2>&1
+0 3 * * * . /etc/cron.env; cd /app && bash backup_garmin.sh >> /proc/1/fd/1 2>&1
