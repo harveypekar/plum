@@ -6,7 +6,7 @@ import json
 import os
 import sys
 import time
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 from garminconnect import Garmin, GarminConnectAuthenticationError
@@ -508,7 +508,7 @@ def write_status(success: bool, started_at: str, counts: dict, error: str | None
     status = {
         "success": success,
         "started_at": started_at,
-        "finished_at": datetime.utcnow().isoformat() + "Z",
+        "finished_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "counts": counts,
         "error": error,
     }
@@ -546,7 +546,7 @@ def _run_fetch(args, started_at: str) -> None:
 
 def main():
     args = parse_args()
-    started_at = datetime.utcnow().isoformat() + "Z"
+    started_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
     try:
         with sync_lock(LOCK_PATH):
             _run_fetch(args, started_at)
