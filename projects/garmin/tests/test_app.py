@@ -66,6 +66,34 @@ def test_browse_blocks_path_traversal(client):
     assert resp.status_code == 404
 
 
+# Note: variants below use percent-encoded dot/slash segments (%2e, %2f), not
+# literal "../". httpx's URL parser applies RFC 3986 dot-segment removal to
+# literal ".." *client-side*, before the request is ever sent — a request for
+# "/browse/../../etc/passwd" never reaches the server as that path at all, so
+# a test built on it would pass without exercising _safe_resolve(). Percent
+# encoding the "." and "/" bytes defeats that client-side normalization, so
+# the string actually arrives at the ASGI app (Starlette decodes it while
+# routing the {path:path} parameter) and genuinely exercises the guard.
+@pytest.mark.parametrize(
+    "attack_path",
+    [
+        "%2e%2e/%2e%2e/etc/passwd",  # doubled ../ , percent-encoded
+        "....//....//etc/passwd",  # defeats naive "strip '../' once" sanitizers
+        "/etc/passwd",  # absolute path: DATA_DIR / "/etc/passwd" == Path("/etc/passwd")
+        "//etc/passwd",  # leading double slash
+        "activities/..%2F..%2F..%2Fetc%2Fpasswd",  # traversal from inside a real subdir
+        "..%2Foutside_secret.json",  # a file that actually exists just above DATA_DIR
+    ],
+)
+def test_browse_blocks_path_traversal_variants(client, tmp_path, attack_path):
+    # Plant a real file just outside DATA_DIR so a bypass would actually leak
+    # content, not just 404 because nothing happens to exist at that path.
+    (tmp_path / "outside_secret.json").write_text('{"leaked": true}')
+
+    resp = client.get(f"/browse/{attack_path}")
+    assert resp.status_code == 404
+
+
 def test_browse_missing_path_is_404(client):
     resp = client.get("/browse/does/not/exist.json")
     assert resp.status_code == 404
