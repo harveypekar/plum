@@ -116,6 +116,7 @@ while IFS= read -r f; do
         projects/rp/*)       projects_to_test="$projects_to_test rp" ;;
         projects/3dml/*)     projects_to_test="$projects_to_test 3dml" ;;
         projects/coach/*)    projects_to_test="$projects_to_test coach" ;;
+        projects/garmin/*)   projects_to_test="$projects_to_test garmin" ;;
     esac
 done <<< "$STAGED_FILES"
 # deduplicate
