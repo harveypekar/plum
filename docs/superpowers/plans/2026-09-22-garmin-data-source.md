@@ -1222,14 +1222,19 @@ remote "true" || log_die "Cannot SSH to ${VPS_USER}@${VPS_HOST} with key $VPS_SS
 log_info "Creating shared 'edge' Docker network if absent"
 remote "docker network inspect edge >/dev/null 2>&1 || docker network create edge"
 
-log_info "Creating $REMOTE_ROOT"
-remote "mkdir -p $REMOTE_ROOT"
+# Mirrors the repo's own docker/garmin + projects/garmin relative layout, so
+# the compose file's relative build context (../../projects/garmin) and
+# volume mount (./rclone.conf) resolve without any path rewriting at deploy
+# time. Do not flatten this — see docker-compose.yml's context path.
+log_info "Creating $REMOTE_ROOT/docker/garmin and $REMOTE_ROOT/projects/garmin"
+remote "mkdir -p $REMOTE_ROOT/docker/garmin $REMOTE_ROOT/projects/garmin"
 
 log_info "VPS setup complete."
 echo "VPS setup complete."
 echo ""
 echo "MANUAL STEP REMAINING: copy your rclone config (containing the"
-echo "hetzner-crypt remote credentials) to ${VPS_USER}@${VPS_HOST}:${REMOTE_ROOT}/rclone.conf"
+echo "hetzner-crypt remote credentials) to:"
+echo "  ${VPS_USER}@${VPS_HOST}:${REMOTE_ROOT}/docker/garmin/rclone.conf"
 echo "The backup cron job will fail until this is in place — the fetch and"
 echo "web dashboard work fine without it."
 ```
@@ -1318,23 +1323,27 @@ if [ "$MODE" = "--check" ]; then
     exit 0
 fi
 
-log_info "Syncing garmin project source to $GARMIN_ROOT"
-remote "mkdir -p $GARMIN_ROOT/project $GARMIN_ROOT/compose"
+# Layout on the VPS mirrors the repo's own docker/garmin + projects/garmin
+# relative structure, so docker-compose.yml's relative build context
+# (../../projects/garmin) and volume mount (./rclone.conf) resolve exactly
+# as they do locally — no path rewriting, no --project-directory override.
+log_info "Syncing garmin project source to $GARMIN_ROOT/projects/garmin"
+remote "mkdir -p $GARMIN_ROOT/docker/garmin $GARMIN_ROOT/projects/garmin"
 rsync_up --delete --exclude data --exclude .venv --exclude __pycache__ --exclude .pytest_cache \
-    "$PROJECT_SRC/" "${VPS_USER}@${VPS_HOST}:${GARMIN_ROOT}/project/"
-rsync_up "$GARMIN_COMPOSE_SRC/docker-compose.yml" "${VPS_USER}@${VPS_HOST}:${GARMIN_ROOT}/compose/"
+    "$PROJECT_SRC/" "${VPS_USER}@${VPS_HOST}:${GARMIN_ROOT}/projects/garmin/"
+rsync_up "$GARMIN_COMPOSE_SRC/docker-compose.yml" "${VPS_USER}@${VPS_HOST}:${GARMIN_ROOT}/docker/garmin/"
 
 log_info "Syncing updated elmarcel Caddy config to $ELMARCEL_ROOT"
 rsync_up "$ELMARCEL_COMPOSE_SRC/Caddyfile" "$ELMARCEL_COMPOSE_SRC/docker-compose.yml" \
     "${VPS_USER}@${VPS_HOST}:${ELMARCEL_ROOT}/"
 
 log_info "Checking for rclone config (backup prerequisite)"
-if ! remote "test -f $GARMIN_ROOT/rclone.conf"; then
-    log_warn "No rclone config at ${GARMIN_ROOT}/rclone.conf — the backup cron job will fail until you copy one there. Fetch and the web dashboard are unaffected."
+if ! remote "test -f $GARMIN_ROOT/docker/garmin/rclone.conf"; then
+    log_warn "No rclone config at ${GARMIN_ROOT}/docker/garmin/rclone.conf — the backup cron job will fail until you copy one there. Fetch and the web dashboard are unaffected."
 fi
 
 log_info "Writing garmin .env for docker compose"
-remote "cat > $GARMIN_ROOT/compose/.env" <<EOF
+remote "cat > $GARMIN_ROOT/docker/garmin/.env" <<EOF
 GARMIN_EMAIL=${GARMIN_EMAIL}
 GARMIN_PASSWORD=${GARMIN_PASSWORD}
 RCLONE_REMOTE=${RCLONE_REMOTE}
@@ -1351,7 +1360,7 @@ GARMIN_WEB_PASSWORD_HASH=${HASH}
 EOF
 
 log_info "Building and starting garmin-web / garmin-cron"
-remote "cd $GARMIN_ROOT/compose && docker compose --project-directory $GARMIN_ROOT/project -f $GARMIN_ROOT/compose/docker-compose.yml --env-file $GARMIN_ROOT/compose/.env up -d --build" \
+remote "cd $GARMIN_ROOT/docker/garmin && docker compose up -d --build" \
     || log_die "docker compose up failed for garmin stack"
 
 log_info "Refreshing elmarcel Caddy to pick up the new site block"
