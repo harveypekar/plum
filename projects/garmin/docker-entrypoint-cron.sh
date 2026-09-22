@@ -5,10 +5,10 @@
 set -euo pipefail
 
 {
-    echo "export GARMIN_EMAIL='${GARMIN_EMAIL:-}'"
-    echo "export GARMIN_PASSWORD='${GARMIN_PASSWORD:-}'"
-    echo "export RCLONE_REMOTE='${RCLONE_REMOTE:-hetzner-crypt}'"
-    echo "export GARMIN_DATA_DIR='${GARMIN_DATA_DIR:-/app/data/garmin}'"
+    printf 'export GARMIN_EMAIL=%q\n' "${GARMIN_EMAIL:-}"
+    printf 'export GARMIN_PASSWORD=%q\n' "${GARMIN_PASSWORD:-}"
+    printf 'export RCLONE_REMOTE=%q\n' "${RCLONE_REMOTE:-hetzner-crypt}"
+    printf 'export GARMIN_DATA_DIR=%q\n' "${GARMIN_DATA_DIR:-/app/data/garmin}"
 } > /etc/cron.env
 chmod 600 /etc/cron.env
 
