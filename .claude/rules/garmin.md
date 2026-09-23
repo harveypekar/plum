@@ -36,7 +36,17 @@ bash tests/test_backup_garmin.sh  # backup script test
   dashboard reads to show sync health — never silently swallow a failed run.
 - Auth: `GARMIN_EMAIL`/`GARMIN_PASSWORD` env vars for unattended login; if
   the account has MFA, the first login must be run interactively once
-  (e.g. over SSH with a TTY) to establish the cached garth token.
+  (e.g. over SSH with a TTY) to establish the cached garth token:
+  ```bash
+  ssh -i <VPS_SSH_KEY> <VPS_USER>@<VPS_HOST>
+  cd /opt/garmin/docker/garmin
+  docker compose exec -it garmin-cron python fetch_garmin.py
+  ```
+  `garmin-cron` is the compose service name (confirmed via `docker compose
+  config --services`); its main process is cron, not python, so `exec -it`
+  is required to get an interactive TTY into a fresh `python
+  fetch_garmin.py` invocation, prompting for the MFA code and caching the
+  resulting garth token for subsequent unattended cron/web-triggered runs.
 - Access control is entirely at the Caddy layer (`basicauth` in
   `docker/elmarcel/Caddyfile`) — no app-level auth code.
 
