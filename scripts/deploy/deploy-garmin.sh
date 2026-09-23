@@ -48,6 +48,10 @@ if [ "$MODE" = "--check" ]; then
         -H "Host: garmin.elmarcel.com" "http://${VPS_HOST}/")"
     [ "$CODE" = "200" ] || log_die "Expected HTTP 200 from garmin.elmarcel.com, got $CODE"
     log_info "OK: garmin.elmarcel.com responds with 200"
+
+    UNAUTH_CODE="$(curl -sS -o /dev/null -w '%{http_code}' -H "Host: garmin.elmarcel.com" "http://${VPS_HOST}/")"
+    [ "$UNAUTH_CODE" = "401" ] || log_die "Expected HTTP 401 without credentials, got $UNAUTH_CODE (basicauth is not enforcing!)"
+    log_info "OK: garmin.elmarcel.com rejects unauthenticated requests with 401"
     exit 0
 fi
 
@@ -76,9 +80,16 @@ GARMIN_EMAIL=${GARMIN_EMAIL}
 GARMIN_PASSWORD=${GARMIN_PASSWORD}
 RCLONE_REMOTE=${RCLONE_REMOTE}
 EOF
+remote "chmod 600 $GARMIN_ROOT/docker/garmin/.env"
 
+# Pipe the plaintext over stdin rather than interpolating it into the
+# remote command string as a --plaintext argument: a password containing a
+# single quote would break naive shell-quoting of a --plaintext value sent
+# over SSH (and worse, could inject commands into the remote shell). Caddy
+# reads the plaintext from stdin when --plaintext is omitted, and strips
+# the trailing newline before hashing (verified empirically).
 log_info "Hashing GARMIN_WEB_PASSWORD for Caddy basicauth"
-HASH="$(remote "docker run --rm caddy:2-alpine caddy hash-password --plaintext '${GARMIN_WEB_PASSWORD}'")"
+HASH="$(printf '%s\n' "$GARMIN_WEB_PASSWORD" | remote "docker run --rm -i caddy:2-alpine caddy hash-password")"
 [ -n "$HASH" ] || log_die "caddy hash-password returned nothing"
 
 log_info "Writing elmarcel .env with basicauth credentials"
@@ -86,6 +97,7 @@ remote "cat > $ELMARCEL_ROOT/.env" <<EOF
 GARMIN_WEB_USER=${GARMIN_WEB_USER}
 GARMIN_WEB_PASSWORD_HASH=${HASH}
 EOF
+remote "chmod 600 $ELMARCEL_ROOT/.env"
 
 log_info "Building and starting garmin-web / garmin-cron"
 remote "cd $GARMIN_ROOT/docker/garmin && docker compose up -d --build" \
