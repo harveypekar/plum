@@ -16,6 +16,17 @@ services:
       - ./www:/srv:ro
       - caddy_data:/data
       - caddy_config:/config
+    environment:
+      - GARMIN_WEB_USER=${GARMIN_WEB_USER:-admin}
+      - GARMIN_WEB_PASSWORD_HASH=${GARMIN_WEB_PASSWORD_HASH}
+    networks:
+      - default
+      - edge
+
+networks:
+  default:
+  edge:
+    external: true
 
 volumes:
   caddy_data:
