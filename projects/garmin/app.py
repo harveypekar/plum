@@ -1,5 +1,6 @@
 """FastAPI dev browser for fetched Garmin data. Not a consumer UI — exposes
 every field of every fetched file, unmodified, for debugging."""
+import html
 import json
 import subprocess
 import sys
@@ -37,14 +38,19 @@ def dashboard():
         summary = "<p>No sync has run yet.</p>"
     else:
         ok = "OK" if status["success"] else "FAILED"
-        counts_html = "".join(f"<li>{k}: {v}</li>" for k, v in status.get("counts", {}).items())
-        error_html = f"<p style='color:red'>{status['error']}</p>" if status.get("error") else ""
+        counts_html = "".join(
+            f"<li>{html.escape(str(k))}: {html.escape(str(v))}</li>"
+            for k, v in status.get("counts", {}).items()
+        )
+        error_html = (
+            f"<p style='color:red'>{html.escape(str(status['error']))}</p>" if status.get("error") else ""
+        )
         summary = (
-            f"<p>Last sync started: {status['started_at']} — {ok}</p>"
+            f"<p>Last sync started: {html.escape(str(status['started_at']))} — {ok}</p>"
             f"<ul>{counts_html}</ul>"
             f"{error_html}"
         )
-    html = f"""<!doctype html>
+    page_html = f"""<!doctype html>
 <html><head><title>Garmin Data Source</title></head>
 <body>
 <h1>Garmin Data Source</h1>
@@ -52,7 +58,7 @@ def dashboard():
 <form method="post" action="/sync"><button type="submit">Sync now</button></form>
 <p><a href="/browse/">Browse data</a></p>
 </body></html>"""
-    return HTMLResponse(html)
+    return HTMLResponse(page_html)
 
 
 @app.post("/sync")
@@ -73,6 +79,14 @@ def _safe_resolve(rel_path: str) -> Path:
         target.relative_to(DATA_DIR.resolve())
     except ValueError:
         raise HTTPException(status_code=404, detail="Not found")
+    # Reject any path with a dotfile segment (e.g. .tokens/oauth1_token.json,
+    # .sync.lock) — same response shape as the traversal guard above, before
+    # any file access happens. .tokens/oauth1_token.json is a real,
+    # long-lived Garmin session token that can log into and WRITE to the
+    # account, not just read fetched data; it must never be reachable
+    # through this shared-password dev browser.
+    if any(part.startswith(".") for part in Path(rel_path).parts):
+        raise HTTPException(status_code=404, detail="Not found")
     return target
 
 
@@ -84,6 +98,13 @@ def browse(path: str = ""):
     if target.is_dir():
         entries = sorted(p.name + ("/" if p.is_dir() else "") for p in target.iterdir())
         return JSONResponse({"path": path, "entries": entries})
-    with open(target, encoding="utf-8") as f:
-        data = json.load(f)
+    try:
+        with open(target, encoding="utf-8") as f:
+            data = json.load(f)
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        # A non-JSON file under DATA_DIR (e.g. reached mid-write, or a
+        # stray non-JSON artifact) should return a clean 4xx, not an
+        # unhandled 500. 415: the resource exists but isn't a media type
+        # this endpoint can serve.
+        raise HTTPException(status_code=415, detail="Not a JSON file")
     return JSONResponse(data)
