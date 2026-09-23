@@ -20,7 +20,7 @@ elmarcel.com {
 }
 
 garmin.elmarcel.com {
-	basicauth {
+	basic_auth {
 		{$GARMIN_WEB_USER} {$GARMIN_WEB_PASSWORD_HASH}
 	}
 	reverse_proxy garmin-web:8000
