@@ -18,7 +18,13 @@ services:
       - caddy_config:/config
     environment:
       - GARMIN_WEB_USER=${GARMIN_WEB_USER:-admin}
-      - GARMIN_WEB_PASSWORD_HASH=${GARMIN_WEB_PASSWORD_HASH}
+      # Required: an empty/unset hash makes Caddy's basic_auth directive
+      # fail validation ("username and password cannot be empty") and
+      # crash-loop, taking down www.elmarcel.com too since they share this
+      # Caddy instance. This can happen if deploy-elmarcel.sh is run before
+      # deploy-garmin.sh has ever populated /opt/elmarcel/.env. Fail fast
+      # with a clear message instead of starting a crash-looping Caddy.
+      - GARMIN_WEB_PASSWORD_HASH=${GARMIN_WEB_PASSWORD_HASH:?GARMIN_WEB_PASSWORD_HASH must be set — run deploy-garmin.sh at least once before (re)starting this stack}
     networks:
       - default
       - edge
