@@ -107,3 +107,80 @@ def test_fetch_activities_calls_get_activities_by_date_exactly_once(tmp_path, mo
     assert len(result) == 150
     saved = json.loads((tmp_path / "activities" / "list.json").read_text())
     assert len(saved) == 150
+
+
+def _patch_run_fetch_collaborators(monkeypatch, activities, seen):
+    """Stub every _run_fetch collaborator except the ones under test, and
+    record what fetch_activity_details/fetch_daily/fetch_range_data are
+    actually called with, into `seen`."""
+    monkeypatch.setattr(fetch_garmin, "authenticate", lambda: object())
+    monkeypatch.setattr(fetch_garmin, "fetch_profile", lambda garmin: None)
+    monkeypatch.setattr(fetch_garmin, "fetch_devices", lambda garmin: None)
+    monkeypatch.setattr(fetch_garmin, "fetch_gear", lambda garmin: None)
+    monkeypatch.setattr(fetch_garmin, "fetch_badges_and_challenges", lambda garmin: None)
+    monkeypatch.setattr(fetch_garmin, "fetch_goals", lambda garmin: None)
+    monkeypatch.setattr(fetch_garmin, "fetch_workouts", lambda garmin: None)
+    monkeypatch.setattr(fetch_garmin, "fetch_weekly", lambda garmin, today, full: None)
+    monkeypatch.setattr(
+        fetch_garmin, "fetch_activities", lambda garmin, today, full: activities
+    )
+    monkeypatch.setattr(
+        fetch_garmin, "fetch_activity_details",
+        lambda garmin, acts, full: seen.setdefault("details", acts),
+    )
+    monkeypatch.setattr(
+        fetch_garmin, "fetch_daily",
+        lambda garmin, acts, today, full: seen.setdefault("daily", acts),
+    )
+    monkeypatch.setattr(
+        fetch_garmin, "fetch_range_data",
+        lambda garmin, acts, today: seen.setdefault("range", acts),
+    )
+
+
+class _Args:
+    def __init__(self, full=False, limit=None):
+        self.full = full
+        self.limit = limit
+
+
+def test_run_fetch_with_limit_only_fetches_details_for_most_recent_n(monkeypatch, tmp_path):
+    """--limit N must restrict the expensive per-activity/per-day fetching
+    to the N most recent activities, while the full activity list is still
+    fetched as usual — this lets a first-time run against a real account be
+    tested safely on a small slice before committing to a full historical
+    backfill (each of those N activities can still trigger dozens of daily
+    endpoint calls, so this must be the *count* of activities let through,
+    not merely a hint)."""
+    monkeypatch.setattr(fetch_garmin, "DATA_DIR", tmp_path)
+    activities = [
+        {"activityId": 1, "startTimeLocal": "2026-01-01 00:00:00"},
+        {"activityId": 2, "startTimeLocal": "2026-03-01 00:00:00"},
+        {"activityId": 3, "startTimeLocal": "2026-02-01 00:00:00"},
+    ]
+    seen = {}
+    _patch_run_fetch_collaborators(monkeypatch, activities, seen)
+
+    fetch_garmin._run_fetch(_Args(limit=2), "2026-01-01T00:00:00Z")
+
+    assert [a["activityId"] for a in seen["details"]] == [2, 3]
+    assert [a["activityId"] for a in seen["daily"]] == [2, 3]
+    assert [a["activityId"] for a in seen["range"]] == [2, 3]
+
+
+def test_run_fetch_without_limit_passes_full_activity_list(monkeypatch, tmp_path):
+    """No --limit (the default, production path) must not truncate
+    anything — this guards against a regression in the slicing logic
+    accidentally clipping the normal unattended run."""
+    monkeypatch.setattr(fetch_garmin, "DATA_DIR", tmp_path)
+    activities = [
+        {"activityId": i, "startTimeLocal": "2026-01-01 00:00:00"} for i in range(5)
+    ]
+    seen = {}
+    _patch_run_fetch_collaborators(monkeypatch, activities, seen)
+
+    fetch_garmin._run_fetch(_Args(limit=None), "2026-01-01T00:00:00Z")
+
+    assert len(seen["details"]) == 5
+    assert len(seen["daily"]) == 5
+    assert len(seen["range"]) == 5
