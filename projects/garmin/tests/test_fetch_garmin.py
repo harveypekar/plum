@@ -2,6 +2,7 @@
 import fcntl
 import json
 import sys
+from datetime import date
 
 import pytest
 
@@ -75,3 +76,34 @@ def test_main_writes_status_on_success(tmp_path, monkeypatch):
     assert status["success"] is True
     assert status["counts"] == {"activities": 3}
     assert status["error"] is None
+
+
+def test_fetch_activities_calls_get_activities_by_date_exactly_once(tmp_path, monkeypatch):
+    """get_activities_by_date() already paginates internally and returns the
+    full result set in one call. fetch_activities() must not loop and re-call
+    it — the real bug this pins caused an unbounded loop against the live
+    Garmin API that kept re-fetching (and duplicating) the same activities
+    forever, since a full-history batch is always >= 100 items and never
+    triggers the old (bogus) "last page" check."""
+    monkeypatch.setattr(fetch_garmin, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(fetch_garmin.time, "sleep", lambda seconds: None)
+
+    call_count = 0
+
+    class FakeGarmin:
+        def get_activities_by_date(self, start_date, end_date):
+            nonlocal call_count
+            call_count += 1
+            if call_count > 1:
+                raise RuntimeError("get_activities_by_date called more than once")
+            return [
+                {"activityId": i, "startTimeLocal": "2026-01-01 00:00:00"}
+                for i in range(150)
+            ]
+
+    result = fetch_garmin.fetch_activities(FakeGarmin(), date(2026, 1, 2))
+
+    assert call_count == 1
+    assert len(result) == 150
+    saved = json.loads((tmp_path / "activities" / "list.json").read_text())
+    assert len(saved) == 150
