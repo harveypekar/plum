@@ -1,0 +1,12 @@
+# Fetch fresh Garmin data every 4 hours. Cron strips the container's
+# environment, so source /etc/cron.env (written by docker-entrypoint-cron.sh
+# at container start) before running anything that needs GARMIN_EMAIL/
+# GARMIN_PASSWORD/RCLONE_REMOTE.
+#
+# Debian's cron defaults to PATH=/usr/bin:/bin for job processes, but the
+# python:3.12-slim base image only has python at /usr/local/bin/python (no
+# /usr/bin/python*) — without this, every job below fails with
+# "python: not found", silently, forever. See docker-entrypoint-cron.sh.
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+0 */4 * * * . /etc/cron.env; cd /app && python fetch_garmin.py >> /proc/1/fd/1 2>&1
+0 3 * * * . /etc/cron.env; cd /app && bash backup_garmin.sh >> /proc/1/fd/1 2>&1

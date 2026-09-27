@@ -1,0 +1,38 @@
+# Garmin data source: web dashboard/browser + scheduled fetch/backup cron.
+# Deployed to /opt/garmin/ on the VPS by scripts/deploy/deploy-garmin.sh.
+# Joins the shared `edge` network so the existing elmarcel Caddy instance
+# can reverse-proxy to garmin-web without running a second Caddy.
+services:
+  garmin-web:
+    build:
+      context: ../../projects/garmin
+    restart: unless-stopped
+    volumes:
+      - garmin_data:/app/data/garmin
+    environment:
+      - GARMIN_EMAIL=${GARMIN_EMAIL}
+      - GARMIN_PASSWORD=${GARMIN_PASSWORD}
+    networks:
+      - edge
+
+  garmin-cron:
+    build:
+      context: ../../projects/garmin
+    restart: unless-stopped
+    command: ["bash", "docker-entrypoint-cron.sh"]
+    volumes:
+      - garmin_data:/app/data/garmin
+      - ./rclone.conf:/root/.config/rclone/rclone.conf:ro
+    environment:
+      - GARMIN_EMAIL=${GARMIN_EMAIL}
+      - GARMIN_PASSWORD=${GARMIN_PASSWORD}
+      - RCLONE_REMOTE=${RCLONE_REMOTE:-hetzner-crypt}
+    networks:
+      - edge
+
+networks:
+  edge:
+    external: true
+
+volumes:
+  garmin_data:

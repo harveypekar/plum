@@ -18,3 +18,10 @@ www.elmarcel.com {
 elmarcel.com {
 	redir https://www.elmarcel.com{uri} permanent
 }
+
+garmin.elmarcel.com {
+	basic_auth {
+		{$GARMIN_WEB_USER} {$GARMIN_WEB_PASSWORD_HASH}
+	}
+	reverse_proxy garmin-web:8000
+}
