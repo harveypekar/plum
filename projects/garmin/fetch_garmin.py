@@ -545,6 +545,8 @@ def _run_fetch(args, started_at: str) -> None:
     total_size_mb = sum(f.stat().st_size for f in DATA_DIR.rglob("*.json")) / 1024 / 1024
     counts = {
         "activities": len(activities),
+        "activities_with_details": len(detail_activities),
+        "limit": args.limit,
         "total_files": total_files,
         "total_size_mb": round(total_size_mb, 1),
     }

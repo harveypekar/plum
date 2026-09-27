@@ -109,10 +109,11 @@ def test_fetch_activities_calls_get_activities_by_date_exactly_once(tmp_path, mo
     assert len(saved) == 150
 
 
-def _patch_run_fetch_collaborators(monkeypatch, activities, seen):
+def _patch_run_fetch_collaborators(monkeypatch, activities, seen, tmp_path):
     """Stub every _run_fetch collaborator except the ones under test, and
     record what fetch_activity_details/fetch_daily/fetch_range_data are
     actually called with, into `seen`."""
+    monkeypatch.setattr(fetch_garmin, "STATUS_PATH", tmp_path / "status.json")
     monkeypatch.setattr(fetch_garmin, "authenticate", lambda: object())
     monkeypatch.setattr(fetch_garmin, "fetch_profile", lambda garmin: None)
     monkeypatch.setattr(fetch_garmin, "fetch_devices", lambda garmin: None)
@@ -153,19 +154,29 @@ def test_run_fetch_with_limit_only_fetches_details_for_most_recent_n(monkeypatch
     endpoint calls, so this must be the *count* of activities let through,
     not merely a hint)."""
     monkeypatch.setattr(fetch_garmin, "DATA_DIR", tmp_path)
+    # Order deliberately does NOT put the two most-recent activities at the
+    # tail of the input list — id2 (most recent) is first, id1 (oldest) is
+    # last — so a naive "take the last N of input order" bug (e.g.
+    # activities[-2:]) would wrongly select [1, 3] instead of the correct
+    # [2, 3], and this test catches that instead of passing by coincidence.
     activities = [
-        {"activityId": 1, "startTimeLocal": "2026-01-01 00:00:00"},
         {"activityId": 2, "startTimeLocal": "2026-03-01 00:00:00"},
         {"activityId": 3, "startTimeLocal": "2026-02-01 00:00:00"},
+        {"activityId": 1, "startTimeLocal": "2026-01-01 00:00:00"},
     ]
     seen = {}
-    _patch_run_fetch_collaborators(monkeypatch, activities, seen)
+    _patch_run_fetch_collaborators(monkeypatch, activities, seen, tmp_path)
 
     fetch_garmin._run_fetch(_Args(limit=2), "2026-01-01T00:00:00Z")
 
     assert [a["activityId"] for a in seen["details"]] == [2, 3]
     assert [a["activityId"] for a in seen["daily"]] == [2, 3]
     assert [a["activityId"] for a in seen["range"]] == [2, 3]
+
+    status = json.loads((tmp_path / "status.json").read_text())
+    assert status["counts"]["activities"] == 3
+    assert status["counts"]["activities_with_details"] == 2
+    assert status["counts"]["limit"] == 2
 
 
 def test_run_fetch_without_limit_passes_full_activity_list(monkeypatch, tmp_path):
@@ -177,10 +188,15 @@ def test_run_fetch_without_limit_passes_full_activity_list(monkeypatch, tmp_path
         {"activityId": i, "startTimeLocal": "2026-01-01 00:00:00"} for i in range(5)
     ]
     seen = {}
-    _patch_run_fetch_collaborators(monkeypatch, activities, seen)
+    _patch_run_fetch_collaborators(monkeypatch, activities, seen, tmp_path)
 
     fetch_garmin._run_fetch(_Args(limit=None), "2026-01-01T00:00:00Z")
 
     assert len(seen["details"]) == 5
     assert len(seen["daily"]) == 5
     assert len(seen["range"]) == 5
+
+    status = json.loads((tmp_path / "status.json").read_text())
+    assert status["counts"]["activities"] == 5
+    assert status["counts"]["activities_with_details"] == 5
+    assert status["counts"]["limit"] is None
