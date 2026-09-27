@@ -291,22 +291,16 @@ def fetch_activities(garmin: Garmin, today: date, full: bool = False) -> list:
 
     start_date = newest_date if newest_date else "2000-01-01"
     end_date = str(today)
-    new_activities = []
-    page = 0
 
-    while True:
-        batch = api_call(
-            f"activities page {page}",
-            garmin.get_activities_by_date, start_date, end_date,
-        )
-        if not batch:
-            break
-        new_activities.extend(batch)
-        print(f"  Fetched {len(new_activities)} activities so far...")
-        if len(batch) < 100:
-            break
-        page += 1
-        time.sleep(1)
+    # get_activities_by_date() already paginates internally against Garmin's
+    # API and returns the complete result set for the date range in one
+    # call — it must not be called in an outer loop, or it re-fetches (and
+    # duplicates) the same full result set forever.
+    new_activities = api_call(
+        "activities list",
+        garmin.get_activities_by_date, start_date, end_date,
+    ) or []
+    print(f"  Fetched {len(new_activities)} activities")
 
     if newest_date and not full:
         existing_ids = {a.get("activityId") for a in existing}
