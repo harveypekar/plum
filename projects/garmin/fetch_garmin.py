@@ -94,6 +94,12 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Fetch all data from Garmin Connect.")
     parser.add_argument("--full", action="store_true",
                         help="Force re-fetch everything (ignore incremental cache)")
+    parser.add_argument("--limit", type=int, default=None,
+                        help="Only fetch full details (per-activity endpoints, daily "
+                             "wellness, range data) for the N most recent activities. "
+                             "The full activity list is still fetched either way. "
+                             "For safely testing against a real account before "
+                             "committing to a full historical backfill.")
     return parser.parse_args()
 
 
@@ -521,15 +527,26 @@ def _run_fetch(args, started_at: str) -> None:
     fetch_workouts(garmin)
 
     activities = fetch_activities(garmin, today, full=args.full)
-    fetch_activity_details(garmin, activities, full=args.full)
-    fetch_daily(garmin, activities, today, full=args.full)
+
+    detail_activities = activities
+    if args.limit is not None:
+        detail_activities = sorted(
+            activities, key=lambda a: a.get("startTimeLocal", ""), reverse=True
+        )[:args.limit]
+        print(f"  --limit {args.limit}: only fetching full details for the "
+              f"{len(detail_activities)} most recent activities")
+
+    fetch_activity_details(garmin, detail_activities, full=args.full)
+    fetch_daily(garmin, detail_activities, today, full=args.full)
     fetch_weekly(garmin, today, full=args.full)
-    fetch_range_data(garmin, activities, today)
+    fetch_range_data(garmin, detail_activities, today)
 
     total_files = sum(1 for _ in DATA_DIR.rglob("*.json"))
     total_size_mb = sum(f.stat().st_size for f in DATA_DIR.rglob("*.json")) / 1024 / 1024
     counts = {
         "activities": len(activities),
+        "activities_with_details": len(detail_activities),
+        "limit": args.limit,
         "total_files": total_files,
         "total_size_mb": round(total_size_mb, 1),
     }
