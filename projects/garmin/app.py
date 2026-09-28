@@ -1,12 +1,12 @@
-"""FastAPI dev browser for fetched Garmin data. Not a consumer UI — exposes
-every field of every fetched file, unmodified, for debugging."""
+"""FastAPI dev dashboard for fetched Garmin data. Not a consumer UI — shows
+the last 10 days of fetched data, largely unmodified, for debugging."""
 import html
 import json
 import subprocess
 import sys
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from sync_lock import LockHeldError, sync_lock
@@ -16,6 +16,11 @@ DATA_DIR = BASE_DIR / "data" / "garmin"
 STATUS_PATH = DATA_DIR / "status.json"
 LOCK_PATH = DATA_DIR / ".sync.lock"
 FETCH_SCRIPT = BASE_DIR / "fetch_garmin.py"
+
+RECENT_DAYS_LIMIT = 10
+# Some daily endpoints (e.g. heart_rates.json) hold thousands of samples;
+# truncating lists keeps the summary readable without hiding field shape.
+MAX_LIST_PREVIEW = 3
 
 app = FastAPI()
 
@@ -29,6 +34,52 @@ def read_status() -> dict:
             return json.load(f)
     except (json.JSONDecodeError, OSError) as e:
         return {**empty, "success": False, "error": f"status.json unreadable: {e}"}
+
+
+def _summarize(value):
+    """Shrink a JSON value for display: keeps every key and a few real
+    values so field shape stays visible, but truncates long lists."""
+    if isinstance(value, dict):
+        return {k: _summarize(v) for k, v in value.items()}
+    if isinstance(value, list):
+        head = [_summarize(v) for v in value[:MAX_LIST_PREVIEW]]
+        if len(value) > MAX_LIST_PREVIEW:
+            head.append(f"... {len(value) - MAX_LIST_PREVIEW} more")
+        return head
+    return value
+
+
+def _recent_days_html() -> str:
+    daily_dir = DATA_DIR / "daily"
+    if not daily_dir.is_dir():
+        return "<p>No daily data yet.</p>"
+
+    day_dirs = sorted(
+        (p for p in daily_dir.iterdir() if p.is_dir()), key=lambda p: p.name, reverse=True
+    )[:RECENT_DAYS_LIMIT]
+    if not day_dirs:
+        return "<p>No daily data yet.</p>"
+
+    days_html = []
+    for day_dir in day_dirs:
+        files = sorted(f for f in day_dir.iterdir() if f.suffix == ".json")
+        files_html = []
+        for f in files:
+            try:
+                with open(f, encoding="utf-8") as fh:
+                    data = json.load(fh)
+            except (json.JSONDecodeError, OSError) as e:
+                body = f"unreadable: {html.escape(str(e))}"
+            else:
+                body = html.escape(json.dumps(_summarize(data), indent=2, default=str))
+            files_html.append(
+                f"<details><summary>{html.escape(f.name)}</summary><pre>{body}</pre></details>"
+            )
+        days_html.append(
+            f"<details><summary>{html.escape(day_dir.name)} ({len(files)} files)</summary>"
+            f"{''.join(files_html)}</details>"
+        )
+    return "".join(days_html)
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -56,7 +107,8 @@ def dashboard():
 <h1>Garmin Data Source</h1>
 {summary}
 <form method="post" action="/sync"><button type="submit">Sync now</button></form>
-<p><a href="/browse/">Browse data</a></p>
+<h2>Recent daily data</h2>
+{_recent_days_html()}
 </body></html>"""
     return HTMLResponse(page_html)
 
@@ -71,40 +123,3 @@ def trigger_sync():
 
     subprocess.Popen([sys.executable, str(FETCH_SCRIPT)])
     return JSONResponse({"status": "started"})
-
-
-def _safe_resolve(rel_path: str) -> Path:
-    target = (DATA_DIR / rel_path).resolve()
-    try:
-        target.relative_to(DATA_DIR.resolve())
-    except ValueError:
-        raise HTTPException(status_code=404, detail="Not found")
-    # Reject any path with a dotfile segment (e.g. .tokens/oauth1_token.json,
-    # .sync.lock) — same response shape as the traversal guard above, before
-    # any file access happens. .tokens/oauth1_token.json is a real,
-    # long-lived Garmin session token that can log into and WRITE to the
-    # account, not just read fetched data; it must never be reachable
-    # through this shared-password dev browser.
-    if any(part.startswith(".") for part in Path(rel_path).parts):
-        raise HTTPException(status_code=404, detail="Not found")
-    return target
-
-
-@app.get("/browse/{path:path}")
-def browse(path: str = ""):
-    target = _safe_resolve(path)
-    if not target.exists():
-        raise HTTPException(status_code=404, detail="Not found")
-    if target.is_dir():
-        entries = sorted(p.name + ("/" if p.is_dir() else "") for p in target.iterdir())
-        return JSONResponse({"path": path, "entries": entries})
-    try:
-        with open(target, encoding="utf-8") as f:
-            data = json.load(f)
-    except (json.JSONDecodeError, UnicodeDecodeError):
-        # A non-JSON file under DATA_DIR (e.g. reached mid-write, or a
-        # stray non-JSON artifact) should return a clean 4xx, not an
-        # unhandled 500. 415: the resource exists but isn't a media type
-        # this endpoint can serve.
-        raise HTTPException(status_code=415, detail="Not a JSON file")
-    return JSONResponse(data)
