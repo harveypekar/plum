@@ -19,8 +19,8 @@ python fetch_garmin.py            # manual fetch (incremental)
 python fetch_garmin.py --full     # force re-fetch everything
 uvicorn app:app --reload          # run the dev browse page locally
 
-pytest tests/                     # Python tests
-bash tests/test_backup_garmin.sh  # backup script test
+pytest tests/                        # Python tests
+bash tests/test_sync_garmin_data.sh  # sync script test
 ```
 
 ## Architecture
@@ -59,9 +59,12 @@ bash tests/test_backup_garmin.sh  # backup script test
   builds, hashes `GARMIN_WEB_PASSWORD` into the Caddyfile's basicauth,
   refreshes the elmarcel Caddy stack, verifies via `curl --fail`.
 
-## Backup
+## Off-VPS data sync
 
-`backup_garmin.sh` runs daily from the `garmin-cron` container: zips
-`data/garmin/`, uploads to `hetzner-crypt:bak/garmin/`, keeps the newest 3.
-Aborts loudly if the configured rclone remote isn't type `crypt` — see
+`sync_garmin_data.sh` runs daily from the `garmin-cron` container:
+`rclone sync`s `data/garmin/` to `hetzner-crypt:data_sources/garmin/`. This
+is the canonical off-box copy of the data, not a dated/rotated backup —
+the remote is kept as an exact mirror of the local tree (deletions
+included), so there's no versioning or pruning to reason about. Aborts
+loudly if the configured rclone remote isn't type `crypt` — see
 `.claude/rules/backup.md` (non-negotiable).

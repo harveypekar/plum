@@ -1,5 +1,5 @@
 #!/bin/bash
-# Test that backup_garmin.sh aborts before touching the network when the
+# Test that sync_garmin_data.sh aborts before touching the network when the
 # configured rclone remote does not resolve to a crypt backend.
 set -euo pipefail
 
@@ -9,7 +9,7 @@ REPO_ROOT="$(cd "$PROJECT_DIR/../.." && pwd)"
 # shellcheck source=/dev/null
 source "$REPO_ROOT/scripts/test/test-helpers.sh"
 
-print_header "backup_garmin.sh: abort on non-crypt remote"
+print_header "sync_garmin_data.sh: abort on non-crypt remote"
 
 WORKDIR="$(mktemp -d)"
 trap 'rm -rf "$WORKDIR"' EXIT
@@ -19,7 +19,7 @@ echo '{}' > "$WORKDIR/data/garmin/status.json"
 
 # Fake rclone: reports the remote as type "sftp" (not crypt) and fails
 # loudly if the script tries to use it for anything beyond the config check
-# — proves the script aborts before any zip/upload/prune step runs.
+# — proves the script aborts before any sync step runs.
 cat > "$WORKDIR/bin/rclone" <<'EOF'
 #!/bin/bash
 if [ "$1" = "config" ] && [ "$2" = "show" ]; then
@@ -33,7 +33,7 @@ chmod +x "$WORKDIR/bin/rclone"
 
 set +e
 PATH="$WORKDIR/bin:$PATH" GARMIN_DATA_DIR="$WORKDIR/data/garmin" RCLONE_REMOTE="hetzner-crypt" \
-    bash "$PROJECT_DIR/backup_garmin.sh" > "$WORKDIR/out.log" 2>&1
+    bash "$PROJECT_DIR/sync_garmin_data.sh" > "$WORKDIR/out.log" 2>&1
 EXIT_CODE=$?
 set -e
 
