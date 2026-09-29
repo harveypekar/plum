@@ -103,8 +103,9 @@ fi
 
 # Layout on the VPS mirrors the repo's own docker/garmin + projects/garmin
 # relative structure, so docker-compose.yml's relative build context
-# (../../projects/garmin) and volume mount (./rclone.conf) resolve exactly
-# as they do locally — no path rewriting, no --project-directory override.
+# (../../projects/garmin) resolves exactly as it does locally — no path
+# rewriting, no --project-directory override. (The rclone mount is an
+# absolute /opt/shared/rclone path, so it isn't affected by this either way.)
 log_info "Syncing garmin project source to $GARMIN_ROOT/projects/garmin"
 remote "mkdir -p $GARMIN_ROOT/docker/garmin $GARMIN_ROOT/projects/garmin"
 rsync_up --delete --exclude data --exclude .venv --exclude __pycache__ --exclude .pytest_cache \
@@ -115,17 +116,15 @@ log_info "Syncing updated elmarcel Caddy config to $ELMARCEL_ROOT"
 rsync_up "$ELMARCEL_COMPOSE_SRC/Caddyfile" "$ELMARCEL_COMPOSE_SRC/docker-compose.yml" \
     "${VPS_USER}@${VPS_HOST}:${ELMARCEL_ROOT}/"
 
-log_info "Checking for rclone config (backup prerequisite)"
-if ! remote "test -f $GARMIN_ROOT/docker/garmin/rclone.conf"; then
-    log_warn "No rclone config at ${GARMIN_ROOT}/docker/garmin/rclone.conf — the backup cron job will fail until you copy one there. Fetch and the web dashboard are unaffected."
-    # docker-compose.yml mounts this path with the short bind-mount syntax
-    # (./rclone.conf:/root/.config/rclone/rclone.conf:ro). If nothing exists
-    # at this path, Docker auto-creates it as a DIRECTORY on first `up`,
-    # which then permanently blocks copying a real rclone.conf file there
-    # (can't write a file over a same-named directory) until someone
-    # manually `sudo rm -r`s it on the VPS. Pre-create an empty placeholder
-    # FILE so Docker's bind mount never falls into that trap.
-    remote "test -f $GARMIN_ROOT/docker/garmin/rclone.conf || touch $GARMIN_ROOT/docker/garmin/rclone.conf"
+# /opt/shared/rclone is a directory-to-directory bind mount shared by every
+# data-source project on this VPS (not garmin-specific) — safe to mkdir
+# unconditionally, unlike a file-level mount there's no risk of Docker
+# auto-creating the wrong node type at this path.
+SHARED_RCLONE_DIR="/opt/shared/rclone"
+log_info "Checking for shared rclone config (sync prerequisite)"
+remote "mkdir -p $SHARED_RCLONE_DIR"
+if ! remote "test -f $SHARED_RCLONE_DIR/rclone.conf"; then
+    log_warn "No rclone config at ${SHARED_RCLONE_DIR}/rclone.conf — the data-sync cron job will fail until you copy one there. Fetch and the web dashboard are unaffected."
 fi
 
 # umask 077 (rather than writing the file then chmod 600 after) means the
