@@ -1,7 +1,7 @@
 FROM python:3.12-slim
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends cron rclone zip \
+    && apt-get install -y --no-install-recommends cron rclone \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -11,7 +11,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-RUN chmod +x docker-entrypoint-cron.sh backup_garmin.sh \
+RUN chmod +x docker-entrypoint-cron.sh sync_garmin_data.sh \
     && crontab crontab
 
 CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
