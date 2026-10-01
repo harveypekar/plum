@@ -22,7 +22,11 @@ services:
     command: ["bash", "docker-entrypoint-cron.sh"]
     volumes:
       - garmin_data:/app/data/garmin
-      - ./rclone.conf:/root/.config/rclone/rclone.conf:ro
+      # Shared across every data-source project on this VPS, not garmin-
+      # specific — holds rclone.conf plus any backend key files it
+      # references (e.g. an SFTP private key), all under one directory so
+      # a new project just needs this same line, no per-project copies.
+      - /opt/shared/rclone:/root/.config/rclone:ro
     environment:
       - GARMIN_EMAIL=${GARMIN_EMAIL}
       - GARMIN_PASSWORD=${GARMIN_PASSWORD}

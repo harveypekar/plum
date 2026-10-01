@@ -58,6 +58,11 @@ bash tests/test_sync_garmin_data.sh  # sync script test
 - `scripts/deploy/deploy-garmin.sh` — rsyncs the project + compose config,
   builds, hashes `GARMIN_WEB_PASSWORD` into the Caddyfile's basicauth,
   refreshes the elmarcel Caddy stack, verifies via `curl --fail`.
+- rclone credentials live at `/opt/shared/rclone/` on the VPS (bind-mounted
+  into `garmin-cron` at `/root/.config/rclone`), not under `/opt/garmin/` —
+  this directory is shared across every data-source project on the VPS, so
+  a new project reuses the same `rclone.conf` (and any key files it
+  references) instead of holding its own copy.
 
 ## Off-VPS data sync
 
